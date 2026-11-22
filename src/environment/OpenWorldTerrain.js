@@ -1043,6 +1043,9 @@ export function updateOpenWorldTerrain(sim) {
     }
     sim.openWorldSurface = frame ? surface : null;
   }
+  if (!frame) {
+    setCorridorStreamersVisible(surface, true);
+  }
   if (frame && surface?.mesh && (sim.activeAirport !== 'lukla' || surface.isLoaded)) {
     if (!surface.openWorld) {
       const half = surface.size / 2;

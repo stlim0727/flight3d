@@ -473,4 +473,15 @@ test('open-world terrain suppresses Jeju corridor streamer across unified world 
   assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored when OpenWorldTerrain is disposed');
   facade.update(0.016, sim.position, 0, {});
   assert.equal(receivedHasOpenWorld, false);
+
+  // Also restore when PresetSpawner.syncUnifiedWorld() disposes openWorld and clears openWorldSurface before updateOpenWorldTerrain()
+  sim.activeAirport = 'incheon';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, false);
+  incheonTerrain.openWorld.dispose();
+  incheonTerrain.openWorld = null;
+  sim.openWorldSurface = null;
+  sim.activeAirport = 'coastal';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored even after external openWorld disposal on anchor switch');
 });
