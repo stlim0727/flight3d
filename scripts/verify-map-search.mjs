@@ -31,11 +31,16 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   assert.ok(await waitFor(session, 'window.sim?.startupReady'), 'simulator startup did not finish');
   assert.ok(await waitFor(session, 'sim.mapPlaces?.airports?.length > 10'), 'map catalog did not load');
 
+  assert.equal(await evaluate("document.getElementById('lobby-regional-cruise') === null"), true);
   assert.ok(await evaluate("!document.getElementById('lobby-map-search').checkVisibility()"), 'map must start collapsed');
   assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must start hidden');
   await screenshot(path.join(artifacts, 'lobby.png'));
   await evaluate("document.querySelector('#lobby-place-picker > summary').click()");
   assert.ok(await waitFor(session, "document.getElementById('lobby-map-search').checkVisibility()"), 'opening Places did not show search');
+
+  for (const id of ['RKSI', 'RKSS', 'RKPC', 'RKPK', 'jamsil', 'suwon', 'busan']) {
+    assert.ok(await evaluate(`Boolean(document.querySelector('#lobby-map-default-bookmarks [data-place-id="${id}"]'))`), `default bookmark missing: ${id}`);
+  }
 
   await evaluate(`(() => {
     const input = document.getElementById('lobby-map-search');
@@ -71,16 +76,66 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   await evaluate("document.getElementById('lobby-map-bookmark-toggle')?.click()");
   assert.ok(await waitFor(session, "Boolean(document.querySelector('#lobby-map-bookmarks button[data-place-id=\"jamsil\"]'))"), 'point bookmark was not saved');
   await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
-  assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.state === 'runway' && window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'airport selection did not leave cruise state');
+  assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.state === 'cruise' && window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'airport selection did not preserve cruise state');
 
   assert.equal(await evaluate("sim.lobby.mapPlan.runwayKey"), '', 'place selection must use automatic direction');
   assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must stay hidden in Places');
-  assert.deepEqual(exceptions, []);
+  await evaluate("document.getElementById('lobby-preset-app').click()");
+  assert.ok(await waitFor(session, "sim.lobby.mapPlan.state === 'approach'"), 'airport must allow approach');
+  const pickPoint = (x, y) => evaluate(`(() => {
+    document.getElementById('lobby-map-overview').click();
+    const map = document.getElementById('lobby-map-svg');
+    const point = map.createSVGPoint();
+    point.x = ${x};
+    point.y = ${y};
+    const screen = point.matrixTransform(map.getScreenCTM());
+    map.querySelector('.lobby-map-backdrop').dispatchEvent(new MouseEvent('click', {
+      bubbles: true, clientX: screen.x, clientY: screen.y,
+    }));
+  })()`);
+  await pickPoint(220, 110);
+  const custom = await evaluate("sim.lobby.mapPlan");
+  assert.equal(custom.state, 'cruise');
+  assert.ok(custom.pointId.startsWith('map:'));
+  assert.ok(Math.abs(custom.point.longitude - 129.5) < 0.04);
+  assert.ok(await evaluate("document.getElementById('lobby-preset-rwy').disabled && document.getElementById('lobby-preset-app').disabled"), 'custom point must only allow cruise');
+  await evaluate("document.getElementById('lobby-map-bookmark-toggle').click()");
+  assert.ok((await evaluate("localStorage.getItem('flight3d.bookmarks.v1')")).includes(custom.pointId), 'custom bookmark did not persist');
+  await pickPoint(140, 140);
+  await evaluate(`[...document.querySelectorAll('#lobby-map-bookmarks button')].find(button => button.dataset.placeId === ${JSON.stringify(custom.pointId)}).click()`);
+  assert.equal(await evaluate("sim.lobby.mapPlan.pointId"), custom.pointId, 'custom bookmark did not restore');
   await screenshot(path.join(artifacts, 'bookmarks.png'));
+  for (const kind of ['point', 'airport']) {
+    if (kind === 'airport') {
+      await evaluate(`(() => {
+        sim.gameFlow.returnToLobby(false);
+        document.querySelector('#lobby-map-default-bookmarks [data-place-id="RKSS"]').click();
+      })()`);
+    }
+    assert.equal(await evaluate("sim.lobby.mapPlan.state"), 'cruise');
+    await evaluate("(async () => { await sim.fly(); })()");
+    assert.ok(await waitFor(session, 'sim.gameFlow.state === "flight" && !sim.startingFlight'), `${kind} cruise did not start`);
+    const actual = await evaluate(`(async () => {
+      const { mapCruisePoint } = await import('/src/config/mapFlightPlaces.js');
+      const { projectToLocal } = await import('/src/geospatial/incheon.js');
+      const { BASE_OFFSETS } = await import('/src/world/UnifiedWorld.js');
+      const point = mapCruisePoint(sim.lobby.mapPlan, sim.mapPlaces);
+      const [x, z] = projectToLocal(point.latitude, point.longitude);
+      const [anchorX, anchorZ] = BASE_OFFSETS[sim.activeAirport];
+      return {
+        horizontalError: Math.hypot(sim.position.x - (x - anchorX), sim.position.z - (z - anchorZ)),
+        altitudeError: Math.abs(sim.position.y - point.altitudeM),
+      };
+    })()`);
+    assert.ok(actual.horizontalError < 500, `${kind} cruise missed selected location: ${actual.horizontalError} m`);
+    assert.ok(actual.altitudeError < 50, `${kind} cruise missed planned altitude: ${actual.altitudeError} m`);
+  }
+  assert.deepEqual(exceptions, []);
   console.log(JSON.stringify({
     gpu: 'hardware Vulkan preflight passed',
     resultCount: results.length,
     view: { before: beforeView, after: afterView },
-    bookmark: 'RKSS persisted and restored from the same session',
+    bookmark: 'RKSS and custom map point persisted and restored',
+    cruise: 'custom point and airport starts matched their selected coordinates and altitude',
   }, null, 2));
 });

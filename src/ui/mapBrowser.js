@@ -11,6 +11,14 @@ export function projectToMap(latitude, longitude) {
   return { x, y };
 }
 
+export function mapCoordinates(x, y) {
+  if (![x, y].every(Number.isFinite) || x < 0 || y < 0 || x > MAP_WIDTH || y > MAP_HEIGHT) return null;
+  return {
+    latitude: BOUNDS.north - (y / MAP_HEIGHT) * (BOUNDS.north - BOUNDS.south),
+    longitude: BOUNDS.west + (x / MAP_WIDTH) * (BOUNDS.east - BOUNDS.west),
+  };
+}
+
 /** Return a viewBox centred on a place, clamped to the map bounds. */
 export function mapViewBoxFor(latitude, longitude, zoom = 2) {
   const point = projectToMap(latitude, longitude);
