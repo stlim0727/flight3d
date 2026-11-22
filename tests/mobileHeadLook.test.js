@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { MobileHeadTracking } from '../src/cameras/MobileHeadTracking.js';
 import { CockpitCameraMode } from '../src/cameras/modes/CockpitCameraMode.js';
+import { HeadPoseDetector } from '../src/cameras/HeadPoseDetector.js';
 
 const fakeCameraSystem = () => ({
   setHeadTrackingEnabled() {},
@@ -130,6 +131,52 @@ describe('mobile head look', () => {
       assert.equal(controller.video, null);
       assert.equal(controller.detector, null);
     } finally {
+      Object.defineProperty(globalThis, 'navigator', { configurable: true, value: previousNavigator });
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: previousDocument });
+      globalThis.window = previousWindow;
+    }
+  });
+
+  it('releases in-flight camera resources when disabled during detector loading', async () => {
+    const previousNavigator = globalThis.navigator;
+    const previousWindow = globalThis.window;
+    const previousDocument = globalThis.document;
+    const originalCreate = HeadPoseDetector.create;
+    let resolveCreate;
+    let stopped = false;
+    let removed = false;
+    const stream = { getTracks: () => [{ stop() { stopped = true; } }] };
+    const video = {
+      style: {},
+      setAttribute() {},
+      play: async () => {},
+      remove() { removed = true; },
+    };
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { mediaDevices: { getUserMedia: async () => stream } },
+    });
+    Object.defineProperty(globalThis, 'document', {
+      configurable: true,
+      value: { createElement: () => video, body: { appendChild() {} } },
+    });
+    globalThis.window = { isSecureContext: true, addEventListener() {} };
+    HeadPoseDetector.create = () => new Promise((resolve) => { resolveCreate = resolve; });
+
+    try {
+      const controller = new MobileHeadTracking(fakeCameraSystem());
+      const pending = controller.enable();
+      await new Promise((resolve) => setImmediate(resolve));
+      await new Promise((resolve) => setImmediate(resolve));
+      controller.disable();
+      resolveCreate({ dispose() {} });
+      await pending;
+
+      assert.equal(controller.state, 'idle');
+      assert.equal(stopped, true, 'stream track must stop before detector loading finishes');
+      assert.equal(removed, true, 'hidden video must be removed before detector loading finishes');
+    } finally {
+      HeadPoseDetector.create = originalCreate;
       Object.defineProperty(globalThis, 'navigator', { configurable: true, value: previousNavigator });
       Object.defineProperty(globalThis, 'document', { configurable: true, value: previousDocument });
       globalThis.window = previousWindow;

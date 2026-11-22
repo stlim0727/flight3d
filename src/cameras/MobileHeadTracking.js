@@ -35,6 +35,7 @@ export class MobileHeadTracking {
     this._generation = 0;
     this._lastNotifiedDetected = false;
     this._lastNotifiedSamples = 0;
+    this._pendingCleanup = null;
   }
 
   getStatus() {
@@ -91,7 +92,17 @@ export class MobileHeadTracking {
     let stream = null;
     let video = null;
     let detector = null;
-
+    const cleanupPending = () => {
+      if (this._pendingCleanup === cleanupPending) this._pendingCleanup = null;
+      if (detector) {
+        detector.dispose();
+        detector = null;
+      }
+      releaseLocal(stream, video);
+      stream = null;
+      video = null;
+    };
+    this._pendingCleanup = cleanupPending;
     this._setStatus('requesting', 'Requesting camera permission…');
     try {
       stream = await navigator.mediaDevices.getUserMedia({
@@ -135,6 +146,7 @@ export class MobileHeadTracking {
       stream = null;
       video = null;
       detector = null;
+      this._pendingCleanup = null;
       this.cameraSystem.setHeadTrackingEnabled(true);
       this.lastPose = { detected: false, yaw: 0, pitch: 0, confidence: 0, bbox: null };
       this.lastDetect = 0;
@@ -142,8 +154,7 @@ export class MobileHeadTracking {
       this._lastNotifiedSamples = 0;
       this._setStatus('active', 'Head tracking on — looking for a face');
     } catch (err) {
-      if (detector) detector.dispose();
-      releaseLocal(stream, video);
+      cleanupPending();
       if (!stillCurrent()) return;
       this.disable();
       this._setStatus('error', `Head tracking failed: ${err?.message || err}`);
@@ -152,6 +163,7 @@ export class MobileHeadTracking {
 
   disable() {
     this._generation++;
+    if (this._pendingCleanup) this._pendingCleanup();
     this._releaseVideo();
     if (this.detector) {
       this.detector.dispose();
