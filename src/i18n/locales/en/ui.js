@@ -1,6 +1,11 @@
 export default {
   "ui.unfoldMap": "Unfold map",
   "ui.foldMap": "Fold map",
+  "ui.busanChart": "Busan coast, bridges and aircraft position",
+  "ui.mapNorthUp": "North up",
+  "ui.mapHeadingUp": "Heading up",
+  "ui.mapLoading": "Loading map",
+  "ui.mapUnavailable": "Some map data unavailable",
   "build.branch": "Branch",
   "build.commit": "Commit",
   "build.merged": "Merged {age}",

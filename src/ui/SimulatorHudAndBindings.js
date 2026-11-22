@@ -18,6 +18,7 @@ import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRe
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
+import { BusanChart } from './BusanChart.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -225,6 +226,10 @@ class SimulatorHudAndBindingsMethods {
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) map.hidden = !available;
       if (!available && map.open) map.open = false;
+      if (available && map.open) {
+        this.busanChart ??= new BusanChart(map);
+        this.busanChart.update(this.position, this.quaternion);
+      }
     }
     this.updateAutopilotUI();
     updateControlState(this.telemetry, this.cameraSystem, {
