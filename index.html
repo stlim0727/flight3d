@@ -366,6 +366,19 @@
               <label><span data-i18n="lobby.map.point">순항 지점</span><select id="lobby-map-point" class="btn"></select></label>
               <label><span data-i18n="lobby.map.departure">출발지 (선택)</span><select id="lobby-map-departure" class="btn"></select></label>
             </div>
+            <div id="lobby-map-browser" class="lobby-map-browser">
+              <div class="lobby-map-toolbar">
+                <input id="lobby-map-search" type="search" autocomplete="off" aria-label="Search airports">
+                <button type="button" id="lobby-map-bookmark-toggle" class="btn btn-bookmark" data-i18n="lobby.bookmark.add">Bookmark</button>
+              </div>
+              <svg id="lobby-map-svg" viewBox="0 0 320 180" role="img" aria-label="Korea airport map">
+                <rect x="0" y="0" width="320" height="180" class="lobby-map-backdrop"></rect>
+                <g id="lobby-map-markers"></g>
+              </svg>
+              <p id="lobby-map-search-status" class="lobby-map-status" aria-live="polite"></p>
+              <div id="lobby-map-results" class="lobby-map-results"></div>
+              <div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div>
+            </div>
           </div>
           <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
             <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>

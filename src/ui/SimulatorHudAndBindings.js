@@ -12,6 +12,7 @@ import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
 import { loadMapFlightPlaces, mapPlanRegion } from '../config/mapFlightPlaces.js';
+import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
@@ -670,6 +671,13 @@ class SimulatorHudAndBindingsMethods {
           }
         }
         this.lobbyScreen?.refresh();
+      },
+      onMapPlacesAdded: airports => {
+        if (!this.mapPlaces) this.mapPlaces = { airports: [], points: [] };
+        for (const airport of airports ?? []) {
+          if (!this.mapPlaces.airports.some(entry => entry.code === airport.code)) this.mapPlaces.airports.push(airport);
+        }
+        registerExternalDestinations(this.mapPlaces.airports.map(airport => airport.code));
       },
       getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },

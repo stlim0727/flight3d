@@ -37,6 +37,7 @@ export function indexedAirportPlaces(airports) {
     .filter(airport => airport.country === 'KR' && airport.runways?.length)
     .map(airport => Object.freeze({
       code: airport.icao || airport.ident,
+      iata: airport.iata ?? '',
       name: airport.name,
       latitude: airport.latitude,
       longitude: airport.longitude,

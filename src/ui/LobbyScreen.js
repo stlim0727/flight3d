@@ -7,7 +7,11 @@ import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
 import { DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
-
+import { searchMapPlaces } from '../config/airportSearch.js';
+import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
+import { indexedAirportPlaces } from '../config/mapFlightPlaces.js';
+import { loadAirportManifest, findAirportByCode } from '../geospatial/airportIndex.js';
+import { mapViewBoxFor, projectToMap } from './mapBrowser.js';
 const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', jeju: 'lobby-airport-jeju', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
@@ -30,7 +34,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {} }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {} }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -60,6 +64,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapRunwaySelect = document.getElementById('lobby-map-runway');
   const mapPointSelect = document.getElementById('lobby-map-point');
   const mapDepartureSelect = document.getElementById('lobby-map-departure');
+  const mapSearchInput = document.getElementById('lobby-map-search');
+  const mapResults = document.getElementById('lobby-map-results');
+  const mapBookmarksEl = document.getElementById('lobby-map-bookmarks');
+  const mapBookmarkToggle = document.getElementById('lobby-map-bookmark-toggle');
+  const mapSvg = document.getElementById('lobby-map-svg');
+  const mapMarkers = document.getElementById('lobby-map-markers');
+  const mapStatus = document.getElementById('lobby-map-search-status');
+  const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, mapResults, mapBookmarksEl, mapMarkers].filter(Boolean);
+  let mapBookmarks = loadBookmarks();
   const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
   let mapCatalog = { airports: [], points: [] };
   const mapStateLabel = state => state === 'none'
@@ -84,6 +97,157 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     refresh();
   };
   for (const select of mapSelects) select.addEventListener('change', emitMapPlan);
+
+  function findMapPlace(kind, id) {
+    const list = kind === 'point' ? mapCatalog.points : mapCatalog.airports;
+    return list.find(place => (place.id ?? place.code) === id) ?? null;
+  }
+  function currentMapPlace() {
+    if (mapPointSelect?.value) return findMapPlace('point', mapPointSelect.value);
+    if (!mapAirportSelect?.value) return null;
+    const airport = findMapPlace('airport', mapAirportSelect.value);
+    return airport ? { ...airport, kind: 'airport', label: airport.name } : null;
+  }
+  function bookmarkFromPlace(place) {
+    return {
+      kind: place.kind,
+      id: place.id ?? place.code,
+      label: place.label ?? place.name,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      iata: place.iata ?? '',
+    };
+  }
+  function renderPlaceList(container, items, emptyKey, activeKey) {
+    if (!container) return;
+    container.replaceChildren();
+    if (!items.length) {
+      const empty = document.createElement('span');
+      empty.textContent = t(emptyKey);
+      container.append(empty);
+      return;
+    }
+    for (const item of items) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = `btn${item.key === activeKey ? ' active' : ''}`;
+      button.dataset.placeKind = item.kind;
+      button.dataset.placeId = item.id;
+      button.textContent = `${item.label}${item.detail ? ` · ${item.detail}` : ''}`;
+      container.append(button);
+    }
+  }
+  function renderMapBrowser() {
+    if (!mapSearchInput) return;
+    mapSearchInput.placeholder = t('lobby.map.search.placeholder');
+    const query = mapSearchInput.value ?? '';
+    const results = searchMapPlaces(mapCatalog, query);
+    const active = currentMapPlace();
+    const activeKey = active ? `${active.kind}:${active.id ?? active.code}` : '';
+    renderPlaceList(mapResults, results.map(result => ({ ...result, key: `${result.kind}:${result.id}` })),
+      'lobby.map.search.empty', activeKey);
+    renderPlaceList(mapBookmarksEl, mapBookmarks.map(bookmark => ({
+      ...bookmark,
+      key: bookmarkKey(bookmark),
+      detail: bookmark.iata || bookmark.code || '',
+    })), 'lobby.map.bookmarks.empty', activeKey);
+
+    if (mapMarkers) {
+      mapMarkers.replaceChildren();
+      const places = [
+        ...mapCatalog.airports.map(airport => ({ ...airport, kind: 'airport', id: airport.code, label: airport.name })),
+        ...mapCatalog.points.map(point => ({ ...point, kind: 'point', label: point.label })),
+      ];
+      for (const place of places) {
+        const projected = projectToMap(place.latitude, place.longitude);
+        if (!projected) continue;
+        const marker = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        marker.setAttribute('cx', projected.x.toFixed(1));
+        marker.setAttribute('cy', projected.y.toFixed(1));
+        marker.setAttribute('r', '3');
+        marker.setAttribute('class', `lobby-map-marker${(place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey ? ' active' : ''}`);
+        marker.dataset.placeKind = place.kind;
+        marker.dataset.placeId = place.id;
+        mapMarkers.append(marker);
+      }
+    }
+    if (mapSvg && active) mapSvg.setAttribute('viewBox', mapViewBoxFor(active.latitude, active.longitude));
+    if (mapStatus) mapStatus.textContent = query
+      ? (results.length ? `${results.length} ${t('lobby.map.results')}` : t('lobby.map.search.empty')) : '';
+    if (mapBookmarkToggle) {
+      bindText(mapBookmarkToggle, () => t(active && isBookmarked(bookmarkFromPlace(active)) ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
+      mapBookmarkToggle.disabled = !active;
+    }
+  }
+  async function resolveBookmarkPlace(bookmark) {
+    const cached = findMapPlace(bookmark.kind, bookmark.id);
+    if (cached) return cached;
+    if (bookmark.kind === 'airport' && (bookmark.code || bookmark.id)) {
+      try {
+        const manifest = await loadAirportManifest();
+        const airport = await findAirportByCode(manifest, bookmark.code || bookmark.id);
+        const [place] = airport ? indexedAirportPlaces([airport]) : [];
+        if (place) {
+          mapCatalog.airports = [...mapCatalog.airports.filter(entry => entry.code !== place.code), place];
+          onMapPlacesAdded?.([place]);
+          return place;
+        }
+      } catch { /* fall through to the stored bookmark */ }
+    }
+    return { ...bookmark, kind: bookmark.kind, id: bookmark.id, label: bookmark.label };
+  }
+  async function selectMapPlace(place, state) {
+    if (!place) return;
+    if (place.kind === 'point' || (place.id && findMapPlace('point', place.id))) {
+      const pointId = place.id ?? place.code;
+      if (mapAirportSelect) mapAirportSelect.value = '';
+      if (mapRunwaySelect) mapRunwaySelect.value = '';
+      if (mapPointSelect) mapPointSelect.value = pointId;
+      if (mapStateSelect) mapStateSelect.value = 'cruise';
+      emitMapPlan();
+      return;
+    }
+    const code = place.code ?? place.id;
+    let airport = findMapPlace('airport', code);
+    if (!airport) {
+      airport = {
+        code, iata: place.iata ?? '', name: place.label ?? place.name ?? code,
+        latitude: place.latitude, longitude: place.longitude, runways: place.runways ?? [],
+      };
+      mapCatalog.airports = [...mapCatalog.airports, airport];
+      onMapPlacesAdded?.([airport]);
+    }
+    if (mapPointSelect) mapPointSelect.value = '';
+    if (mapAirportSelect) mapAirportSelect.value = code;
+    if (mapStateSelect) mapStateSelect.value = state ?? (mapStateSelect.value === 'none' ? 'runway' : mapStateSelect.value);
+    emitMapPlan();
+    if (mapRunwaySelect && !mapRunwaySelect.value && mapRunwaySelect.options.length > 1) {
+      mapRunwaySelect.value = mapRunwaySelect.options[1].value;
+      emitMapPlan();
+    }
+  }
+  async function onMapPlaceClick(event) {
+    const target = event.target?.closest?.('[data-place-kind]');
+    if (!target) return;
+    const kind = target.dataset.placeKind;
+    const id = target.dataset.placeId;
+    if (mapBookmarksEl?.contains?.(target)) {
+      const bookmark = mapBookmarks.find(entry => bookmarkKey(entry) === `${kind}:${id}`);
+      if (bookmark) selectMapPlace(await resolveBookmarkPlace(bookmark));
+      return;
+    }
+    selectMapPlace(findMapPlace(kind, id));
+  }
+  mapSearchInput?.addEventListener('input', renderMapBrowser);
+  mapResults?.addEventListener('click', onMapPlaceClick);
+  mapBookmarksEl?.addEventListener('click', onMapPlaceClick);
+  mapMarkers?.addEventListener('click', onMapPlaceClick);
+  mapBookmarkToggle?.addEventListener('click', () => {
+    const active = currentMapPlace();
+    if (!active) return;
+    mapBookmarks = toggleBookmark(bookmarkFromPlace(active));
+    renderMapBrowser();
+  });
   function setMapPlaces(places = {}) {
     mapCatalog = { airports: places.airports ?? [], points: places.points ?? [] };
     if (mapAirportSelect) {
@@ -101,6 +265,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       addOption(mapDepartureSelect, '', t('lobby.map.none'));
       for (const id of DESTINATION_CHOICES.filter(value => value !== 'none')) addOption(mapDepartureSelect, id, t(REGION_NAME_KEYS[id] ?? id));
     }
+    renderMapBrowser();
     refresh();
   }
   const valleyGroup = document.getElementById('lobby-valley-options');
@@ -335,6 +500,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       for (const runway of runways) addOption(mapRunwaySelect, runway.value, runway.label);
       mapRunwaySelect.value = runways.some(runway => runway.value === plan.runwayKey) ? plan.runwayKey : '';
     }
+    renderMapBrowser();
     const aircraft = getAircraft?.() ?? 'B738';
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', key === aircraft);
@@ -567,6 +733,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (regionalSelect) regionalSelect.disabled = busy;
     for (const select of mapSelects) select.disabled = busy;
     if (destinationSelect) destinationSelect.disabled = busy;
+    for (const control of mapBrowserControls) control.disabled = busy;
     const flyBtn = document.getElementById('btn-fly');
     if (flyBtn) flyBtn.disabled = busy;
     const resume = document.getElementById('btn-lobby-resume');

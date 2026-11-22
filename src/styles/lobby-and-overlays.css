@@ -248,6 +248,15 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 }
 .lobby-map-row label { display: flex; flex-direction: column; gap: calc(3px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-map-row select { width: 100%; }
+.lobby-map-browser { display: grid; gap: calc(5px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-map-toolbar { display: flex; gap: calc(4px * var(--ui-scale, 1)); }
+.lobby-map-toolbar input { flex: 1; min-width: 0; }
+.lobby-map-backdrop { fill: rgba(30, 41, 59, .7); stroke: #475569; stroke-width: 1px; }
+.lobby-map-marker { fill: #86d5ff; stroke: #0f172a; stroke-width: 1px; cursor: pointer; }
+.lobby-map-marker.active { fill: #fbbf24; }
+.lobby-map-status { margin: 0; color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
+.lobby-map-results, .lobby-map-bookmarks { display: flex; flex-wrap: wrap; gap: calc(4px * var(--ui-scale, 1)); }
+.lobby-map-results .btn, .lobby-map-bookmarks .btn { font-size: calc(10px * var(--ui-scale, 1)); }
 .lobby-card .btn {
   min-width: 0;
   min-height: calc(28px * var(--ui-scale, 1));
