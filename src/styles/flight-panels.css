@@ -557,8 +557,8 @@ body[data-pilotage-layout="cockpit"] #pilotage-map {
 }
 body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; height: min(31dvh, 17rem); }
 @media (min-width: 601px) and (pointer: fine) {
-  body[data-flow="flight"][data-pilotage-layout="cockpit"] #hud-overlay { z-index: 999; }
-  body[data-pilotage-layout="cockpit"] #pilotage-map[open] {
+  body[data-flow="flight"] #hud-overlay:has(#pilotage-map[open]:not([hidden])) { z-index: 999; }
+  body[data-flow="flight"] #pilotage-map[open] {
     --chart-width: min(80vw, 1100px);
     --chart-height: min(70dvh, 720px);
     position: fixed;
@@ -569,7 +569,7 @@ body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; hei
     background: rgb(17 25 32 / 23%);
     backdrop-filter: blur(7px);
   }
-  body[data-pilotage-layout="cockpit"] #pilotage-map[open] .map-paper {
+  body[data-flow="flight"] #pilotage-map[open] .map-paper {
     inset: 50% auto auto 50%;
     transform: translate(-50%, -50%);
     width: var(--chart-width);
@@ -579,7 +579,7 @@ body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; hei
     overflow: hidden;
     box-shadow: 0 14px 50px rgb(12 20 24 / 32%);
   }
-  body[data-pilotage-layout="cockpit"] #pilotage-map[open] summary {
+  body[data-flow="flight"] #pilotage-map[open] summary {
     position: absolute;
     top: calc(50% + var(--chart-height) / 2 + 9px);
     right: calc((100% - var(--chart-width)) / 2);
