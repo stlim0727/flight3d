@@ -114,12 +114,40 @@ export class UnifiedWorld {
   set corridorStreamer(value) { if (this.anchorTerrain) this.anchorTerrain.corridorStreamer = value; }
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */
-  register(id, { terrain, airport, group = null, mesh = null, extent }) {
+  register(id, { terrain, airport, group = null, mesh = null, extent, mounted = true }) {
     if (!BASE_OFFSETS[id] && !this.dynamicOffsets.has(id)) throw new Error(`Unknown unified region: ${id}`);
     if (!terrain || !extent) throw new Error(`Unified region ${id} needs terrain and extent`);
-    this.regions.set(id, { terrain, airport, group, mesh, extent });
+    this.regions.set(id, { terrain, airport, group, mesh, extent, mounted: Boolean(mounted) });
     this.syncMeshes();
     return this;
+  }
+
+  /** Surface records stay registered when visuals are unmounted. */
+  isMounted(id) {
+    return this.regions.get(id)?.mounted === true;
+  }
+
+  setMounted(id, mounted) {
+    const region = this.regions.get(id);
+    if (!region || region.mounted === Boolean(mounted)) return false;
+    region.mounted = Boolean(mounted);
+    this.syncMeshes();
+    return true;
+  }
+
+  /** Distance in metres from an anchor-local point to a region's world-frame box. */
+  distanceToRegion(id, x, z) {
+    const region = this.regions.get(id);
+    const base = BASE_OFFSETS[id];
+    if (!region || !base) return Infinity;
+    const anchor = BASE_OFFSETS[this.anchor];
+    const ox = base[0] - anchor[0];
+    const oz = base[1] - anchor[1];
+    const e = region.extent;
+    return Math.hypot(
+      Math.max(e.minX + ox - x, 0, x - e.maxX - ox),
+      Math.max(e.minZ + oz - z, 0, z - e.maxZ - oz),
+    );
   }
 
   /** Add a streamed airport slot whose WGS84 placement is derived from index data. */
@@ -177,14 +205,14 @@ export class UnifiedWorld {
     return true;
   }
 
-  /** Keep every registered region visible, translated into the current frame. */
+  /** Keep every registered region in the active frame; only mounted ones draw. */
   syncMeshes() {
     for (const [id, region] of this.regions) {
       const [x, z] = this.offsets.get(id);
       region.group?.position.set(x, 0, z);
       region.mesh?.position.set(x, 0, z);
-      if (region.group) region.group.visible = true;
-      if (region.mesh) region.mesh.visible = true;
+      if (region.group) region.group.visible = region.mounted;
+      if (region.mesh) region.mesh.visible = region.mounted;
     }
   }
 
@@ -270,12 +298,12 @@ export class UnifiedWorld {
     const realOffset = realOffsetInIncheonFrame(id);
     const placementIsReal = realOffset
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
-    const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
+    const synthetic = !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
     const authoredThreshold = APPROACH_DATA[id]?.threshold;
     const markerLocal = synthetic || !authoredThreshold
       ? null
-      : [target[0] + authoredThreshold.x, target[1] + authoredThreshold.z];
+      : [target[0] - anchor[0] + authoredThreshold.x, target[1] - anchor[1] + authoredThreshold.z];
     const dx = markerLocal ? markerLocal[0] - x : centreDx;
     const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic

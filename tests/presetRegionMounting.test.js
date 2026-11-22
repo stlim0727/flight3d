@@ -1,0 +1,107 @@
+import test from 'node:test';
+import * as THREE from 'three';
+import assert from 'node:assert/strict';
+import { installPresetSpawner } from '../src/core/PresetSpawner.js';
+import { BASE_OFFSETS, REGION_EXTENTS, UnifiedWorld } from '../src/world/UnifiedWorld.js';
+
+class Spawner {}
+installPresetSpawner(Spawner);
+
+function region(height, extent) {
+  const group = new THREE.Group();
+  const mesh = new THREE.Mesh(new THREE.BufferGeometry());
+  return {
+    group,
+    mesh,
+    extent,
+    terrain: { getHeight: () => height },
+    airport: { isOnRunway: () => false },
+  };
+}
+
+function makeSpawner() {
+  const scene = new THREE.Scene();
+  const world = new UnifiedWorld('incheon');
+  const incheon = region(7, REGION_EXTENTS.incheon);
+  const jeju = region(36, REGION_EXTENTS.jeju);
+  const coastal = region(0, REGION_EXTENTS.coastal);
+  world.register('incheon', incheon).register('jeju', jeju).register('coastal', coastal);
+  scene.add(incheon.group, incheon.mesh, jeju.group, jeju.mesh, coastal.group, coastal.mesh);
+  const foliage = { group: new THREE.Group(), treeData: [], buildingData: [] };
+  const ships = { group: new THREE.Group(), vessels: [], speedboats: [] };
+  scene.add(foliage.group, ships.group);
+  const spawner = new Spawner();
+  Object.assign(spawner, {
+    scene,
+    world,
+    position: new THREE.Vector3(0, 0, 0),
+    linearVelocity: new THREE.Vector3(),
+    telemetry: { onGround: false },
+    activeAirport: 'incheon',
+    foliage,
+    ships,
+    water: { mesh: new THREE.Object3D() },
+  });
+  return spawner;
+}
+
+test('distant base regions leave the scene while their surfaces stay registered', () => {
+  const spawner = makeSpawner();
+  const { world } = spawner;
+  const jeju = world.regions.get('jeju');
+  const probe = [BASE_OFFSETS.jeju[0] + 10, BASE_OFFSETS.jeju[1] + 10];
+
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('jeju'), false);
+  assert.equal(jeju.group.parent, null);
+  assert.equal(jeju.mesh.parent, null);
+  assert.equal(world.getHeight(...probe), 36);
+  assert.equal(world.regions.has('jeju'), true);
+
+  spawner.position.set(probe[0], 500, probe[1]);
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('jeju'), true);
+  assert.equal(jeju.group.parent, spawner.scene);
+  assert.equal(world.getHeight(...probe), 36);
+
+  spawner.position.set(0, 500, 0);
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('jeju'), false);
+  assert.equal(jeju.group.parent, null);
+  assert.equal(world.getHeight(...probe), 36);
+});
+
+test('mount and unmount distances differ, and coastal props follow their region', () => {
+  const spawner = makeSpawner();
+  const { world } = spawner;
+  const coastal = world.regions.get('coastal');
+
+  // Start far away so coastal is unmounted before probing the hysteresis band.
+  spawner.position.set(0, 0, 0);
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('coastal'), false);
+
+  // 38 km from the coastal box: too far to load, close enough to keep a mount.
+  spawner.position.set(-30000, 0, -60000);
+  assert.equal(spawner.updateRegionMounting(), false);
+  assert.equal(spawner.foliage.group.parent, null);
+  assert.equal(spawner.ships.group.parent, null);
+
+  // 18 km: inside the load radius.
+  spawner.position.set(-50000, 0, -60000);
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('coastal'), true);
+  assert.equal(coastal.group.parent, spawner.scene);
+  assert.equal(spawner.foliage.group.parent, spawner.scene);
+  assert.equal(spawner.ships.group.parent, spawner.scene);
+
+  spawner.position.set(-30000, 0, -60000);
+  assert.equal(spawner.updateRegionMounting(), false, 'hysteresis must keep the region mounted');
+  assert.equal(world.isMounted('coastal'), true);
+
+  spawner.position.set(0, 0, 0);
+  assert.equal(spawner.updateRegionMounting(), true);
+  assert.equal(world.isMounted('coastal'), false);
+  assert.equal(spawner.foliage.group.parent, null);
+  assert.equal(spawner.ships.group.parent, null);
+});

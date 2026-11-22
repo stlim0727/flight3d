@@ -143,3 +143,34 @@ test('tile size participates in the version identifier', () => {
   assert.notEqual(versionForSources(sources, 10), versionForSources(sources, 5));
   assert.equal(versionForSources(sources, 10), versionForSources(sources, 10));
 });
+
+test('the builder emits a compact versioned search view of the same validated airports', () => {
+  const rows = [
+    airport(),
+    airport({ id: '1002', ident: 'RKSU', icao_code: 'RKSU', iata_code: 'KSU', name: 'New Airport', latitude_deg: '37.5', longitude_deg: '126.5' }),
+    airport({ id: '1003', ident: 'RKTY', type: 'heliport' }),
+    airport({ id: '1004', ident: '01A', icao_code: '', iata_code: '', name: 'Purkeypile Airport', latitude_deg: '62.940833', longitude_deg: '-152.269722' }),
+  ];
+  const runways = [
+    runway(),
+    runway({ id: '2002', airport_ref: '1002', airport_ident: 'RKSU', le_latitude_deg: '37.5005', le_longitude_deg: '126.5005', le_elevation_ft: '23', he_latitude_deg: '37.5205', he_longitude_deg: '126.5205', he_elevation_ft: '23' }),
+    runway({ id: '2003', airport_ref: '1004', airport_ident: '01A', length_ft: '2000', width_ft: '100', le_latitude_deg: '62.940833', le_longitude_deg: '-152.269722', le_elevation_ft: '23', he_latitude_deg: '62.945833', he_longitude_deg: '-152.269722', he_elevation_ft: '23' }),
+  ];
+  const { manifest, tiles, searchIndex } = build(rows, runways);
+  assert.equal(searchIndex.schemaVersion, 1);
+  assert.equal(searchIndex.version, manifest.version);
+  assert.deepEqual(searchIndex.airports, [
+    { code: '01A', iata: '', name: 'Purkeypile Airport', latitude: 62.940833, longitude: -152.269722, country: 'KR', type: 'large_airport', tileId: '15-2' },
+    { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.469101, longitude: 126.450996, country: 'KR', type: 'large_airport', tileId: '12-30' },
+    { code: 'RKSU', iata: 'KSU', name: 'New Airport', latitude: 37.5, longitude: 126.5, country: 'KR', type: 'large_airport', tileId: '12-30' },
+  ]);
+  assert.deepEqual(manifest.searchIndex, { path: 'test-version/search.json', schemaVersion: 1, count: 3 });
+  assert.equal(manifest.ident['01A'], '15-2');
+  for (const entry of searchIndex.airports) {
+    if (manifest.icao[entry.code]) assert.equal(manifest.icao[entry.code], entry.tileId);
+    else assert.equal(manifest.ident[entry.code], entry.tileId);
+    assert.ok(!Object.hasOwn(entry, 'runways'));
+    assert.ok(tiles.get(entry.tileId).airports.some(airport => (airport.icao || airport.ident) === entry.code));
+  }
+  assert.deepEqual(build(rows, runways).searchIndex, searchIndex);
+});

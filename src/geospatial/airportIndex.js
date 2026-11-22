@@ -1,6 +1,8 @@
 // Browser-side lookup for the versioned OurAirports runway index.
 // Only the manifest and the tiles intersecting a query are fetched.
 /** Vite injects BASE_URL (e.g. `/flight3d/` on Pages); Node falls back to `/`. */
+/** Search artifact schema; it is versioned with the tile index it was built from. */
+export const SEARCH_SCHEMA_VERSION = 1;
 export function airportDataBaseUrl(base) {
   const configured = typeof import.meta.env === 'object' ? import.meta.env.BASE_URL : undefined;
   const prefix = base ?? configured ?? '/';
@@ -12,6 +14,7 @@ const EARTH_RADIUS_KM = 6371.0088;
 const MAX_PIN_DISTANCE_KM = 5;
 
 const manifestCache = new Map();
+const searchIndexCache = new Map();
 const tileCache = new Map();
 
 function resourceUrl(baseUrl, path) {
@@ -44,6 +47,44 @@ export function distanceKm(a, b) {
 export function clearAirportIndexCache() {
   manifestCache.clear();
   tileCache.clear();
+  searchIndexCache.clear();
+}
+
+/**
+ * Load the compact global search artifact lazily. The manifest pins its path,
+ * schema and count, so a stale or partial artifact is rejected rather than
+ * silently yielding an empty search result.
+ */
+export async function loadAirportSearchIndex(manifest, {
+  baseUrl = DEFAULT_BASE_URL,
+  fetchImpl = globalThis.fetch,
+} = {}) {
+  const descriptor = manifest?.searchIndex;
+  if (!descriptor || typeof descriptor.path !== 'string' || !descriptor.path
+    || descriptor.schemaVersion !== SEARCH_SCHEMA_VERSION
+    || !Number.isInteger(descriptor.count) || descriptor.count < 0) {
+    throw new Error('Unsupported airport search index');
+  }
+  const key = `${baseUrl}|${manifest.version}|${descriptor.path}`;
+  if (searchIndexCache.has(key)) return searchIndexCache.get(key);
+  const index = await getJson(resourceUrl(baseUrl, descriptor.path), fetchImpl);
+  if (index?.schemaVersion !== SEARCH_SCHEMA_VERSION || index.version !== manifest.version
+    || !Array.isArray(index.airports) || index.airports.length !== descriptor.count) {
+    throw new Error('Invalid airport search index');
+  }
+  for (const entry of index.airports) {
+    if (!entry || typeof entry.code !== 'string' || !entry.code
+      || typeof entry.name !== 'string' || !entry.name
+      || typeof entry.iata !== 'string' || typeof entry.country !== 'string'
+      || typeof entry.type !== 'string' || typeof entry.tileId !== 'string'
+      || !Object.hasOwn(manifest.tiles, entry.tileId)
+      || !validCoordinate(entry.latitude, entry.longitude)) {
+      throw new Error('Invalid airport search index entry');
+    }
+  }
+  Object.freeze(index.airports);
+  searchIndexCache.set(key, index.airports);
+  return index.airports;
 }
 
 /** Fetch and validate the small root manifest; cached per base URL. */
@@ -145,10 +186,14 @@ export async function findAirportsInRegion(manifest, { latitude, longitude, radi
 export async function findAirportByCode(manifest, code, options = {}) {
   const key = typeof code === 'string' ? code.trim().toUpperCase() : '';
   if (!key) return null;
-  const tileId = manifest.icao[key] ?? manifest.iata[key];
+  const hint = typeof options.tileId === 'string' && Object.hasOwn(manifest.tiles, options.tileId)
+    ? options.tileId : null;
+  const tileId = hint ?? manifest.icao[key] ?? manifest.iata[key] ?? manifest.ident?.[key];
   if (!tileId) return null;
   const tile = await loadAirportTile(manifest, tileId, options);
-  return tile.airports.find(airport => airport.icao === key || airport.iata === key) ?? null;
+  const airports = tile.airports;
+  return airports.find(airport => airport.icao === key || airport.iata === key)
+    ?? airports.find(airport => airport.ident === key) ?? null;
 }
 
 function normalizeName(name) {

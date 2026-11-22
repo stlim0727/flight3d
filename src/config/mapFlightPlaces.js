@@ -58,18 +58,29 @@ export function mapPlanRegion(plan, places = {}) {
   const jeju = haversineDistanceM(location.latitude, location.longitude, JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
   return jeju < incheon ? 'jeju' : 'incheon';
 }
+/** Adapt one full index record into the place shape used by the map selects. */
+export function indexedAirportPlace(airport) {
+  const code = airport?.icao || airport?.ident;
+  if (!code) return null;
+  return Object.freeze({
+    code,
+    iata: airport.iata ?? '',
+    name: airport.name,
+    latitude: airport.latitude,
+    longitude: airport.longitude,
+    elevationM: airport.elevationM,
+    country: airport.country,
+    type: airport.type,
+    tileId: airport.tileId,
+    runways: airport.runways ?? [],
+  });
+}
+
 export function indexedAirportPlaces(airports) {
   return airports
     .filter(airport => airport.country === 'KR')
-    .map(airport => Object.freeze({
-      code: airport.icao || airport.ident,
-      iata: airport.iata ?? '',
-      name: airport.name,
-      latitude: airport.latitude,
-      longitude: airport.longitude,
-      elevationM: airport.elevationM,
-      runways: airport.runways ?? [],
-    }))
+    .map(indexedAirportPlace)
+    .filter(Boolean)
     .sort((a, b) => a.code.localeCompare(b.code));
 }
 

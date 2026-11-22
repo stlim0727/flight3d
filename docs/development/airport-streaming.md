@@ -64,6 +64,28 @@ anchor is involved: the external airport is a dynamic region in `UnifiedWorld`.
 This is asset readiness, not physics behavior: no force, moment or control
 model branches on the streaming state.
 
+## Base region visual mounting (issue #944)
+
+The six permanent regions (Incheon, Jeju, Lukla, coastal, Neon and valley) keep
+their surface records in `UnifiedWorld` at all times: `getHeight`, normals,
+water level, runway predicates, region labels and collision data must not
+depend on whether their meshes are in the scene. `PresetSpawner.updateRegionMounting()`
+runs each frame and only adds/removes the visual groups and meshes:
+
+- the active anchor, the region under the aircraft, an occupied runway and an
+  active valley mission are always mounted;
+- other regions mount when the aircraft comes within roughly 25 km of their
+  world-frame extent (extended with airspeed lead, capped at 80 km), and
+  unmount only beyond that distance plus a 30 km hysteresis band;
+- coastal foliage and ships follow the coastal region's mounted state;
+- mounting changes refresh the airport facade and collision environment;
+  `setAnchor()` remains a spawn-time frame change and never discards surfaces.
+
+`scripts/verify-region-lazy-mount.mjs` checks on hardware Vulkan Chrome that
+distant groups leave the scene while Jeju's height/run answers stay identical,
+that approach and retreat remount/unmount them, and that switching the anchor
+to Jeju restores real threshold guidance.
+
 ## Verification
 
 - `tests/externalAirportSurface.test.js`: conversion, threshold separation,

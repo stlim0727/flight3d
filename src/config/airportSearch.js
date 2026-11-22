@@ -54,8 +54,9 @@ function bestTextScore(texts, query) {
 }
 
 function airportMatch(airport, query) {
-  if (!hasCoordinates(airport) || typeof airport.code !== 'string' || !airport.code.trim()) return null;
-  const code = airport.code.trim();
+  const code = typeof airport.code === 'string' ? airport.code.trim()
+    : typeof airport.icao === 'string' ? airport.icao.trim() : '';
+  if (!hasCoordinates(airport) || !code) return null;
   const name = typeof airport.name === 'string' ? airport.name.trim() : '';
   const iata = typeof airport.iata === 'string' ? airport.iata.trim() : '';
   const identifiers = [code, iata].filter(Boolean).map(normalizeSearchText);
@@ -105,6 +106,13 @@ function compareText(a, b) {
   if (a > b) return 1;
   return 0;
 }
+function rankedResults(matches, max) {
+  matches.sort((a, b) => a.score - b.score
+    || compareText(a.result.kind, b.result.kind)
+    || compareText(a.result.id, b.result.id)
+    || compareText(a.result.label, b.result.label));
+  return matches.slice(0, max).map(match => match.result);
+}
 
 /** Return up to `limit` catalog places ranked by code match, then text match. */
 export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
@@ -125,9 +133,24 @@ export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
     if (match) matches.push(match);
   }
 
-  matches.sort((a, b) => a.score - b.score
-    || compareText(a.result.kind, b.result.kind)
-    || compareText(a.result.id, b.result.id)
-    || compareText(a.result.label, b.result.label));
-  return matches.slice(0, max).map(match => match.result);
+  return rankedResults(matches, max);
+}
+
+/**
+ * Search the compact global artifact (an entry array or `{ airports }`) with
+ * the same normalization and ranking as the local catalog. No DOM, no fetch.
+ */
+export function searchAirportIndex(index, query, limit = DEFAULT_LIMIT) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return [];
+  const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
+  if (max === 0) return [];
+  const airports = Array.isArray(index) ? index : index?.airports;
+  if (!Array.isArray(airports)) return [];
+  const matches = [];
+  for (const airport of airports) {
+    const match = airportMatch(airport, normalized);
+    if (match) matches.push(match);
+  }
+  return rankedResults(matches, max);
 }

@@ -20,7 +20,7 @@ import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
 import { LuklaTerrain } from '../environment/LuklaTerrain.js';
 import { LuklaAirport } from '../environment/LuklaAirport.js';
 import { APPROACH_DATA } from '../config/approachData.js';
-import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
+import { WORLD_REGIONS, REGION_EXTENTS, BASE_OFFSETS } from '../world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
 import {
   defaultScenarioForRegion,
@@ -33,6 +33,13 @@ import {
   saveSavedScenario,
 } from '../config/flightSelection.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
+
+// Visual mounting follows the aircraft with hysteresis: scenery appears while
+// still well outside its extent, and only unloads after a wider retreat.
+const REGION_MOUNT_BASE_MARGIN_M = 25000;
+const REGION_MOUNT_SPEED_LEAD_S = 60;
+const REGION_MOUNT_MAX_MARGIN_M = 80000;
+const REGION_UNMOUNT_EXTRA_MARGIN_M = 30000;
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
@@ -721,8 +728,7 @@ class PresetSpawnerMethods {
     const [coastalX, coastalZ] = world.offsets.get('coastal');
     this.foliage?.group?.position.set(coastalX, 0, coastalZ);
     this.ships?.group?.position.set(coastalX, 0, coastalZ);
-    if (this.foliage?.group) this.foliage.group.visible = true;
-    if (this.ships?.group) this.ships.group.visible = true;
+    // updateRegionMounting() owns foliage/ships visibility with the coastal region.
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
@@ -743,15 +749,87 @@ class PresetSpawnerMethods {
     // surface and Valley mission hides the shared ocean, so leave those alone.
     if (this.water && id !== 'neon' && id !== 'valley') this.water.mesh.visible = true;
 
-    const spawnAirport = id === 'incheon' ? this.incheonAirport
-      : id === 'jeju' ? this.jejuAirport
-      : id === 'lukla' ? this.luklaAirport
-      : id === 'neon' ? this.neonCity?.airport
-      : this.airport;
+    this.updateRegionMounting();
+
+    const spawnAirport = this.spawnAirportFor(id);
     const facade = createWorldAirportFacade(world, spawnAirport);
     this.currentTerrain = world;
     this.currentAirport = facade;
     return true;
+  }
+
+  spawnAirportFor(id) {
+    return id === 'incheon' ? this.incheonAirport
+      : id === 'jeju' ? this.jejuAirport
+      : id === 'lukla' ? this.luklaAirport
+      : id === 'neon' ? this.neonCity?.airport
+      : this.airport;
+  }
+
+  /** Regions that must stay mounted regardless of distance to the aircraft. */
+  requiredMountedRegions() {
+    const world = this.world;
+    const required = new Set([world.anchor]);
+    const x = this.position?.x ?? 0;
+    const z = this.position?.z ?? 0;
+    const under = world.regionAt(x, z);
+    if (under && WORLD_REGIONS.includes(under.id)) required.add(under.id);
+    if (this.telemetry?.onGround && WORLD_REGIONS.includes(this.activeAirport)) {
+      required.add(this.activeAirport);
+    }
+    if (this.pilotArena?.active) required.add('valley');
+    return required;
+  }
+
+  /** Mount/unmount visuals with separate approach and retreat distances. */
+  updateRegionMounting() {
+    const world = this.world;
+    if (!world || !this.scene) return false;
+    const required = this.requiredMountedRegions();
+    const speed = Math.max(0, this.linearVelocity?.length?.() ?? 0);
+    const approachMargin = Math.min(
+      REGION_MOUNT_MAX_MARGIN_M,
+      REGION_MOUNT_BASE_MARGIN_M + speed * REGION_MOUNT_SPEED_LEAD_S,
+    );
+    const unmountMargin = approachMargin + REGION_UNMOUNT_EXTRA_MARGIN_M;
+    const x = this.position?.x ?? 0;
+    const z = this.position?.z ?? 0;
+    let changed = false;
+    for (const id of WORLD_REGIONS) {
+      const region = world.regions.get(id);
+      if (!region) continue;
+      const distance = world.distanceToRegion(id, x, z);
+      const mounted = required.has(id)
+        || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin);
+      if (world.setMounted(id, mounted)) changed = true;
+      this.setSceneObject(region.group, mounted);
+      if (region.mesh !== region.group) this.setSceneObject(region.mesh, mounted);
+    }
+    const coastalMounted = world.isMounted('coastal');
+    this.setSceneObject(this.foliage?.group, coastalMounted);
+    this.setSceneObject(this.ships?.group, coastalMounted);
+    if (this.foliage?.group) this.foliage.group.visible = coastalMounted;
+    if (this.ships?.group) this.ships.group.visible = coastalMounted;
+    if (!changed) return false;
+    const facade = createWorldAirportFacade(world, this.spawnAirportFor(world.anchor));
+    this.currentAirport = facade;
+    this.collisionDetector?.setEnvironment(
+      world,
+      facade,
+      this.worldObstacles(),
+      this.ships,
+      this.activeAirport === 'coastal' ? this.water : null,
+    );
+    return true;
+  }
+
+  setSceneObject(object, mounted) {
+    if (!object) return;
+    if (mounted) {
+      if (object.parent !== this.scene) this.scene.add(object);
+    } else if (object.parent === this.scene) {
+      this.scene.remove(object);
+    }
   }
 
   /** Static obstacles from all mounted regions, translated into world coordinates. */

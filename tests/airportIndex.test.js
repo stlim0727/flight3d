@@ -7,6 +7,7 @@ import {
   findAirportByCode,
   findAirportsInRegion,
   loadAirportManifest,
+  loadAirportSearchIndex,
   matchAirportPin,
   tileIdsForBounds,
 } from '../src/geospatial/airportIndex.js';
@@ -41,9 +42,10 @@ function fixture() {
     generatedAt: '2026-01-01T00:00:00.000Z',
   });
 }
-function serve({ manifest, tiles }, baseUrl = 'https://example.test/airports/') {
+function serve({ manifest, tiles, searchIndex }, baseUrl = 'https://example.test/airports/') {
   const files = new Map([[`${baseUrl}manifest.json`, manifest]]);
   for (const [tileId, tile] of tiles) files.set(`${baseUrl}${manifest.version}/tiles/${tileId}.json`, tile);
+  if (searchIndex) files.set(`${baseUrl}${manifest.searchIndex.path}`, searchIndex);
   const requested = [];
   const fetchImpl = async url => {
     requested.push(url);
@@ -131,4 +133,61 @@ test('official ICAO codes win over a conflicting source ident', async () => {
   assert.equal(resolved.icao, 'OPGW');
   const airports = fixture().tiles.get('12-30').airports;
   assert.equal(matchAirportPin({ icao: 'OPGW' }, airports)?.icao, 'OPGW');
+});
+
+test('the global search artifact loads lazily, caches, and is cleared with the index caches', async () => {
+  clearAirportIndexCache();
+  const data = fixture();
+  const { baseUrl, fetchImpl, requested } = serve(data);
+  const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
+  assert.deepEqual(requested, [`${baseUrl}manifest.json`]);
+
+  const entries = await loadAirportSearchIndex(manifest, { baseUrl, fetchImpl });
+  assert.deepEqual(entries, data.searchIndex.airports);
+  assert.deepEqual(requested, [`${baseUrl}manifest.json`, `${baseUrl}fixture/search.json`]);
+  await loadAirportSearchIndex(manifest, { baseUrl, fetchImpl });
+  assert.equal(requested.length, 2, 'the artifact is cached under the base URL and version');
+  clearAirportIndexCache();
+  await loadAirportSearchIndex(manifest, { baseUrl, fetchImpl });
+  assert.equal(requested.length, 3, 'clearAirportIndexCache invalidates the search artifact');
+});
+
+test('search artifact fetch and validation failures propagate instead of returning an empty index', async () => {
+  clearAirportIndexCache();
+  const data = fixture();
+  const { baseUrl, fetchImpl } = serve(data);
+  const { manifest, searchIndex } = data;
+  await assert.rejects(loadAirportSearchIndex(manifest, {
+    baseUrl,
+    fetchImpl: async () => new Response('unavailable', { status: 503 }),
+  }), /request failed/);
+  await assert.rejects(loadAirportSearchIndex({ ...manifest, searchIndex: null }, { baseUrl, fetchImpl }), /Unsupported/);
+
+  const broken = [
+    { ...searchIndex, version: 'stale' },
+    { ...searchIndex, schemaVersion: 2 },
+    { ...searchIndex, airports: searchIndex.airports.slice(1) },
+    { ...searchIndex, airports: [{ ...searchIndex.airports[0], tileId: '99-99' }] },
+    { ...searchIndex, airports: [{ ...searchIndex.airports[0], latitude: NaN }] },
+  ];
+  for (const artifact of broken) {
+    await assert.rejects(loadAirportSearchIndex(manifest, serve({ ...data, searchIndex: artifact }, baseUrl)), /Invalid airport search index/);
+  }
+});
+
+test('code lookup resolves no-ICAO identifiers used by global search results', async () => {
+  clearAirportIndexCache();
+  const data = fixture();
+  data.manifest.ident = { '01A': '15-2' };
+  data.manifest.tiles['15-2'] = {};
+  data.tiles.set('15-2', {
+    schemaVersion: 1,
+    version: 'fixture',
+    tile: '15-2',
+    airports: [{ id: '9', ident: '01A', icao: '', iata: '', name: 'Purkeypile Airport', latitude: 62.940833, longitude: -152.269722, runways: [] }],
+  });
+  const { baseUrl, fetchImpl } = serve(data);
+  const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
+  const resolved = await findAirportByCode(manifest, '01A', { baseUrl, fetchImpl });
+  assert.equal(resolved.ident, '01A');
 });

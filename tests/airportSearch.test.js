@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeSearchText, searchMapPlaces } from '../src/config/airportSearch.js';
+import { normalizeSearchText, searchAirportIndex, searchMapPlaces } from '../src/config/airportSearch.js';
 
 const AIRPORTS = [
   { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451 },
@@ -139,4 +139,43 @@ test('cruise points match localized aliases', () => {
   assert.equal(matches.length, 1);
   assert.equal(matches[0].kind, 'point');
   assert.equal(matches[0].id, 'jamsil');
+});
+
+const GLOBAL_ENTRIES = [
+  { code: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793, country: 'US', type: 'large_airport', tileId: '13-10' },
+  { code: 'RJTT', iata: 'HND', name: 'Tokyo Haneda International Airport', latitude: 35.5533, longitude: 139.7811, country: 'JP', type: 'large_airport', tileId: '12-31' },
+  { code: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295, country: 'NP', type: 'small_airport', tileId: '11-26' },
+  { code: 'BAD1', iata: 'BAD', name: 'Broken View Airport', latitude: NaN, longitude: 126 },
+];
+
+test('global search ranks ICAO, IATA and name matches with the local rules', () => {
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, ' kjfk! '), [{
+    kind: 'airport',
+    id: 'KJFK',
+    label: 'KJFK · John F. Kennedy International Airport',
+    detail: 'IATA JFK',
+    latitude: 40.6394,
+    longitude: -73.7793,
+  }]);
+  assert.deepEqual(searchAirportIndex({ airports: GLOBAL_ENTRIES }, 'hnd').map(match => match.id), ['RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'kennedy').map(match => match.id), ['KJFK']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'international').map(match => match.id), ['KJFK', 'RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'tenzing').map(match => match.id), ['VNLK']);
+});
+
+test('global search applies limits and rejects invalid indexes without mutation', () => {
+  const before = structuredClone(GLOBAL_ENTRIES);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport').map(match => match.id), ['KJFK', 'RJTT', 'VNLK']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport', 2).map(match => match.id), ['KJFK', 'RJTT']);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, 'airport', 0), []);
+  assert.deepEqual(searchAirportIndex(GLOBAL_ENTRIES, '   '), []);
+  for (const index of [null, undefined, {}, [], { airports: 'nope' }]) {
+    assert.deepEqual(searchAirportIndex(index, 'jfk'), []);
+  }
+  assert.deepEqual(GLOBAL_ENTRIES, before);
+});
+
+test('global search accepts the icao field used by index records', () => {
+  const entries = [{ icao: 'VNLK', iata: 'LUA', name: 'Tenzing-Hillary Airport', latitude: 27.6868, longitude: 86.7295 }];
+  assert.deepEqual(searchAirportIndex(entries, 'vnlk').map(match => match.id), ['VNLK']);
 });

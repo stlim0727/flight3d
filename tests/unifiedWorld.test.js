@@ -8,6 +8,7 @@ import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS } from '../src/geospatial/airportGeo
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 import { APPROACH_DATA } from '../src/config/approachData.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { haversineDistanceM, initialBearingDeg } from '../src/geospatial/CorridorCoordinateSystem.js';
 
 function fakeRegion(height, runwayLocal = null) {
   const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
@@ -86,6 +87,30 @@ test('all registered regions stay mounted after anchor changes', () => {
   assert.equal(lukla.group.position.x, 0);
   assert.equal(lukla.group.position.z, 0);
   assert.equal(world.regions.size, 3);
+});
+
+test('unmounted regions keep altitude and runway surfaces across anchor changes', () => {
+  const { world, jeju } = makeWorld();
+  const [jx, jz] = BASE_OFFSETS.jeju;
+  assert.equal(world.setMounted('jeju', false), true);
+  assert.equal(jeju.group.visible, false);
+  assert.equal(world.isMounted('jeju'), false);
+  assert.equal(world.regions.has('jeju'), true);
+  assert.equal(world.getHeight(jx + 10, jz + 10), 36);
+  assert.equal(world.isOnRunway(jx + 10, jz + 10), true);
+  world.setAnchor('jeju');
+  assert.equal(jeju.group.visible, false);
+  assert.equal(jeju.group.position.x, 0);
+  assert.equal(world.getHeight(10, 10), 36);
+});
+
+test('region distance is measured to the world-frame box in the active anchor frame', () => {
+  const world = new UnifiedWorld('incheon');
+  world.register('coastal', { ...fakeRegion(0), extent: REGION_EXTENTS.coastal });
+  assert.equal(world.distanceToRegion('coastal', BASE_OFFSETS.coastal[0], BASE_OFFSETS.coastal[1]), 0);
+  assert.ok(world.distanceToRegion('coastal', 0, 0) > 60000);
+  world.setAnchor('coastal');
+  assert.equal(world.distanceToRegion('coastal', 0, 0), 0);
 });
 
 test('readiness follows the spawn region DEM state', () => {
@@ -356,6 +381,41 @@ test('destination info uses great-circle bearings to real runway thresholds', ()
   assert.equal(world.destinationInfo(0, 0, 'unknown'), null);
   const fromJeju = world.destinationInfo(BASE_OFFSETS.jeju[0], BASE_OFFSETS.jeju[1], 'incheon');
   assert.ok(fromJeju.bearingDeg < 10 || fromJeju.bearingDeg > 350);
+});
+
+test('real threshold guidance and ND marker follow the active anchor', () => {
+  const anchors = ['incheon', 'jeju', 'lukla'];
+  for (const anchor of anchors) {
+    for (const target of anchors) {
+      if (anchor === target) continue;
+      const info = new UnifiedWorld(anchor).destinationInfo(0, 0, target);
+      const origin = AIRPORT_ORIGINS[anchor];
+      const threshold = RUNWAY_THRESHOLDS[target];
+      assert.equal(info.synthetic, false, `${anchor} -> ${target}`);
+      assert.equal(info.target, 'threshold', `${anchor} -> ${target}`);
+      assert.ok(Math.abs(info.distanceM - haversineDistanceM(
+        origin.latitude, origin.longitude, threshold.latitude, threshold.longitude,
+      )) < 0.5, `${anchor} -> ${target} distance`);
+      assert.ok(Math.abs(info.bearingDeg - initialBearingDeg(
+        origin.latitude, origin.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${anchor} -> ${target} bearing`);
+      const marker = [
+        BASE_OFFSETS[target][0] - BASE_OFFSETS[anchor][0] + APPROACH_DATA[target].threshold.x,
+        BASE_OFFSETS[target][1] - BASE_OFFSETS[anchor][1] + APPROACH_DATA[target].threshold.z,
+      ];
+      assert.ok(Math.hypot(info.dx - marker[0], info.dz - marker[1]) < 1e-6,
+        `${anchor} -> ${target} rendered threshold marker`);
+      const reverse = new UnifiedWorld(target).destinationInfo(0, 0, anchor);
+      assert.equal(reverse.synthetic, false, `${target} -> ${anchor}`);
+      assert.ok(Math.abs(reverse.distanceM - haversineDistanceM(
+        AIRPORT_ORIGINS[target].latitude, AIRPORT_ORIGINS[target].longitude,
+        RUNWAY_THRESHOLDS[anchor].latitude, RUNWAY_THRESHOLDS[anchor].longitude,
+      )) < 0.5, `${target} -> ${anchor} distance`);
+    }
+    const synthetic = new UnifiedWorld(anchor).destinationInfo(0, 0, 'neon');
+    assert.equal(synthetic.synthetic, true, `${anchor} -> neon`);
+    assert.equal(synthetic.target, 'centre', `${anchor} -> neon`);
+  }
 });
 
 test('streamed external airport registers as a dynamic region and reports preparation', () => {
