@@ -71,8 +71,8 @@ export class JejuTileStreamer {
    * @param {THREE.Mesh} terrainMesh - The 80km x 56km terrain mesh for Jeju Island
    * @param {Object} flightSurface - JejuFlightSurface instance for physics & elevation
    * @param {Object} [options]
-   * @param {number} [options.zoom=10] - Zoom level (10 or 11)
-   * @param {number} [options.anisotropy=1] - Texture anisotropy filtering level
+   * @param {number} [options.zoom=11] - Zoom level (10 or 11)
+   * @param {number} [options.anisotropy=8] - Texture anisotropy filtering level
    */
   constructor(terrainMesh, flightSurface, options = {}) {
     this.terrainMesh = terrainMesh;
@@ -81,10 +81,10 @@ export class JejuTileStreamer {
     this.cacheManager = options.cacheManager || new TileCacheManager(options.cacheOptions);
 
     const urlZoom = parseInt(getQueryParam('jejuZoom'), 10);
-    this.zoom = Number.isFinite(urlZoom) ? urlZoom : (options.zoom ?? 10);
+    this.zoom = Number.isFinite(urlZoom) ? urlZoom : (options.zoom ?? 11);
 
     const urlAnisotropy = parseInt(getQueryParam('jejuAnisotropy'), 10);
-    this.anisotropy = Number.isFinite(urlAnisotropy) ? urlAnisotropy : (options.anisotropy ?? 1);
+    this.anisotropy = Number.isFinite(urlAnisotropy) ? urlAnisotropy : (options.anisotropy ?? 8);
 
     this.setZoomLevel(this.zoom);
 
