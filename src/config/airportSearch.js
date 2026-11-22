@@ -84,8 +84,8 @@ function pointMatch(point, query) {
   if (!hasCoordinates(point)) return null;
   const id = typeof point.id === 'string' ? point.id.trim() : '';
   const label = typeof point.label === 'string' ? point.label.trim() : '';
-  if (!id && !label) return null;
-  const score = bestTextScore([label, id], query);
+  const aliases = Array.isArray(point.aliases) ? point.aliases : [point.ko, point.en].filter(Boolean);
+  const score = bestTextScore([label, id, ...aliases], query);
   if (score < 0) return null;
   return {
     score,

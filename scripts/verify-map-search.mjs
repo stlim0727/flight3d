@@ -53,6 +53,19 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
   assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'bookmark did not restore selection');
 
+  await evaluate(`(() => {
+    const input = document.getElementById('lobby-map-search');
+    input.value = '잠실';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    document.querySelector('#lobby-map-results button[data-place-id="jamsil"]')?.click();
+    return true;
+  })()`);
+  assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.pointId === 'jamsil' && window.sim?.lobby?.mapPlan?.state === 'cruise'"), 'Korean point search did not select cruise');
+  await evaluate("document.getElementById('lobby-map-bookmark-toggle')?.click()");
+  assert.ok(await waitFor(session, "Boolean(document.querySelector('#lobby-map-bookmarks button[data-place-id=\"jamsil\"]'))"), 'point bookmark was not saved');
+  await evaluate("document.querySelector('#lobby-map-bookmarks button[data-place-id=\"RKSS\"]')?.click()");
+  assert.ok(await waitFor(session, "window.sim?.lobby?.mapPlan?.state === 'runway' && window.sim?.lobby?.mapPlan?.airportCode === 'RKSS'"), 'airport selection did not leave cruise state');
+
   assert.deepEqual(exceptions, []);
   await screenshot(path.join(artifacts, 'bookmarks.png'));
   console.log(JSON.stringify({

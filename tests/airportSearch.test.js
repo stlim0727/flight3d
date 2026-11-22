@@ -130,3 +130,13 @@ test('search does not mutate its input or return catalog objects', () => {
   results[0].label = 'changed';
   assert.deepEqual(places, before);
 });
+
+test('cruise points match localized aliases', () => {
+  const places = {
+    points: [{ id: 'jamsil', label: 'Jamsil', aliases: ['잠실', 'Jamsil'], latitude: 37.5054, longitude: 127.137 }],
+  };
+  const matches = searchMapPlaces(places, '잠실');
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].kind, 'point');
+  assert.equal(matches[0].id, 'jamsil');
+});

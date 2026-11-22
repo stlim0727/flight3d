@@ -103,7 +103,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     return list.find(place => (place.id ?? place.code) === id) ?? null;
   }
   function currentMapPlace() {
-    if (mapPointSelect?.value) return findMapPlace('point', mapPointSelect.value);
+    if (mapPointSelect?.value) {
+      const point = findMapPlace('point', mapPointSelect.value);
+      return point ? { ...point, kind: 'point', label: point.label } : null;
+    }
     if (!mapAirportSelect?.value) return null;
     const airport = findMapPlace('airport', mapAirportSelect.value);
     return airport ? { ...airport, kind: 'airport', label: airport.name } : null;
@@ -219,7 +222,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
     if (mapPointSelect) mapPointSelect.value = '';
     if (mapAirportSelect) mapAirportSelect.value = code;
-    if (mapStateSelect) mapStateSelect.value = state ?? (mapStateSelect.value === 'none' ? 'runway' : mapStateSelect.value);
+    if (mapStateSelect) mapStateSelect.value = state ?? (['none', 'cruise'].includes(mapStateSelect.value) ? 'runway' : mapStateSelect.value);
     emitMapPlan();
     if (mapRunwaySelect && !mapRunwaySelect.value && mapRunwaySelect.options.length > 1) {
       mapRunwaySelect.value = mapRunwaySelect.options[1].value;

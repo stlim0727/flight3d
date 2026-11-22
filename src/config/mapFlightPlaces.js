@@ -12,6 +12,9 @@ export function cruisePlaces() {
   return Object.entries(REGIONAL_CRUISES).map(([id, place]) => Object.freeze({
     id,
     label: place.en ?? place.ko ?? id,
+    ko: place.ko ?? '',
+    en: place.en ?? '',
+    aliases: [place.ko, place.en].filter(Boolean),
     latitude: place.latitude,
     longitude: place.longitude,
     headingDeg: place.headingDeg,
