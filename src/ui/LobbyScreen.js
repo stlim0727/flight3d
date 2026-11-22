@@ -257,12 +257,24 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const [x, y, width, height] = mapViewBox().split(/\s+/).map(Number);
     return { x, y, width, height };
   };
+  const MIN_VIEWBOX_SPAN = Math.min(MAP_WIDTH, MAP_HEIGHT) / 2 ** 12;
   const clampViewBox = box => {
-    const width = Math.max(1, Math.min(MAP_WIDTH, box.width));
-    const height = Math.max(1, Math.min(MAP_HEIGHT, box.height));
+    const ratio = box.width > 0 && box.height > 0 ? box.width / box.height : 1;
+    let width = Math.max(MIN_VIEWBOX_SPAN, Math.min(MAP_WIDTH, box.width));
+    let height = width / ratio;
+    if (height > MAP_HEIGHT) {
+      height = MAP_HEIGHT;
+      width = height * ratio;
+    }
+    if (height < MIN_VIEWBOX_SPAN) {
+      height = MIN_VIEWBOX_SPAN;
+      width = height * ratio;
+    }
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
     return {
-      x: Math.max(0, Math.min(MAP_WIDTH - width, box.x)),
-      y: Math.max(0, Math.min(MAP_HEIGHT - height, box.y)),
+      x: Math.max(0, Math.min(MAP_WIDTH - width, centerX - width / 2)),
+      y: Math.max(0, Math.min(MAP_HEIGHT - height, centerY - height / 2)),
       width, height,
     };
   };
