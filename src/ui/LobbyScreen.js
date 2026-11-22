@@ -2,17 +2,17 @@ import { regionalCruise } from '../config/regionalCruises.js';
 import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
-import { aircraftSpec, airportSpec } from './lobbySpecs.js';
+import { aircraftSpec } from './lobbySpecs.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
-import { DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
+import { DEFAULT_AIRPORT, DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
 import { searchMapPlaces } from '../config/airportSearch.js';
 import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
-import { defaultMapBookmarks, indexedAirportPlaces } from '../config/mapFlightPlaces.js';
+import { defaultMapBookmarks, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, findAirportByCode } from '../geospatial/airportIndex.js';
 import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap } from './mapBrowser.js';
-const AIRPORT_BUTTONS = { incheon: 'lobby-airport-incheon', jeju: 'lobby-airport-jeju', coastal: 'lobby-airport-coastal', lukla: 'lobby-airport-lukla', neon: 'lobby-airport-neon', valley: 'lobby-airport-valley' };
+const BUILTIN_REGION_AIRPORT_CODES = Object.freeze({ incheon: 'RKSI', jeju: 'RKPC' });
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
 /** Aircraft the lobby offers, so warmup can prepare exactly this set. */
 export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
@@ -83,7 +83,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   let mapBookmarks = loadBookmarks();
   let mapCenteredKey = '';
   const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
-  let mapCatalog = { airports: [], points: [] };
+  let mapCatalog = { airports: [], points: [], regions: specialRegionPlaces() };
   const mapStateLabel = state => state === 'none'
     ? t('lobby.map.none')
     : t({ runway: 'incheon.runway', cruise: 'incheon.cruise', approach: 'incheon.approach' }[state] ?? state);
@@ -132,6 +132,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   function findMapPlace(kind, id) {
+    if (kind === 'region') return (mapCatalog.regions ?? []).find(place => place.id === id) ?? null;
     if (kind === 'point' && customPoint?.id === id) return customPoint;
     const list = kind === 'point' ? mapCatalog.points : mapCatalog.airports;
     return list.find(place => (place.id ?? place.code) === id) ?? null;
@@ -175,15 +176,23 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
   }
   function renderMapBrowser() {
-    if (!mapSearchInput) return;
-    mapSearchInput.placeholder = t('lobby.map.search.placeholder');
-    const query = mapSearchInput.value ?? '';
+    if (!mapSearchInput && !mapDefaultBookmarks && !mapBookmarksEl && !mapMarkers) return;
+    if (mapSearchInput) mapSearchInput.placeholder = t('lobby.map.search.placeholder');
+    const query = mapSearchInput?.value ?? '';
     const results = searchMapPlaces(mapCatalog, query);
     const active = currentMapPlace();
-    const activeKey = active ? `${active.kind}:${active.id ?? active.code}` : '';
-    renderPlaceList(mapResults, results.map(result => ({ ...result, key: `${result.kind}:${result.id}` })),
+    const airport = getAirport();
+    const activeKey = active
+      ? `${active.kind}:${active.id ?? active.code}`
+      : (BUILTIN_REGION_AIRPORT_CODES[airport]
+        ? `airport:${BUILTIN_REGION_AIRPORT_CODES[airport]}`
+        : (airport ? `region:${airport}` : ''));
+    const formatPlaceItem = item => item.kind === 'region'
+      ? { ...item, label: item.nameKey ? t(item.nameKey) : item.label, detail: '' }
+      : item;
+    renderPlaceList(mapResults, results.map(result => formatPlaceItem({ ...result, key: `${result.kind}:${result.id}` })),
       'lobby.map.search.empty', activeKey);
-    const withBookmarkLabels = bookmark => ({
+    const withBookmarkLabels = bookmark => formatPlaceItem({
       ...bookmark,
       key: bookmarkKey(bookmark),
       detail: bookmark.iata || bookmark.code || '',
@@ -248,6 +257,17 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   function selectMapPlace(place) {
     if (!place) return;
+    if (place.kind === 'region') {
+      if (mapStateSelect) mapStateSelect.value = 'none';
+      if (mapAirportSelect) mapAirportSelect.value = '';
+      if (mapRunwaySelect) mapRunwaySelect.value = '';
+      if (mapPointSelect) mapPointSelect.value = '';
+      mapSvg?.setAttribute('viewBox', `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+      mapCenteredKey = '';
+      onAirport?.(place.id);
+      refresh();
+      return;
+    }
     if (place.kind === 'point' || (place.id && findMapPlace('point', place.id))) {
       const pointId = place.id;
       if (!mapCatalog.points.some(point => point.id === pointId)) {
@@ -325,7 +345,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     renderMapBrowser();
   });
   function setMapPlaces(places = {}) {
-    mapCatalog = { airports: places.airports ?? [], points: places.points ?? [] };
+    mapCatalog = { airports: places.airports ?? [], points: places.points ?? [], regions: places.regions ?? specialRegionPlaces() };
     if (mapAirportSelect) {
       mapAirportSelect.replaceChildren();
       addOption(mapAirportSelect, '', t('lobby.map.none'));
@@ -472,12 +492,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     ['btn-fly', onFly],
     ['btn-lobby-resume', () => onResume?.()],
     ['btn-lobby-restart', () => onRestart?.()],
-    ['lobby-airport-coastal', () => onAirport('coastal')],
-    ['lobby-airport-incheon', () => onAirport('incheon')],
-    ['lobby-airport-jeju', () => onAirport('jeju')],
-    ['lobby-airport-lukla', () => onAirport('lukla')],
-    ['lobby-airport-neon', () => onAirport('neon')],
-    ['lobby-airport-valley', () => onAirport('valley')],
     ['lobby-aircraft-b738', () => onAircraft?.('B738')],
     ['lobby-aircraft-c172', () => onAircraft?.('C172')],
     ['lobby-aircraft-f16', () => onAircraft?.('F16')],
@@ -499,7 +513,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         if (type !== 'cruise' && !place.runways?.length) return;
         mapStateSelect.value = type;
         emitMapPlan();
+      } else if (button.dataset.startLabel) {
+        if (!isScenarioAvailable(getAirport(), type)) onAirport?.(DEFAULT_AIRPORT);
+        onPreset(type);
       } else {
+        if (!isScenarioAvailable(getAirport(), type) && scenario.airports?.[0]) {
+          onAirport?.(scenario.airports[0]);
+        }
         onPreset(type);
       }
     });
@@ -536,16 +556,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     for (const badge of document.querySelectorAll('[data-spec-aircraft]')) {
       bindText(badge, () => aircraftSpec(badge.dataset.specAircraft));
     }
-    for (const badge of document.querySelectorAll('[data-spec-airport]')) {
-      bindText(badge, () => airportSpec(badge.dataset.specAirport));
-    }
     for (const [code, id] of Object.entries(LANGUAGE_BUTTONS)) {
       document.getElementById(id)?.classList.toggle('active', code === getLanguage());
     }
     const airport = getAirport();
-    for (const [key, id] of Object.entries(AIRPORT_BUTTONS)) {
-      document.getElementById(id)?.classList.toggle('active', key === airport);
-    }
     if (destinationSelect) {
       destinationSelect.value = resolveDestination(getDestination?.());
       for (const option of destinationSelect.options) {
@@ -587,15 +601,22 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const aircraft = getAircraft?.() ?? 'B738';
     if (aircraftSummary) bindText(aircraftSummary, () => AIRCRAFT_REGISTRY[aircraft]?.name ?? aircraft);
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
-      document.getElementById(id)?.classList.toggle('active', key === aircraft);
-      document.getElementById(id).disabled = airport === 'valley' || Boolean(requiredAircraft(getPreset()));
+      const el = document.getElementById(id);
+      if (!el) continue;
+      el.classList.toggle('active', key === aircraft);
+      el.disabled = airport === 'valley' || Boolean(requiredAircraft(getPreset()));
     }
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       if (type === 'demo') continue;
       const button = document.getElementById(scenario.lobbyButtonId);
       const span = button?.querySelector('span');
       if (span) {
-        bindText(span, () => t(button.dataset.startLabel ?? scenarioLabelKey(getAirport(), type) ?? 'lobby.spawn'));
+        bindText(span, () => t(
+          button.dataset.startLabel
+            ?? scenarioLabelKey(getAirport(), type)
+            ?? scenarioLabelKey(scenario.airports?.[0], type)
+            ?? 'lobby.spawn'
+        ));
       }
     }
     if ((aircraft === 'F16' && !['lukla','incheon'].includes(airport)) && getPreset() === 'demo') onPreset('runway');
@@ -731,14 +752,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       }
       if (managedAirport) {
         bindText(managedAirport, () => {
-          const id = getAirport?.() ?? 'coastal';
-          const btn = document.getElementById(AIRPORT_BUTTONS[id]);
-          return btn?.querySelector('span')?.textContent?.trim() || id;
+          const activePlace = currentMapPlace();
+          if (activePlace) return activePlace.label;
+          const id = getAirport?.() ?? DEFAULT_AIRPORT;
+          return t(REGION_NAME_KEYS[id] ?? id);
         });
       }
       if (managedScenario) {
         bindText(managedScenario, () => {
-          const airportId = getAirport?.() ?? 'coastal';
+          const airportId = getAirport?.() ?? DEFAULT_AIRPORT;
           const presetId = getPreset?.() ?? 'runway';
           if (presetId === 'demo') {
             const profile = resolveDemoProfile(getAircraft?.(), airportId, getDemoProfile?.());
@@ -779,7 +801,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         button.setAttribute('aria-pressed', String(isSelected));
         button.disabled = Boolean(place && type !== 'cruise' && !plannedAirport?.runways?.length);
       }
-      button.style.display = isScenarioAvailable(airport, type) || (button.dataset.startLabel && place) ? '' : 'none';
+      button.style.display = '';
     }
     if (demoPresetBtn) {
       demoPresetBtn.classList.toggle('active', preset === 'demo' && demoPresetBtn.dataset.profileId === selected.id);

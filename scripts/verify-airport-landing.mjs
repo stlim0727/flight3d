@@ -31,9 +31,12 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   checkGpu(cdpPort);
   results.browser = { gpuAngle, renderer: 'see .cache/airport-landing/gpu.json' };
   assert.ok(await waitFor(session, 'Boolean(window.sim?.gameFlow?.state)'), 'simulator did not boot');
+  assert.ok(await waitFor(session, "window.sim?.lobby?.airport === 'incheon' || Boolean(document.querySelector('#lobby-map-default-bookmarks [data-place-id=\"RKSI\"]'))"), 'incheon place was not ready');
 
   await evaluate(`(() => {
-    document.getElementById('lobby-airport-incheon')?.click();
+    const picker = document.querySelector('#lobby-place-picker');
+    if (picker && !picker.open) picker.querySelector('summary')?.click();
+    document.querySelector('#lobby-map-default-bookmarks [data-place-id="RKSI"]')?.click();
     const select = document.getElementById('lobby-destination');
     select.value = 'RKSS';
     select.dispatchEvent(new Event('change', { bubbles: true }));

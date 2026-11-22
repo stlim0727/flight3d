@@ -100,6 +100,28 @@ function pointMatch(point, query) {
   };
 }
 
+function regionMatch(region, query) {
+  if (!region || typeof region.id !== 'string' || !region.id.trim()) return null;
+  const id = region.id.trim();
+  const code = typeof region.code === 'string' ? region.code.trim() : '';
+  const label = typeof region.label === 'string' ? region.label.trim() : '';
+  const aliases = Array.isArray(region.aliases) ? region.aliases : [];
+  const identifiers = [code, id].filter(Boolean).map(normalizeSearchText);
+  const codeScore = identifierScore(identifiers, query);
+  const score = codeScore >= 0 ? codeScore : bestTextScore([label, ...aliases], query);
+  if (score < 0) return null;
+  return {
+    score,
+    result: {
+      kind: 'region',
+      id,
+      label: label || code || id,
+      detail: code || 'region',
+      ...(region.nameKey ? { nameKey: region.nameKey } : {}),
+    },
+  };
+}
+
 function compareText(a, b) {
   if (a < b) return -1;
   if (a > b) return 1;
@@ -115,6 +137,7 @@ export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
 
   const airports = Array.isArray(places?.airports) ? places.airports : [];
   const points = Array.isArray(places?.points) ? places.points : [];
+  const regions = Array.isArray(places?.regions) ? places.regions : [];
   const matches = [];
   for (const airport of airports) {
     const match = airportMatch(airport, normalized);
@@ -122,6 +145,10 @@ export function searchMapPlaces(places, query, limit = DEFAULT_LIMIT) {
   }
   for (const point of points) {
     const match = pointMatch(point, normalized);
+    if (match) matches.push(match);
+  }
+  for (const region of regions) {
+    const match = regionMatch(region, normalized);
     if (match) matches.push(match);
   }
 

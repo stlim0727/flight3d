@@ -5,7 +5,7 @@ import {
   takeoffSpawnPlan, cruiseSpawnPlan, approachSpawnPlan, resolveMapFlightPlan,
 } from '../src/config/mapFlightPlan.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
-import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion } from '../src/config/mapFlightPlaces.js';
+import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion, specialRegionPlaces } from '../src/config/mapFlightPlaces.js';
 
 const close = (actual, expected, epsilon = 1e-9, label = 'value') => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${label}: ${actual} != ${expected}`);
@@ -286,4 +286,23 @@ test('default bookmarks include indexed major airports and regional cities', () 
   assert.deepEqual(defaultMapBookmarks({ airports, points: cruisePlaces() }).map(({ kind, id }) => [kind, id]), [
     ['airport', 'RKSS'], ['point', 'jamsil'], ['point', 'suwon'], ['point', 'busan'],
   ]);
+});
+
+test('specialRegionPlaces exposes non-Korea and fictional free-flight regions for default bookmarks', () => {
+  const regions = specialRegionPlaces();
+  assert.deepEqual(regions.map(region => region.id), ['lukla', 'neon', 'coastal']);
+  assert.ok(!regions.some(region => region.id === 'valley'));
+  const airports = [{ code: 'RKSS', name: 'Gimpo' }];
+  assert.deepEqual(
+    defaultMapBookmarks({ airports, points: cruisePlaces(), regions }).map(({ kind, id }) => [kind, id]),
+    [
+      ['airport', 'RKSS'],
+      ['point', 'jamsil'],
+      ['point', 'suwon'],
+      ['point', 'busan'],
+      ['region', 'lukla'],
+      ['region', 'neon'],
+      ['region', 'coastal'],
+    ],
+  );
 });

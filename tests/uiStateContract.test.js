@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
 import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
+import { t } from '../src/i18n/index.js';
 
 class MockElement {
   constructor(id = '', tagName = 'DIV') {
@@ -109,8 +110,6 @@ function setupMockDOM() {
     'lobby-valley-options', 'lobby-pilot-human', 'lobby-pilot-ai',
     'lobby-valley-gyro', 'lobby-valley-settings', 'lobby-valley-preflight',
     'lobby-time-select', 'dev-enabled',
-    'lobby-airport-incheon', 'lobby-airport-coastal',
-    'lobby-airport-lukla', 'lobby-airport-neon', 'lobby-airport-valley',
     'lobby-aircraft-b738', 'lobby-aircraft-c172', 'lobby-aircraft-f16',
     'lobby-lang-en', 'lobby-lang-ko', 'btn-lobby-fold', 'btn-lobby-unfold', 'btn-lobby-back',
   ];
@@ -249,8 +248,11 @@ test('UI State Contract: In-Flight Menu Management hides condition selectors and
 
     // Verify held flight summary information
     const managedAircraft = elements.get('lobby-managed-aircraft');
+    const managedAirport = elements.get('lobby-managed-airport');
     const managedTime = elements.get('lobby-managed-time');
     assert.ok(managedAircraft.textContent.includes('Boeing 737') || managedAircraft.textContent.includes('B738'));
+    assert.equal(managedAirport.textContent, t('coastal.airport'));
+    assert.equal(elements.get('lobby-airport-coastal'), undefined);
     assert.equal(managedTime.textContent, '16:48');
 
     // Actions: verify onRestart called exactly once

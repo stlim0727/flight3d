@@ -55,7 +55,7 @@ test('storage keys follow repository convention', () => {
 });
 
 test('default selection constants are valid', () => {
-  assert.equal(DEFAULT_AIRPORT, 'coastal');
+  assert.equal(DEFAULT_AIRPORT, 'incheon');
   assert.equal(DEFAULT_AIRCRAFT, 'B738');
   assert.equal(DEFAULT_SCENARIO, 'runway');
   assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju']);
@@ -108,7 +108,7 @@ test('loadSavedFlightSelection restores defaults when storage is empty', () => {
   const storage = createMockStorage();
   const selection = loadSavedFlightSelection(storage);
   assert.deepEqual(selection, {
-    airport: 'coastal',
+    airport: 'incheon',
     aircraft: 'B738',
     scenario: 'runway',
   });
@@ -164,12 +164,12 @@ test('loadSavedFlightSelection safely handles unavailable or throwing storage', 
   };
   const selection = loadSavedFlightSelection(throwingStorage);
   assert.deepEqual(selection, {
-    airport: 'coastal',
+    airport: 'incheon',
     aircraft: 'B738',
     scenario: 'runway',
   });
   assert.deepEqual(loadSavedFlightSelection(null), {
-    airport: 'coastal',
+    airport: 'incheon',
     aircraft: 'B738',
     scenario: 'runway',
   });
