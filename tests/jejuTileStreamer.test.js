@@ -147,3 +147,56 @@ test('loadJejuAirport integrates tileStreamer and exposes lifecycle disposal', a
   assert.equal(typeof airport.dispose, 'function');
   assert.doesNotThrow(() => airport.dispose());
 });
+
+test('JejuTileStreamer supports Zoom 11 configuration with identical bounds and UV alignment', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo10 = new THREE.PlaneGeometry(80000, 56000, 4, 4);
+  const mesh10 = new THREE.Mesh(geo10, new THREE.MeshBasicMaterial());
+  const streamer10 = new JejuTileStreamer(mesh10, surface, { zoom: 10, anisotropy: 1 });
+
+  const geo11 = new THREE.PlaneGeometry(80000, 56000, 4, 4);
+  const mesh11 = new THREE.Mesh(geo11, new THREE.MeshBasicMaterial());
+  const streamer11 = new JejuTileStreamer(mesh11, surface, { zoom: 11, anisotropy: 8 });
+
+  assert.equal(streamer10.macroTiles.length, 8);
+  assert.equal(streamer11.macroTiles.length, 32);
+  assert.equal(streamer11.anisotropy, 8);
+
+  // Geographic gridBounds must match within millimeter precision
+  assert.ok(Math.abs(streamer10.gridBounds.minX - streamer11.gridBounds.minX) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.maxX - streamer11.gridBounds.maxX) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.minZ - streamer11.gridBounds.minZ) < 1e-3);
+  assert.ok(Math.abs(streamer10.gridBounds.maxZ - streamer11.gridBounds.maxZ) < 1e-3);
+
+  // UV coordinates for every vertex must match identically between zoom 10 and 11
+  streamer10.updateMeshUVs();
+  streamer11.updateMeshUVs();
+
+  const uv10 = geo10.attributes.uv;
+  const uv11 = geo11.attributes.uv;
+  for (let i = 0; i < uv10.count; i++) {
+    assert.ok(Math.abs(uv10.getX(i) - uv11.getX(i)) < 1e-5, `UV X drift at vertex ${i}`);
+    assert.ok(Math.abs(uv10.getY(i) - uv11.getY(i)) < 1e-5, `UV Y drift at vertex ${i}`);
+  }
+});
+
+test('JejuTileStreamer setConfig dynamically updates anisotropy and zoom tiles', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+  const streamer = new JejuTileStreamer(mesh, surface, { zoom: 10, anisotropy: 1 });
+
+  assert.equal(streamer.zoom, 10);
+  assert.equal(streamer.anisotropy, 1);
+  assert.equal(streamer.macroTiles.length, 8);
+
+  // Update anisotropy only
+  await streamer.setConfig({ anisotropy: 8 });
+  assert.equal(streamer.anisotropy, 8);
+  assert.equal(streamer.zoom, 10);
+
+  // Update zoom to 11
+  await streamer.setConfig({ zoom: 11 });
+  assert.equal(streamer.zoom, 11);
+  assert.equal(streamer.macroTiles.length, 32);
+});

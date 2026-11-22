@@ -46,7 +46,9 @@ export async function withBrowserSession(options = {}, fn) {
     const vitePort = await getFreePort();
     origin = `http://127.0.0.1:${vitePort}`;
     const mode = options.preview ? 'preview' : 'dev';
+    const repoRoot = options.cwd || resolve(import.meta.dirname, '../..');
     viteProc = spawn('npx', ['vite', ...(mode === 'preview' ? ['preview'] : []), '--host', '127.0.0.1', '--port', String(vitePort), '--strictPort'], {
+      cwd: repoRoot,
       stdio: 'ignore',
       windowsHide: true,
     });
