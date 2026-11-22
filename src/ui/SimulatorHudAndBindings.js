@@ -651,7 +651,12 @@ class SimulatorHudAndBindingsMethods {
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getDestination: () => this.lobby.destination || 'none',
-      onDestination: id => { this.lobby.destination = id; this.destinationAirport = id; },
+      onDestination: id => {
+        this.lobby.destination = id;
+        this.destinationAirport = id;
+        if (this.lobby.mapPlan && this.lobby.mapPlan.state !== 'cruise') this.lobby.mapPlan = null;
+        this.lobbyScreen?.refresh();
+      },
       getMapPlan: () => this.lobby.mapPlan,
       onMapPlan: plan => {
         this.lobby.mapPlan = plan?.state === 'none' ? null : plan;

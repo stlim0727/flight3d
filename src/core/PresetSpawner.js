@@ -612,9 +612,10 @@ class PresetSpawnerMethods {
         this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1),
       );
       this.aero.syncMassProperties();
-      this.engines.settleSpool();
+
     }
     this.applyComputedTrim();
+    if (state !== 'runway') this.engines.settleSpool();
     this.refreshTakeoffPerformance();
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);

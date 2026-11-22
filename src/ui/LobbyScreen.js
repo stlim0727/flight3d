@@ -566,6 +566,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (selectionEl) selectionEl.hidden = !busy;
     if (regionalSelect) regionalSelect.disabled = busy;
     for (const select of mapSelects) select.disabled = busy;
+    if (destinationSelect) destinationSelect.disabled = busy;
     const flyBtn = document.getElementById('btn-fly');
     if (flyBtn) flyBtn.disabled = busy;
     const resume = document.getElementById('btn-lobby-resume');
