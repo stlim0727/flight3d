@@ -42,7 +42,16 @@
         <span class="map-unfold" data-i18n="ui.unfoldMap">지도 펼치기</span>
         <span class="map-fold" data-i18n="ui.foldMap">지도 접기</span>
       </summary>
-      <div class="map-paper"></div>
+      <div class="map-paper">
+        <canvas data-i18n-aria-label="ui.busanChart" role="img"></canvas>
+        <button class="map-mode" type="button" aria-pressed="false">
+          <span class="map-north" aria-hidden="true">↑</span>
+          <span class="map-mode-label" data-i18n="ui.mapNorthUp"></span>
+        </button>
+        <span class="map-scale">1 km</span>
+        <span class="map-status" role="status" hidden></span>
+        <a class="map-credit" href="https://docs.overturemaps.org/attribution/" target="_blank" rel="noopener">© Overture / OpenStreetMap</a>
+      </div>
     </details>
     <!-- Top Instrument Telemetry Strip -->
     <header class="hud-strip">

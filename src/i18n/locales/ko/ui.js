@@ -1,6 +1,11 @@
 export default {
   "ui.unfoldMap": "지도 펼치기",
   "ui.foldMap": "지도 접기",
+  "ui.busanChart": "부산 해안과 교량, 현재 기체 위치",
+  "ui.mapNorthUp": "북쪽 위",
+  "ui.mapHeadingUp": "기수 위",
+  "ui.mapLoading": "지도 불러오는 중",
+  "ui.mapUnavailable": "일부 지도 데이터 없음",
   "build.branch": "브랜치",
   "build.commit": "커밋",
   "build.merged": "{age} 병합",
