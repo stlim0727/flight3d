@@ -291,8 +291,12 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   width: 100%;
   aspect-ratio: 4 / 3;
   height: auto;
-  cursor: crosshair;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
+#lobby-map-svg:active { cursor: grabbing; }
 .lobby-map-row {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));

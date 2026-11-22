@@ -2,37 +2,49 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
 
-test('map projection keeps Korean airports inside the compact SVG', () => {
+test('projection covers airports worldwide and keeps south below north', () => {
   const gimpo = projectToMap(37.5583, 126.791);
-  const jeju = projectToMap(33.512, 126.493);
-  assert.ok(gimpo.x > 0 && gimpo.x < MAP_WIDTH && gimpo.y > 0 && gimpo.y < MAP_HEIGHT);
-  assert.ok(jeju.y > gimpo.y, 'Jeju should be lower on the map');
+  const jfk = projectToMap(40.6394, -73.7793);
+  const sydney = projectToMap(-33.9399, 151.1753);
+  for (const point of [gimpo, jfk, sydney]) {
+    assert.ok(point && point.x >= 0 && point.x <= MAP_WIDTH && point.y >= 0 && point.y <= MAP_HEIGHT);
+  }
+  assert.ok(jfk.x < gimpo.x, 'JFK should be west of Seoul');
+  assert.ok(sydney.y > gimpo.y, 'Sydney should be below Seoul');
   assert.equal(projectToMap(NaN, 127), null);
-  assert.equal(projectToMap(37, 140), null);
+  assert.equal(projectToMap(37, 181), null);
 });
 
-test('viewBox centres on the selected place and stays clamped', () => {
-  const centred = mapViewBoxFor(37.5054, 127.137, 2).split(' ').map(Number);
-  assert.equal(centred[2], MAP_WIDTH / 2);
-  assert.equal(centred[3], MAP_HEIGHT / 2);
-  assert.ok(centred[0] > 0 && centred[0] < MAP_WIDTH / 2);
-  assert.equal(centred[1], 0);
+test('viewBox centres on a place at a tile zoom level and clamps at world zoom', () => {
+  const centre = projectToMap(37.5054, 127.137);
+  const centred = mapViewBoxFor(37.5054, 127.137, 6).split(' ').map(Number);
+  assert.equal(centred[2], MAP_WIDTH / 64);
+  assert.equal(centred[3], MAP_HEIGHT / 64);
+  assert.ok(Math.abs(centred[0] + centred[2] / 2 - centre.x) < 1);
+  assert.ok(Math.abs(centred[1] + centred[3] / 2 - centre.y) < 1);
+  assert.equal(mapViewBoxFor(0, 0, 0), `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
   assert.equal(mapViewBoxFor(NaN, 127), `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
 });
 
 test('map clicks convert projected coordinates back to latitude and longitude', () => {
-  const { x, y } = projectToMap(35.125, 129.5);
-  assert.deepEqual(mapCoordinates(x, y), { latitude: 35.125, longitude: 129.5 });
+  for (const [latitude, longitude] of [[35.125, 129.5], [40.6394, -73.7793], [-33.9399, 151.1753]]) {
+    const { x, y } = projectToMap(latitude, longitude);
+    const restored = mapCoordinates(x, y);
+    assert.ok(Math.abs(restored.latitude - latitude) < 1e-6);
+    assert.ok(Math.abs(restored.longitude - longitude) < 1e-6);
+  }
   assert.equal(mapCoordinates(-1, 0), null);
   assert.equal(mapCoordinates(0, NaN), null);
 });
 
 test('aspect fitting keeps a square phone map centred and inside bounds', () => {
-  assert.equal(fitMapViewBoxToAspect('0 0 320 240', 4 / 3), '0.00 0.00 320.00 240.00');
-  const square = fitMapViewBoxToAspect('0 60 320 120', 1).split(' ').map(Number);
+  assert.equal(
+    fitMapViewBoxToAspect(`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`, 4 / 3),
+    `0.00 ${((MAP_HEIGHT - MAP_HEIGHT * 3 / 4) / 2).toFixed(2)} ${MAP_WIDTH.toFixed(2)} ${(MAP_HEIGHT * 3 / 4).toFixed(2)}`,
+  );
+  const square = fitMapViewBoxToAspect('256 384 512 256', 1).split(' ').map(Number);
   assert.ok(Math.abs(square[2] - square[3]) < 0.01, 'viewBox must match the square viewport');
-  assert.equal(square[1], 0);
-  assert.ok(square[0] > 0 && square[0] + square[2] <= MAP_WIDTH);
-  assert.ok(square[3] <= MAP_HEIGHT);
+  assert.deepEqual(square.slice(0, 2), [256, 256]);
+  assert.ok(square[0] + square[2] <= MAP_WIDTH && square[1] + square[3] <= MAP_HEIGHT);
   assert.equal(fitMapViewBoxToAspect('not a viewBox', 1), 'not a viewBox');
 });

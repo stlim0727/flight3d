@@ -1,31 +1,33 @@
-// Equirectangular helpers for the lobby's Korea map. Pure: no DOM.
-export const MAP_WIDTH = 320;
-export const MAP_HEIGHT = 240;
-export const MAP_BOUNDS = Object.freeze({ west: 124, east: 132, south: 33, north: 39 });
+// Web Mercator helpers for the lobby's global map. Pure: no DOM.
+export const MAP_WIDTH = 1024;
+export const MAP_HEIGHT = 1024;
+export const MAP_BOUNDS = Object.freeze({ west: -180, east: 180, south: -85.0511, north: 85.0511 });
+const MAX_LATITUDE = MAP_BOUNDS.north;
 
 export function projectToMap(latitude, longitude) {
-  if (![latitude, longitude].every(Number.isFinite)) return null;
+  if (![latitude, longitude].every(Number.isFinite) || longitude < MAP_BOUNDS.west || longitude > MAP_BOUNDS.east) return null;
   const x = ((longitude - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west)) * MAP_WIDTH;
-  const y = ((MAP_BOUNDS.north - latitude) / (MAP_BOUNDS.north - MAP_BOUNDS.south)) * MAP_HEIGHT;
+  const limited = Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, latitude));
+  const sine = Math.sin(limited * Math.PI / 180);
+  const y = (0.5 - Math.log((1 + sine) / (1 - sine)) / (4 * Math.PI)) * MAP_HEIGHT;
   if (![x, y].every(Number.isFinite) || x < 0 || x > MAP_WIDTH || y < 0 || y > MAP_HEIGHT) return null;
   return { x, y };
 }
 
 export function mapCoordinates(x, y) {
   if (![x, y].every(Number.isFinite) || x < 0 || y < 0 || x > MAP_WIDTH || y > MAP_HEIGHT) return null;
-  return {
-    latitude: MAP_BOUNDS.north - (y / MAP_HEIGHT) * (MAP_BOUNDS.north - MAP_BOUNDS.south),
-    longitude: MAP_BOUNDS.west + (x / MAP_WIDTH) * (MAP_BOUNDS.east - MAP_BOUNDS.west),
-  };
+  const longitude = MAP_BOUNDS.west + (x / MAP_WIDTH) * (MAP_BOUNDS.east - MAP_BOUNDS.west);
+  const latitude = Math.atan(Math.sinh(Math.PI - (y / MAP_HEIGHT) * 2 * Math.PI)) * 180 / Math.PI;
+  return { latitude, longitude };
 }
 
-/** Return a viewBox centred on a place, clamped to the map bounds. */
-export function mapViewBoxFor(latitude, longitude, zoom = 2) {
+/** Return a viewBox centred on a place at a tile zoom level, clamped to the world. */
+export function mapViewBoxFor(latitude, longitude, zoom = 6) {
   const point = projectToMap(latitude, longitude);
   if (!point) return `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
-  const factor = Number.isFinite(zoom) && zoom >= 1 ? Math.min(zoom, 4) : 2;
-  const width = MAP_WIDTH / factor;
-  const height = MAP_HEIGHT / factor;
+  const level = Number.isFinite(zoom) ? Math.max(0, Math.min(12, Math.round(zoom))) : 6;
+  const width = MAP_WIDTH / 2 ** level;
+  const height = MAP_HEIGHT / 2 ** level;
   const x = Math.max(0, Math.min(MAP_WIDTH - width, point.x - width / 2));
   const y = Math.max(0, Math.min(MAP_HEIGHT - height, point.y - height / 2));
   return `${x} ${y} ${width} ${height}`;
