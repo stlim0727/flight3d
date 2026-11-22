@@ -370,7 +370,7 @@ function runwayMarkingsGeometry(descriptor) {
   const usable = end - start;
   const glyphs = [designatorGlyphs(first.ident), designatorGlyphs(second.ident)];
   const cells = glyphs.map(list => list.length ? designatorCell(list.length, innerHalf) : 0);
-  const reach = Math.max(...cells.map(cell => cell ? 85 + 4 * cell + cell / 2 : 0)) + 5;
+  const reach = Math.max(40, ...cells.map(cell => cell ? 85 + 4 * cell + cell / 2 : 0)) + 5;
   const endsFit = usable > 2 * reach;
 
   if (endsFit) {

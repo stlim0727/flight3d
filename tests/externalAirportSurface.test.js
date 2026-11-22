@@ -129,6 +129,12 @@ function quadCoords(vertices, frame) {
   };
 }
 
+function interiorOverlap(a, b) {
+  const epsilon = 0.01;
+  return Math.min(a.vMax, b.vMax) - Math.max(a.vMin, b.vMin) > epsilon
+    && Math.min(a.uMax, b.uMax) - Math.max(a.uMin, b.uMin) > epsilon;
+}
+
 test('descriptors convert WGS84 into ARP-relative metres and keep thresholds distinct', () => {
   const source = airport();
   const result = buildExternalRunwayDescriptors(source);
@@ -359,6 +365,22 @@ test('markings are oriented, separated and bounded across reciprocal and constra
       end('03', { x: -1500, z: 0, elevationM: 12 }, { x: -900, z: 0, elevationM: 12 }, 600),
       end('21', { x: 1500, z: 0, elevationM: 12 }, { x: 900, z: 0, elevationM: 12 }, 600),
     ] },
+    { label: 'no-designator-cell', widthM: 9.1, lengthM: 1000, ends: [
+      end('03', { x: -500, z: 0, elevationM: 12 }),
+      end('21', { x: 500, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'no-font-ident', widthM: 45, lengthM: 1000, ends: [
+      end('N', { x: -500, z: 0, elevationM: 12 }),
+      end('S', { x: 500, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'three-char', widthM: 45, lengthM: 1500, ends: [
+      end('16R', { x: -750, z: 0, elevationM: 12 }),
+      end('34L', { x: 750, z: 0, elevationM: 12 }),
+    ] },
+    { label: 'displaced-short-usable', widthM: 45, lengthM: 3000, expectAim: false, ends: [
+      end('03', { x: -1500, z: 0, elevationM: 12 }, { x: -300, z: 0, elevationM: 12 }, 1200),
+      end('21', { x: 1500, z: 0, elevationM: 12 }, { x: 300, z: 0, elevationM: 12 }, 1200),
+    ] },
   ];
   for (const variant of variants) {
     const [tiled] = buildExternalRunwayDescriptors({
@@ -368,13 +390,27 @@ test('markings are oriented, separated and bounded across reciprocal and constra
     });
     const variantFrame = frameFor(tiled);
     const { quads: variantQuads } = markingQuads(createExternalAirportMesh([tiled]), '201');
-    for (const quad of variantQuads) {
-      const coord = quadCoords(quad, variantFrame);
+    const variantCoords = variantQuads.map(quad => quadCoords(quad, variantFrame));
+    for (const coord of variantCoords) {
       assert.ok(coord.ny > 0, `${variant.label}: marking faces +Y`);
       assert.ok(coord.vMin >= -0.02 && coord.vMax <= variantFrame.length + 0.02,
         `${variant.label}: along stays on the ribbon`);
       assert.ok(coord.uMin >= -variant.widthM / 2 - 0.02 && coord.uMax <= variant.widthM / 2 + 0.02,
         `${variant.label}: lateral stays on the ribbon`);
+    }
+    for (let i = 0; i < variantCoords.length; i++) {
+      for (let j = i + 1; j < variantCoords.length; j++) {
+        assert.ok(!interiorOverlap(variantCoords[i], variantCoords[j]),
+          `${variant.label}: quads ${i} and ${j} overlap`);
+      }
+    }
+    if (variant.expectAim === false) {
+      assert.ok(!variantCoords.some(coord => coord.vSpan > 25 && coord.vSpan < 35 && coord.uSpan > 4),
+        `${variant.label}: aiming points suppressed when usable length <= 700 m`);
+    }
+    if (variant.label === 'three-char') {
+      assert.ok(variantCoords.filter(coord => coord.vSpan <= 3 && coord.v > 70 && coord.v < 100).length > 10,
+        'three-character idents render glyph cells');
     }
   }
   group.dispose();
