@@ -254,7 +254,6 @@ test('jejuSurfaceMaterial matches OpenWorldTerrain satellite colorimetry and dif
     'jejuSurfaceMaterial must apply 14% chroma boost to match OpenWorldTerrain');
   assert.ok(fakeShader.fragmentShader.includes('pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08))'),
     'jejuSurfaceMaterial must apply 1.08 gamma contrast enhancement');
-  assert.equal(mat.polygonOffset, true, 'jejuSurfaceMaterial should have polygonOffset enabled');
 });
 
 

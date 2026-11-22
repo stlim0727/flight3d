@@ -126,9 +126,6 @@ export function jejuSurfaceMaterial({
     roughness,
     metalness,
     side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: 1,
-    polygonOffsetUnits: 1,
   });
 
   material.onBeforeCompile = shader => {
