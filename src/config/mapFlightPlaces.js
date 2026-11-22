@@ -12,6 +12,9 @@ export function cruisePlaces() {
   return Object.entries(REGIONAL_CRUISES).map(([id, place]) => Object.freeze({
     id,
     label: place.en ?? place.ko ?? id,
+    ko: place.ko ?? '',
+    en: place.en ?? '',
+    aliases: [place.ko, place.en].filter(Boolean),
     latitude: place.latitude,
     longitude: place.longitude,
     headingDeg: place.headingDeg,
@@ -37,6 +40,7 @@ export function indexedAirportPlaces(airports) {
     .filter(airport => airport.country === 'KR' && airport.runways?.length)
     .map(airport => Object.freeze({
       code: airport.icao || airport.ident,
+      iata: airport.iata ?? '',
       name: airport.name,
       latitude: airport.latitude,
       longitude: airport.longitude,
