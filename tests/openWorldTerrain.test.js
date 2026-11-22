@@ -214,14 +214,14 @@ test('scales multi-tile z13/z14 detail budget and anisotropy with render quality
   assert.equal(world.detailWanted.get('midA'), 13);
   assert.equal(world.detailWanted.get('midB'), 13);
 
-  world.detailWanted.clear();
+  // Lowering quality while tiles remain visible must immediately reconcile retained selections.
   world.setImageryQuality('performance', 4);
   assert.equal(world.imageryBudget.anisotropy, 4);
   world.updateImageryDetail(camera, 1080, 500);
   assert.equal(world.detailWanted.get('near'), 13);
   assert.equal(world.detailWanted.get('midA'), 12);
+  assert.equal(world.detailWanted.get('midB'), 12);
 
-  world.detailWanted.clear();
   world.setImageryQuality('ultraLow', 16);
   assert.equal(world.imageryBudget.anisotropy, 2);
   world.updateImageryDetail(camera, 1080, 800);

@@ -830,6 +830,24 @@ export class OpenWorldTerrain {
       // Ranking controls new requests. A resident tile keeps its detail while
       // it is still useful, even if another tile grows larger on screen.
       const budget = this.imageryBudget;
+      // Reconcile resident selections against the active quality budget so
+      // lowering render quality immediately shrinks retained detail tiles.
+      if (wanted.size > 0) {
+        const byPriority = [...wanted.entries()]
+          .sort(([a], [b]) => (this.tiles.get(b)?.imageryPriority ?? 0) - (this.tiles.get(a)?.imageryPriority ?? 0));
+        wanted.clear();
+        let keptHigh = 0;
+        let keptUltra = 0;
+        for (const [key, level] of byPriority) {
+          if (wanted.size >= budget.detailTileLimit) break;
+          let capped = level;
+          if (capped >= 14 && keptUltra >= budget.ultraDetailTileLimit) capped = 13;
+          if (capped >= 13 && keptHigh >= budget.highDetailTileLimit) capped = 12;
+          wanted.set(key, capped);
+          if (capped >= 13) keptHigh++;
+          if (capped >= 14) keptUltra++;
+        }
+      }
       let highDetailCount = 0;
       let ultraDetailCount = 0;
       for (const level of wanted.values()) {
