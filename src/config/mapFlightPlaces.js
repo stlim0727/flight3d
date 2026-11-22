@@ -3,6 +3,8 @@
 import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
 import { registerExternalDestinations } from './externalDestinations.js';
 import { REGIONAL_CRUISES } from './regionalCruises.js';
+import { haversineDistanceM, JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { INCHEON_PATCH } from '../geospatial/incheon.js';
 
 const KOREA_CENTRE = Object.freeze({ latitude: 36.4, longitude: 127.9, radiusKm: 700 });
 
@@ -18,6 +20,18 @@ export function cruisePlaces() {
   }));
 }
 
+
+/** Pick the geographic scene anchor whose frame can stream this map plan. */
+export function mapPlanRegion(plan, places = {}) {
+  if (plan?.state === 'cruise') {
+    return places.points?.find(point => point.id === plan.pointId)?.airport ?? null;
+  }
+  const airport = places.airports?.find(entry => entry.code === plan?.airportCode);
+  if (!airport || !Number.isFinite(airport.latitude) || !Number.isFinite(airport.longitude)) return null;
+  const incheon = haversineDistanceM(airport.latitude, airport.longitude, INCHEON_PATCH.origin.latitude, INCHEON_PATCH.origin.longitude);
+  const jeju = haversineDistanceM(airport.latitude, airport.longitude, JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
+  return jeju < incheon ? 'jeju' : 'incheon';
+}
 export function indexedAirportPlaces(airports) {
   return airports
     .filter(airport => airport.country === 'KR' && airport.runways?.length)

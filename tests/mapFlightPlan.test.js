@@ -5,6 +5,7 @@ import {
   takeoffSpawnPlan, cruiseSpawnPlan, approachSpawnPlan, resolveMapFlightPlan,
 } from '../src/config/mapFlightPlan.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { mapPlanRegion } from '../src/config/mapFlightPlaces.js';
 
 const close = (actual, expected, epsilon = 1e-9, label = 'value') => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${label}: ${actual} != ${expected}`);
@@ -245,4 +246,16 @@ test('runway starts use the aircraft-specific resting gear height', () => {
   close(c172.y - frame.threshold.elevationM, 1.35, 1e-9, 'C172 clearance');
   const approach = approachSpawnPlan({ frame, distanceM: 0, aircraftId: 'C172' });
   close(approach.y - frame.threshold.elevationM, 1.35, 1e-9, 'C172 approach clearance');
+});
+
+test('map plans select the geographic anchor that can stream their location', () => {
+  assert.equal(mapPlanRegion({ state: 'cruise', pointId: 'jamsil' }, {
+    points: [{ id: 'jamsil', airport: 'incheon' }],
+  }), 'incheon');
+  assert.equal(mapPlanRegion({ state: 'approach', airportCode: 'RKPC' }, {
+    airports: [{ code: 'RKPC', latitude: 33.512, longitude: 126.493 }],
+  }), 'jeju');
+  assert.equal(mapPlanRegion({ state: 'runway', airportCode: 'RKSS' }, {
+    airports: [{ code: 'RKSS', latitude: 37.558, longitude: 126.791 }],
+  }), 'incheon');
 });

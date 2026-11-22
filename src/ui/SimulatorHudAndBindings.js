@@ -11,7 +11,7 @@ import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
-import { loadMapFlightPlaces } from '../config/mapFlightPlaces.js';
+import { loadMapFlightPlaces, mapPlanRegion } from '../config/mapFlightPlaces.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
@@ -662,6 +662,8 @@ class SimulatorHudAndBindingsMethods {
         this.lobby.mapPlan = plan?.state === 'none' ? null : plan;
         if (this.lobby.mapPlan) {
           this.lobby.preset = this.lobby.mapPlan.state;
+          const region = mapPlanRegion(this.lobby.mapPlan, this.mapPlaces);
+          if (region) this.lobby.airport = region;
           if (this.lobby.mapPlan.state !== 'cruise' && this.lobby.mapPlan.airportCode) {
             this.lobby.destination = this.lobby.mapPlan.airportCode;
             this.destinationAirport = this.lobby.mapPlan.airportCode;

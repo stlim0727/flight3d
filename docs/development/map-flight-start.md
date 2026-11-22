@@ -13,11 +13,13 @@ anchor behaviour.
 - `#lobby-map-runway` lists each runway end of the selected airport; the value
   is `${runwayId}:${endId}` and the label shows the end ident and heading.
 - `#lobby-map-point` lists `REGIONAL_CRUISES` places for cruise starts.
-- `#lobby-map-departure` is optional and does not change the scene anchor.
+- `#lobby-map-departure` is optional and never selects a departure airport; the geographic scene anchor is derived from the map location as described below.
 
 `loadMapFlightPlaces()` reads a regional tile set from the airport index and
 filters Korean airports; cruise points come from `REGIONAL_CRUISES`. No
-per-airport coordinates are hand-authored in the UI.
+per-airport coordinates are hand-authored in the UI. Selecting a map plan also
+chooses the scene anchor that can stream the location: cruise points use their
+declared airport, and runways use the nearer of the Incheon and Jeju origins.
 
 `resolveLobbyMapPlan()` freezes the choice into the start request before async
 preparation. It calls `resolveMapFlightPlan()` with the selected airport,
