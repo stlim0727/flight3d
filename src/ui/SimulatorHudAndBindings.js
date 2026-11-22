@@ -144,6 +144,15 @@ class SimulatorHudAndBindingsMethods {
       this.showToast(() => t('sound.value', { value: this.audio.getVolumeState().text }));
     };
 
+    this.controls.onToggleMap = () => {
+      const map = document.getElementById('pilotage-map');
+      // Clicking the summary toggles the sheet like a pilot's tap, so the
+      // unfold/fold rustle follows the same path as the on-screen button.
+      if (map && !map.hidden && this.gameFlow.state === FLOW.FLIGHT) map.querySelector('summary')?.click();
+      // M used to mute; flights without a chart point players to the new key.
+      else this.showToast(() => t('notice.mapUnavailable'));
+    };
+
     this.controls.onResetLook = () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
