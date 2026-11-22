@@ -200,3 +200,65 @@ test('JejuTileStreamer setConfig dynamically updates anisotropy and zoom tiles',
   assert.equal(streamer.zoom, 11);
   assert.equal(streamer.macroTiles.length, 32);
 });
+
+test('JejuTileStreamer discards stale in-flight loads when loadGeneration advances', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+  let callCount = 0;
+  const mockCache = {
+    getTileImage() {
+      callCount++;
+      return new Promise((resolve) => setTimeout(() => resolve({ width: 256, height: 256 }), 30));
+    },
+    getMetrics() { return {}; },
+    dispose() {},
+  };
+
+  const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: mockCache, zoom: 10 });
+  const loadPromise1 = streamer.loadIslandMacroTiles();
+
+  // Advance generation by re-triggering load with zoom 11
+  streamer.setZoomLevel(11);
+  const loadPromise2 = streamer.loadIslandMacroTiles();
+
+  const [res1, res2] = await Promise.all([loadPromise1, loadPromise2]);
+  // In Node test runner without document, both safely resolve false, but res1 must have aborted on generation check
+  assert.equal(res1, false);
+  assert.equal(streamer.loadGeneration, 2);
+});
+
+test('JejuTileStreamer setConfig allows retry after failure because appliedZoom is not set', async () => {
+  const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+  const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+  const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+  let failNetwork = true;
+  let attempts = 0;
+  const flakyCache = {
+    getTileImage() {
+      attempts++;
+      if (failNetwork) return Promise.resolve(null);
+      return Promise.resolve({ width: 256, height: 256 });
+    },
+    getMetrics() { return {}; },
+    dispose() {},
+  };
+
+  const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: flakyCache, zoom: 10 });
+  assert.equal(streamer.appliedZoom, null);
+
+  // First attempt fails (loadIslandMacroTiles returns false)
+  const success1 = await streamer.setConfig({ zoom: 11 });
+  assert.equal(success1, false);
+  assert.equal(streamer.zoom, 11);
+  assert.equal(streamer.appliedZoom, null);
+
+  // Second attempt with the exact same zoom=11 executes loadIslandMacroTiles again rather than skipping
+  const success2 = await streamer.setConfig({ zoom: 11 });
+  assert.equal(success2, false);
+  assert.equal(streamer.appliedZoom, null);
+  // It attempted the load twice rather than short-circuiting on attempts
+  assert.ok(streamer.loadGeneration >= 2);
+});

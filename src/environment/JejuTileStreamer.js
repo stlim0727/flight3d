@@ -86,21 +86,10 @@ export class JejuTileStreamer {
     const urlAnisotropy = parseInt(getQueryParam('jejuAnisotropy'), 10);
     this.anisotropy = Number.isFinite(urlAnisotropy) ? urlAnisotropy : (options.anisotropy ?? 1);
 
-    if (this.zoom === 11) {
-      this.minTileX = 1740;
-      this.totalTilesX = 8;
-      this.minTileY = 820;
-      this.totalTilesY = 4;
-      this.macroTiles = createJejuMacroTiles(11);
-    } else {
-      this.zoom = 10;
-      this.minTileX = 870;
-      this.totalTilesX = 4;
-      this.minTileY = 410;
-      this.totalTilesY = 2;
-      this.macroTiles = JEJU_MACRO_TILES;
-    }
+    this.setZoomLevel(this.zoom);
 
+    this.appliedZoom = null;
+    this.loadGeneration = 0;
     this.macroTexture = null;
     this.canvas = null;
     this.tilesLoaded = 0;
@@ -125,6 +114,24 @@ export class JejuTileStreamer {
       minZ: Math.min(nwZ, seZ),
       maxZ: Math.max(nwZ, seZ),
     };
+  }
+
+  setZoomLevel(zoom) {
+    if (zoom === 11) {
+      this.zoom = 11;
+      this.minTileX = 1740;
+      this.totalTilesX = 8;
+      this.minTileY = 820;
+      this.totalTilesY = 4;
+      this.macroTiles = createJejuMacroTiles(11);
+    } else {
+      this.zoom = 10;
+      this.minTileX = 870;
+      this.totalTilesX = 4;
+      this.minTileY = 410;
+      this.totalTilesY = 2;
+      this.macroTiles = JEJU_MACRO_TILES;
+    }
   }
 
   /**
@@ -195,6 +202,8 @@ export class JejuTileStreamer {
    * @returns {Promise<boolean>} Whether satellite streaming successfully applied
    */
   async loadIslandMacroTiles() {
+    const generation = ++this.loadGeneration;
+
     if (this.disposed || typeof document === 'undefined') {
       // In headless test environments or disposed instance
       return false;
@@ -204,6 +213,7 @@ export class JejuTileStreamer {
 
     try {
       const tiles = this.macroTiles;
+      const targetZoom = this.zoom;
       // Fetch macro tiles concurrently through the rate-limited CacheManager
       const tilePromises = tiles.map(async (t) => {
         const img = await this.cacheManager.getTileImage(t.z, t.x, t.y);
@@ -211,7 +221,7 @@ export class JejuTileStreamer {
       });
 
       const results = await Promise.all(tilePromises);
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
       const successful = results.filter((r) => r.img && r.img.width > 0);
 
@@ -240,7 +250,7 @@ export class JejuTileStreamer {
       this.canvas.height = canvasHeight;
 
       const ctx = this.canvas.getContext('2d');
-      if (!ctx || this.disposed) return false;
+      if (!ctx || this.disposed || generation !== this.loadGeneration) return false;
 
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
@@ -248,12 +258,12 @@ export class JejuTileStreamer {
         ctx.drawImage(t.img, t.col * 256, t.row * 256, 256, 256);
       }
 
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
       // Update mesh UV mapping
       this.updateMeshUVs();
 
-      if (this.disposed) return false;
+      if (this.disposed || generation !== this.loadGeneration) return false;
 
       // Recreate Three.js texture when dimensions change (WebGL2 immutable storage requirement)
       if (dimensionsChanged && this.macroTexture) {
@@ -270,11 +280,12 @@ export class JejuTileStreamer {
       this.macroTexture.anisotropy = this.anisotropy;
       this.macroTexture.needsUpdate = true;
 
-      // Thread 3: Check disposed state before applying texture to terrain material
-      if (this.terrainMesh?.material && !this.disposed) {
+      // Thread 3: Check disposed state and generation match before applying texture to terrain material
+      if (this.terrainMesh?.material && !this.disposed && generation === this.loadGeneration) {
         this.terrainMesh.material.map = this.macroTexture;
         this.terrainMesh.material.vertexColors = false;
         this.terrainMesh.material.needsUpdate = true;
+        this.appliedZoom = targetZoom;
       }
 
       return true;
@@ -300,22 +311,8 @@ export class JejuTileStreamer {
       }
     }
 
-    if (zoom !== undefined && zoom !== this.zoom) {
-      this.zoom = zoom;
-      if (this.zoom === 11) {
-        this.minTileX = 1740;
-        this.totalTilesX = 8;
-        this.minTileY = 820;
-        this.totalTilesY = 4;
-        this.macroTiles = createJejuMacroTiles(11);
-      } else {
-        this.zoom = 10;
-        this.minTileX = 870;
-        this.totalTilesX = 4;
-        this.minTileY = 410;
-        this.totalTilesY = 2;
-        this.macroTiles = JEJU_MACRO_TILES;
-      }
+    if (zoom !== undefined && (zoom !== this.appliedZoom || !this.macroTexture)) {
+      this.setZoomLevel(zoom);
       return this.loadIslandMacroTiles();
     }
 
@@ -341,7 +338,9 @@ export class JejuTileStreamer {
    */
   dispose() {
     this.disposed = true;
+    this.loadGeneration++;
     this.isStreaming = false;
+    this.appliedZoom = null;
     if (this.macroTexture) {
       this.macroTexture.dispose();
       this.macroTexture = null;
