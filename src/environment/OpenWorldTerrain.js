@@ -581,6 +581,28 @@ export class OpenWorldTerrain {
     return { height: Math.max(0, height), water };
   }
 
+  sampleRaw(x, z) {
+    if (this.protects(x, z)) return undefined;
+    const { x: tx, y: ty, fx, fy } = this.coordinate(x, z);
+    const tile = this.tiles.get(keyOf(wrapX(tx), ty));
+    if (!tile?.raster) return undefined;
+    const px = fx * (samples - 1);
+    const py = fy * (samples - 1);
+    const x0 = Math.floor(px);
+    const y0 = Math.floor(py);
+    const x1 = Math.min(samples - 1, x0 + 1);
+    const y1 = Math.min(samples - 1, y0 + 1);
+    const dx = px - x0;
+    const dy = py - y0;
+    const r = tile.raster;
+    const h00 = r[y0 * samples + x0];
+    const h10 = r[y0 * samples + x1];
+    const h01 = r[y1 * samples + x0];
+    const h11 = r[y1 * samples + x1];
+    const height = (h00 * (1 - dx) + h10 * dx) * (1 - dy) + (h01 * (1 - dx) + h11 * dx) * dy;
+    return Number.isFinite(height) ? Math.max(0, height) : undefined;
+  }
+
   readyAt(x, z) {
     if (this.protects(x, z)) return true;
     const { x: tx, y: ty } = this.coordinate(x, z);
@@ -1076,7 +1098,7 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      const entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       if (local) {
         const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
         if (west < half && eastEdge > -half && north < half && southEdge > -half) {

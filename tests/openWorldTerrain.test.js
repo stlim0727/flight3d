@@ -566,5 +566,7 @@ test('OpenWorldTerrain blends vertices near registered external airport runways'
   const sampled = openWorld.sample(0, 0);
   assert.ok(sampled);
   assert.ok(sampled.height < 10, `Height at airport centre should be close to runway elevation: got ${sampled.height}`);
+  const raw = openWorld.sampleRaw(0, 0);
+  assert.equal(Math.round(raw), 25, 'sampleRaw must return the unblended DEM height');
   openWorld.dispose();
 });
