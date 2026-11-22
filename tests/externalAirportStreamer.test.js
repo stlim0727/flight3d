@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { BASE_OFFSETS } from '../src/world/UnifiedWorld.js';
 import { ExternalAirportStreamer } from '../src/world/ExternalAirportStreamer.js';
 
 const flush = () => new Promise(resolve => setImmediate(resolve));
@@ -22,7 +23,12 @@ function harness({ descriptor: initialDescriptor, ...options } = {}) {
     registerDynamic(id, spec) {
       assert.ok(Array.isArray(spec.baseOffset), 'dynamic baseOffset must be an array');
       events.registered.push([id, spec]);
-      this.offsets.set(id, spec.baseOffset);
+      const anchor = BASE_OFFSETS[this.anchor];
+      this.offsets.set(id, [spec.baseOffset[0] - anchor[0], spec.baseOffset[1] - anchor[1]]);
+    },
+    incheonFrameToAnchor(x, z) {
+      const anchor = BASE_OFFSETS[this.anchor];
+      return [x - anchor[0], z - anchor[1]];
     },
     unregister(id) {
       events.unregistered.push(id);
@@ -255,4 +261,43 @@ test('changing destination while on a runway keeps the occupied region until air
   assert.deepEqual(h.events.unregistered, ['RKSS']);
   assert.equal(h.events.removed.length, 1);
   assert.equal(h.events.disposed.length, 1);
+});
+
+test('reselecting the occupied airport cancels retirement without unmounting', async () => {
+  const h = harness();
+  assert.equal(await h.streamer.ensure('RKSS'), true);
+  h.streamer.setDestination(null);
+  assert.equal(h.events.unregistered.length, 0);
+  h.streamer.setDestination('RKSS');
+  assert.equal(h.events.unregistered.length, 0, 'reselect keeps the same contact surface');
+  assert.equal(h.events.removed.length, 0);
+  assert.equal(h.streamer.statusFor('RKSS').state, 'ready');
+  h.streamer.update({ x: 0, z: 0, onGround: true, onRunway: true, destinationCode: 'RKSS' });
+  assert.equal(h.events.unregistered.length, 0, 'ground update does not retire reselected region');
+});
+
+test('an unloaded destination is rebased when the spawn anchor changes', async () => {
+  const h = harness({
+    descriptor: {
+      icao: 'RKSS', latitude: 37.5583, longitude: 126.791, elevationM: 18, runways: [],
+    },
+  });
+  h.world.anchor = 'jeju';
+  assert.equal(await h.streamer.ensure('RKSS'), true);
+  const [baseX, baseZ] = projectToLocal(37.5583, 126.791);
+  h.streamer.update({
+    x: baseX - BASE_OFFSETS.jeju[0] + 200000,
+    z: baseZ - BASE_OFFSETS.jeju[1],
+    onGround: false, onRunway: false, destinationCode: 'RKSS',
+  });
+  assert.deepEqual(h.events.unregistered, ['RKSS']);
+  assert.equal(h.events.loads.length, 1);
+
+  h.world.anchor = 'incheon';
+  h.streamer.update({
+    x: baseX, z: baseZ, onGround: false, onRunway: false, destinationCode: 'RKSS',
+  });
+  await flush();
+  assert.equal(h.events.loads.length, 2, 'near the real destination a new load starts');
+  assert.equal(h.streamer.statusFor('RKSS').state, 'ready');
 });

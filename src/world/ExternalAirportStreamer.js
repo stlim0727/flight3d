@@ -93,7 +93,18 @@ export class ExternalAirportStreamer {
     this._token += 1;
     this._loadingPromise = null;
     // A destination change is only a wish. Keep the currently occupied region
-    // until update() can confirm the aircraft has left its runway.
+    // until update() can confirm the aircraft has left its runway. Re-selecting
+    // the already mounted airport cancels retirement instead of unmounting it.
+    if (this._loaded && this._loaded.code === next) {
+      this._retired = null;
+      this._code = next;
+      this._state = 'ready';
+      this._error = null;
+      this._failedAt = 0;
+      this._needsRearm = false;
+      this._report();
+      return;
+    }
     if (this._loaded && this._loaded.code !== next) this._retired = this._loaded.code;
     else this._unmount();
     this._code = next;
@@ -179,6 +190,9 @@ export class ExternalAirportStreamer {
 
   _distance(x, z, code) {
     let offset = this.world?.offsets?.get?.(code);
+    if (!validOffset(offset) && validOffset(this._lastOffset)) {
+      offset = this.world?.incheonFrameToAnchor?.(this._lastOffset[0], this._lastOffset[1]);
+    }
     if (!validOffset(offset)) offset = this._lastOffset;
     if (!validOffset(offset)) return 0;
     this._lastOffset = [offset[0], offset[1]];
@@ -190,8 +204,8 @@ export class ExternalAirportStreamer {
   _unmount() {
     const loaded = this._loaded;
     if (!loaded) return;
-    const worldOffset = this.world?.offsets?.get?.(loaded.code);
-    this._lastOffset = validOffset(worldOffset) ? [worldOffset[0], worldOffset[1]] : loaded.offset;
+    // Keep the Incheon-frame base offset; the anchor can change while unmounted.
+    this._lastOffset = [loaded.baseOffset[0], loaded.baseOffset[1]];
     this._loaded = null;
     if (loaded.group) {
       try { this.scene?.remove?.(loaded.group); } catch { /* cleanup must continue */ }
@@ -274,7 +288,7 @@ export class ExternalAirportStreamer {
         ? [published[0], published[1]]
         : [baseOffset[0], baseOffset[1]];
       this._loaded = { code, region, descriptor, baseOffset, offset, group };
-      this._lastOffset = offset;
+      this._lastOffset = [baseOffset[0], baseOffset[1]];
       this._state = 'ready';
       this._error = null;
       this._report();
