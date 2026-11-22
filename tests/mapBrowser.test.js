@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { projectToMap, mapViewBoxFor, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
+import { mapCoordinates, projectToMap, mapViewBoxFor, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
 
 test('map projection keeps Korean airports inside the compact SVG', () => {
   const gimpo = projectToMap(37.5583, 126.791);
@@ -18,4 +18,11 @@ test('viewBox centres on the selected place and stays clamped', () => {
   assert.ok(centred[0] > 0 && centred[0] < MAP_WIDTH / 2);
   assert.equal(centred[1], 0);
   assert.equal(mapViewBoxFor(NaN, 127), `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`);
+});
+
+test('map clicks convert projected coordinates back to latitude and longitude', () => {
+  const { x, y } = projectToMap(35.125, 129.5);
+  assert.deepEqual(mapCoordinates(x, y), { latitude: 35.125, longitude: 129.5 });
+  assert.equal(mapCoordinates(-1, 0), null);
+  assert.equal(mapCoordinates(0, NaN), null);
 });

@@ -4,6 +4,7 @@ import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
+import { mapCruisePoint } from '../config/mapFlightPlaces.js';
 import { resolveMapFlightPlan } from '../config/mapFlightPlan.js';
 import { BASE_OFFSETS } from '../world/UnifiedWorld.js';
 import { projectToLocal } from '../geospatial/incheon.js';
@@ -79,7 +80,7 @@ function resolveLobbyMapPlan(sim) {
   if (!choice || choice.state === 'none') return null;
   const catalog = sim.mapPlaces;
   const airport = catalog?.airports?.find(entry => entry.code === choice.airportCode);
-  const point = catalog?.points?.find(entry => entry.id === choice.pointId);
+  const point = mapCruisePoint(choice, catalog);
   const [runwayId, endId] = (choice.runwayKey ?? '').split(':');
   const baseOffset = airport ? projectToLocal(airport.latitude, airport.longitude) : [0, 0];
   const anchorBase = BASE_OFFSETS[sim.activeAirport] ?? [0, 0];

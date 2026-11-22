@@ -311,6 +311,9 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   border-radius: 6px;
 }
 .lobby-map-backdrop { fill: rgba(30, 41, 59, .7); stroke: #475569; stroke-width: 1px; }
+.lobby-map-grid { fill: none; stroke: #334155; stroke-width: .6; }
+#lobby-map-svg { cursor: crosshair; }
+.lobby-map-tools { display: flex; align-items: center; justify-content: space-between; gap: .5em; }
 .lobby-map-marker { fill: #86d5ff; stroke: #0f172a; stroke-width: 1px; cursor: pointer; }
 .lobby-map-marker.active { fill: #fbbf24; }
 .lobby-map-status { margin: 0; color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
@@ -362,7 +365,7 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-language .btn { min-height: calc(24px * var(--ui-scale, 1)); padding: calc(2px * var(--ui-scale, 1)) calc(6px * var(--ui-scale, 1)); font-size: calc(10px * var(--ui-scale, 1)); }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */
 .lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
-#lobby-time-select, #lobby-regional-cruise { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
+#lobby-time-select { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
 .lobby-tabs { display: flex; gap: calc(3px * var(--ui-scale, 1)); padding: calc(3px * var(--ui-scale, 1)); background: rgba(0, 0, 0, .25); border-radius: calc(8px * var(--ui-scale, 1)); }
 .lobby-tabs > .lobby-tab { flex: 1; }
 .lobby-tabs > [hidden] { display: none; }

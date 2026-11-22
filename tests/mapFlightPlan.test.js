@@ -5,7 +5,7 @@ import {
   takeoffSpawnPlan, cruiseSpawnPlan, approachSpawnPlan, resolveMapFlightPlan,
 } from '../src/config/mapFlightPlan.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
-import { mapPlanRegion } from '../src/config/mapFlightPlaces.js';
+import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion } from '../src/config/mapFlightPlaces.js';
 
 const close = (actual, expected, epsilon = 1e-9, label = 'value') => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${label}: ${actual} != ${expected}`);
@@ -260,7 +260,7 @@ test('runway starts use the aircraft-specific resting gear height', () => {
 
 test('map plans select the geographic anchor that can stream their location', () => {
   assert.equal(mapPlanRegion({ state: 'cruise', pointId: 'jamsil' }, {
-    points: [{ id: 'jamsil', airport: 'incheon' }],
+    points: [{ id: 'jamsil', airport: 'incheon', latitude: 37.5, longitude: 127.1 }],
   }), 'incheon');
   assert.equal(mapPlanRegion({ state: 'approach', airportCode: 'RKPC' }, {
     airports: [{ code: 'RKPC', latitude: 33.512, longitude: 126.493 }],
@@ -268,4 +268,22 @@ test('map plans select the geographic anchor that can stream their location', ()
   assert.equal(mapPlanRegion({ state: 'runway', airportCode: 'RKSS' }, {
     airports: [{ code: 'RKSS', latitude: 37.558, longitude: 126.791 }],
   }), 'incheon');
+});
+
+test('map cruise uses airport elevation or a default altitude for a custom point', () => {
+  const airports = [{ code: 'RKSS', latitude: 37.56, longitude: 126.8, elevationM: 18 }];
+  const airportPlan = { state: 'cruise', airportCode: 'RKSS' };
+  const airport = mapCruisePoint(airportPlan, { airports });
+  assert.equal(airport.altitudeM, 1218);
+  assert.equal(mapPlanRegion(airportPlan, { airports }), 'incheon');
+  const customPlan = { state: 'cruise', point: { latitude: 33.5, longitude: 126.5 } };
+  assert.equal(mapCruisePoint(customPlan).altitudeM, 3500);
+  assert.equal(mapPlanRegion(customPlan), 'jeju');
+});
+
+test('default bookmarks include indexed major airports and regional cities', () => {
+  const airports = [{ code: 'RKSS', name: 'Gimpo' }, { code: 'OTHER', name: 'Other' }];
+  assert.deepEqual(defaultMapBookmarks({ airports, points: cruisePlaces() }).map(({ kind, id }) => [kind, id]), [
+    ['airport', 'RKSS'], ['point', 'jamsil'], ['point', 'suwon'], ['point', 'busan'],
+  ]);
 });
