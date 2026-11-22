@@ -1035,13 +1035,15 @@ export class OpenWorldTerrain {
   async load(tile) {
     const { x, y, key } = tile;
     const controller = new AbortController();
+    this.pending.get(key)?.abort();
     this.pending.set(key, controller);
+    let entry = null;
     try {
       const waterData = this.fetchWater(tile, controller.signal);
       const [raster, east, south, southeast, water] = await Promise.all([
         this.raster(x, y), this.raster(wrapX(x + 1), y), this.raster(x, y + 1), this.raster(wrapX(x + 1), y + 1), waterData,
       ]);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || this.pending.get(key) !== controller) return;
       const local = this.localSurface;
       const half = local?.size / 2;
       const blendDistance = 1200;
@@ -1087,7 +1089,7 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
+      entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
       if (local) {
         const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
         if (west < half && eastEdge > -half && north < half && southEdge > -half) {
@@ -1099,6 +1101,10 @@ export class OpenWorldTerrain {
             mesh.add(entry.localMesh);
           }
         }
+      }
+      if (controller.signal.aborted || this.pending.get(key) !== controller) {
+        this.releaseEntry(entry);
+        return;
       }
       this.updateRenderGeometry(entry, key);
       const previous = this.tiles.get(key);
@@ -1113,7 +1119,17 @@ export class OpenWorldTerrain {
         entry.detailLevel = previous.detailLevel;
         entry.detail.map.value = previous.detailMap;
         entry.detail.blend.value = previous.detail.blend.value;
+        entry.detailUpdatedAt = previous.detailUpdatedAt ?? performance.now();
+        if (previous.detailLastVisibleAt !== undefined) {
+          entry.detailLastVisibleAt = previous.detailLastVisibleAt;
+        }
         previous.detailMap = null;
+      }
+      if (previous?.detail?.edges) {
+        entry.detail.edges.value.copy(previous.detail.edges.value);
+      }
+      if (previous?.detail?.corners) {
+        entry.detail.corners.value.copy(previous.detail.corners.value);
       }
       if (previous?.previousDetailMap) {
         entry.previousDetailMap = previous.previousDetailMap;
@@ -1126,9 +1142,13 @@ export class OpenWorldTerrain {
       }
       this.retry.delete(key);
     } catch {
-      if (!controller.signal.aborted) this.retry.set(key, performance.now() + 4000);
+      if (!controller.signal.aborted && this.pending.get(key) === controller) {
+        this.retry.set(key, performance.now() + 4000);
+      }
     } finally {
-      this.pending.delete(key);
+      if (this.pending.get(key) === controller) {
+        this.pending.delete(key);
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3, Vector4 } from 'three';
+import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Texture, Vector3, Vector4 } from 'three';
 import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
@@ -660,6 +660,92 @@ test('sampleRaw matches triangle interpolation on rawHeight matching mesh vertic
 
   const raw = openWorld.sampleRaw(0, 0);
   assert.equal(Math.round(raw), 196);
+
+  openWorld.dispose();
+});
+
+test('reloaded tile preserves transferred detail imagery timestamp without NaN blend', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  openWorld.raster = () => Promise.resolve(raster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const entry = openWorld.tiles.get(`${x}/${y}`);
+  const texture = new Texture();
+  entry.detailMap = texture;
+  entry.detailLevel = 13;
+  entry.detail.map.value = texture;
+  entry.detail.blend.value = 0.5;
+  entry.detailUpdatedAt = 1000;
+
+  // Invalidate to reload
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const reloaded = openWorld.tiles.get(`${x}/${y}`);
+  assert.equal(reloaded.detailMap, texture);
+  assert.equal(reloaded.detailUpdatedAt, 1000);
+
+  // updateImageryDetail should advance blend without NaN
+  const camera = new PerspectiveCamera(60, 1, 0.1, 1000);
+  openWorld.detailWanted.set(`${x}/${y}`, 13);
+  openWorld.updateImageryDetail(camera, 1080, 1500);
+  assert.equal(Number.isFinite(reloaded.detail.blend.value), true);
+  assert.ok(reloaded.detail.blend.value > 0.5);
+
+  openWorld.dispose();
+});
+
+test('aborted load finally does not remove newer pending controller for same tile', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  let resolveFirst, resolveSecond;
+  const unblockFirst = new Promise(resolve => { resolveFirst = resolve; });
+  const unblockSecond = new Promise(resolve => { resolveSecond = resolve; });
+  let phase = 1;
+  openWorld.raster = () => {
+    if (phase === 1) return unblockFirst.then(() => raster);
+    if (phase === 2) return unblockSecond.then(() => raster);
+    return Promise.resolve(raster);
+  };
+  openWorld.fetchWater = () => Promise.resolve(null);
+
+  // Start first load (blocked on unblockFirst)
+  const firstPromise = openWorld.load({ x, y, key: `${x}/${y}` });
+  const firstController = openWorld.pending.get(`${x}/${y}`);
+  assert.ok(firstController);
+
+  // Start second load for same key (which aborts first and sets second controller, blocked on unblockSecond)
+  phase = 2;
+  const secondPromise = openWorld.load({ x, y, key: `${x}/${y}` });
+  const secondController = openWorld.pending.get(`${x}/${y}`);
+  assert.ok(secondController && secondController !== firstController);
+
+  // Allow first to unblock and run its finally block
+  resolveFirst();
+  await firstPromise;
+
+  // The second controller must NOT have been deleted from pending by first's finally
+  assert.equal(openWorld.pending.get(`${x}/${y}`), secondController);
+
+  // Allow second to complete
+  resolveSecond();
+  await secondPromise;
+  assert.equal(openWorld.pending.has(`${x}/${y}`), false);
 
   openWorld.dispose();
 });
