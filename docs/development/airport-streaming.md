@@ -75,7 +75,9 @@ model branches on the streaming state.
 
 `npm run test:airport-landing` runs in hardware Vulkan Chrome: GPU preflight
 passes, the index-backed region mounts with two runway ribbons, contact height
-matches the indexed threshold, and the aircraft is supported and stopped on
-the streamed runway with screenshots in `.cache/airport-landing/`. The
-CDP-injected takeoff attempt did not accelerate through input arbitration, so
-full re-takeoff is not claimed. Node tests do not prove rendering or touchdown.
+matches the indexed threshold, and the aircraft is supported, stopped on the
+streamed runway, then rotated and climbed away with all gear airborne and a
+positive climb rate. Rotation uses the same virtual elevator input path as the
+touch/controller interfaces; CDP only starts the preset, injects commands and
+reads state. Screenshots are in `.cache/airport-landing/`. Node tests do not
+prove rendering or touchdown.

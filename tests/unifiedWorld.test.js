@@ -6,6 +6,7 @@ import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS } from '../src/geospatial/airportGeodesy.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
+import { projectToLocal } from '../src/geospatial/incheon.js';
 
 function fakeRegion(height, runwayLocal = null) {
   const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
@@ -403,4 +404,21 @@ test('unmount keeps destination guidance and unknown codes never point at the or
   assert.deepEqual(world.incheonFrameToAnchor(30000, -2000), [
     30000 - BASE_OFFSETS.jeju[0], -2000 - BASE_OFFSETS.jeju[1],
   ]);
+});
+
+test('Lukla uses its surveyed WGS84 origin in the world frame', () => {
+  const expected = projectToLocal(AIRPORT_ORIGINS.lukla.latitude, AIRPORT_ORIGINS.lukla.longitude);
+  assert.deepEqual([...BASE_OFFSETS.lukla], expected);
+  const world = new UnifiedWorld('incheon');
+  const info = world.destinationInfo(0, 0, 'lukla');
+  assert.equal(info.id, 'lukla');
+  assert.equal(info.code, 'LUK');
+  assert.equal(info.synthetic, false);
+  assert.equal(info.target, 'threshold');
+  assert.ok(info.bearingDeg > 260 && info.bearingDeg < 270);
+  assert.ok(info.distanceNm > 1000, 'Lukla should be far from Incheon in the real world frame');
+  const expectedThreshold = wgs84ToLocal(
+    RUNWAY_THRESHOLDS.lukla.latitude, RUNWAY_THRESHOLDS.lukla.longitude, AIRPORT_ORIGINS.incheon,
+  );
+  assert.ok(Math.hypot(info.dx - expectedThreshold[0], info.dz - expectedThreshold[1]) < 1);
 });
