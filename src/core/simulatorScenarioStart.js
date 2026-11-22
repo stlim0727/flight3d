@@ -21,6 +21,9 @@ export function createSimulatorScenarioStart(sim) {
         scenario: sim.lobby.preset, demoProfile: sim.lobby.demoProfile,
         pilotMode: sim.lobby.pilotMode || 'human',
         mapPlan: resolveLobbyMapPlan(sim) });
+      if (request.scenario !== 'demo' && sim.touchControls?.gyroRequested && !sim.touchControls?.gyroActive) {
+        sim.touchControls.restoreGyroSettings({ userGesture: true });
+      }
       const wantsDemo = request.scenario === 'demo';
       if (sim.demoDirector?.isActive || sim.demoDirector?.waitingForTerrain) {
         sim.demoDirector.stop(wantsDemo ? null : () => t('manual.control.engaged'));
@@ -35,9 +38,12 @@ export function createSimulatorScenarioStart(sim) {
     installers: {
       // PresetSpawner owns the recording after pose installation; mission adapters
       // own recording before course preparation. Neither is restarted at commit.
-      preset(request) {
+      async preset(request) {
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+        if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
+          await waitForStreamedAirport(sim, request.mapPlan.airportCode);
+        }
         if (!regionalCruise(request.scenario)) return result;
         return waitForRegionalTerrain(sim);
       },
@@ -61,9 +67,7 @@ export function createSimulatorScenarioStart(sim) {
       });
       saveSimulatorPreferences({ demoProfile: request.demoProfile });
       saveFlightSelection(request);
-      if (request.scenario !== 'demo' && sim.touchControls?.gyroRequested && !sim.touchControls?.gyroActive) {
-        sim.touchControls.restoreGyroSettings({ userGesture: true });
-      }
+
       if (sim.multiplayer?.active && sim.multiplayer.preparing) sim.gameFlow.pause();
     },
   });
@@ -88,6 +92,26 @@ function resolveLobbyMapPlan(sim) {
     anchorBase,
     aircraftId: sim.lobby.aircraft ?? sim.currentAircraftId,
   });
+}
+
+async function waitForStreamedAirport(sim, code) {
+  const streamer = sim.airportStreamer;
+  if (!streamer) return;
+  streamer.ensure(code);
+  const deadline = performance.now() + 6000;
+  do {
+    const status = streamer.statusFor?.(code);
+    if (status?.state === 'ready') return;
+    streamer.update?.({
+      x: sim.position.x,
+      z: sim.position.z,
+      speedMps: 0,
+      onGround: Boolean(sim.telemetry?.onGround),
+      onRunway: Boolean(sim.currentAirport?.isOnRunway?.(sim.position.x, sim.position.z)),
+      destinationCode: code,
+    });
+    await new Promise(resolve => setTimeout(resolve, 50));
+  } while (performance.now() < deadline);
 }
 
 async function waitForRegionalTerrain(sim) {

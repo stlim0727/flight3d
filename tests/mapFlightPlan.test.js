@@ -236,3 +236,13 @@ test('planning never mutates its inputs', () => {
   assert.equal(airport.runways[0].ends[0].threshold.x, -1400);
   assert.equal(point.headingDeg, 284);
 });
+
+test('runway starts use the aircraft-specific resting gear height', () => {
+  const frame = runwayEndFrame(syntheticAirport(), '09/27', '09');
+  const b738 = takeoffSpawnPlan({ frame, aircraftId: 'B738' });
+  const c172 = takeoffSpawnPlan({ frame, aircraftId: 'C172' });
+  close(b738.y - frame.threshold.elevationM, 3.5, 1e-9, 'B738 clearance');
+  close(c172.y - frame.threshold.elevationM, 1.35, 1e-9, 'C172 clearance');
+  const approach = approachSpawnPlan({ frame, distanceM: 0, aircraftId: 'C172' });
+  close(approach.y - frame.threshold.elevationM, 1.35, 1e-9, 'C172 approach clearance');
+});

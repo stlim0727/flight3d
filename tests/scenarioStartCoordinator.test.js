@@ -160,6 +160,8 @@ test('map flight plan is captured before install and applies the resolved spawn'
       }],
       points: [],
     };
+    const gyroRestores = [];
+    sim.touchControls = { gyroRequested: true, gyroActive: false, restoreGyroSettings: options => gyroRestores.push(options) };
     let applied;
     sim.setPreset = preset => events.push(preset);
     sim.applyMapSpawn = (spawn, state) => {
@@ -170,5 +172,6 @@ test('map flight plan is captured before install and applies the resolved spawn'
     assert.deepEqual(events.slice(0, 2), ['approach', 'map:approach']);
     assert.equal(applied.state, 'approach');
     assert.ok(Number.isFinite(applied.spawn.x) && Number.isFinite(applied.spawn.yaw));
+    assert.deepEqual(gyroRestores, [{ userGesture: true }]);
   });
 });

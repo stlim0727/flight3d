@@ -73,9 +73,9 @@ function harness({ descriptor: initialDescriptor, ...options } = {}) {
   return { streamer, world, scene, events, behavior, clock, descriptor, makeRegion };
 }
 
-test('only indexed external ICAO codes are considered and reset unmounts', async () => {
+test('four-letter ICAO codes are accepted; invalid codes reset and unmount', async () => {
   const h = harness();
-  h.streamer.setDestination('RKSI');
+  h.streamer.setDestination('BAD');
   assert.deepEqual(h.streamer.status, {
     state: 'idle', code: null, error: null, loaded: false, distanceM: null,
   });
@@ -86,17 +86,26 @@ test('only indexed external ICAO codes are considered and reset unmounts', async
   assert.equal(await h.streamer.ensure('RKSS'), true);
   assert.equal(h.events.loads[0][0], 'RKSS');
   assert.equal(h.streamer.statusFor('rkss').state, 'ready');
-  assert.equal(h.streamer.statusFor('RKSI'), null);
+  assert.equal(h.streamer.statusFor('BAD'), null);
 
   h.streamer.setDestination('RJTT');
   assert.equal(h.streamer.status.state, 'idle');
-  assert.equal(h.streamer.status.code, null);
+  assert.equal(h.streamer.status.code, 'RJTT');
   assert.equal(h.events.removed.length, 0, 'destination selection alone keeps occupied contact');
   h.streamer.update({ x: 0, z: 0, onGround: false, onRunway: false, destinationCode: 'RJTT' });
   assert.equal(h.events.removed.length, 1);
   assert.deepEqual(h.events.unregistered, ['RKSS']);
   assert.equal(h.events.disposed.length, 1);
   assert.equal(h.world.offsets.has('RKSS'), false);
+});
+
+test('additional map catalog airports can stream a runway region', async () => {
+  const h = harness({
+    descriptor: { icao: 'RKPK', latitude: 35.179, longitude: 128.938, elevationM: 8, runways: [] },
+  });
+  assert.equal(await h.streamer.ensure('RKPK'), true);
+  assert.deepEqual(h.events.registered.map(([code]) => code), ['RKPK']);
+  assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });
 
 test('concurrent ensures share one load; completions after a destination change are discarded', async () => {

@@ -660,6 +660,7 @@ class SimulatorHudAndBindingsMethods {
         }
         this.lobbyScreen?.refresh();
       },
+      getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {
         if (!this.touchControls) return;
@@ -671,11 +672,13 @@ class SimulatorHudAndBindingsMethods {
       onAirport: id => {
         this.lobby.airport = id;
         this.lobby.preset = defaultScenarioForRegion(id);
+        this.lobby.mapPlan = null;
         if (id === 'valley') this.lobby.aircraft = 'F16';
         this.lobbyScreen?.refresh();
       },
       onPreset: type => {
         this.lobby.preset = type;
+        this.lobby.mapPlan = null;
         if (type === 'valley') {
           this.lobby.aircraft = 'F16';
         }

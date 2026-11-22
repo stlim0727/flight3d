@@ -3,5 +3,7 @@
 export const EXTERNAL_DESTINATION_CODES = Object.freeze(['RKSS']);
 
 export function isExternalDestination(value) {
-  return typeof value === 'string' && EXTERNAL_DESTINATION_CODES.includes(value.trim().toUpperCase());
+  if (typeof value !== 'string') return false;
+  const code = value.trim().toUpperCase();
+  return EXTERNAL_DESTINATION_CODES.includes(code) || /^[A-Z]{4}$/.test(code);
 }

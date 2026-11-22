@@ -1,6 +1,6 @@
 // Pure geometry for map-based flight starts (#922). No DOM and no simulator state.
 import { projectToLocal } from '../geospatial/incheon.js';
-
+import { AIRCRAFT_REGISTRY } from './aircraftConfigs.js';
 const finite = Number.isFinite;
 const DEG = Math.PI / 180;
 const TAKEOFF_DISTANCE_M = 100;
@@ -22,6 +22,10 @@ export function directionToHeading(x, z) {
 
 function numberOr(value, fallback) {
   return finite(value) ? value : fallback;
+}
+
+function clearanceFor(aircraftId) {
+  return AIRCRAFT_REGISTRY[aircraftId]?.landingGear?.cgGroundHeightM ?? DEFAULT_CLEARANCE_M;
 }
 
 /** Offsets may be [x, z] arrays or {x, z}; anything else means no offset. */
@@ -116,7 +120,7 @@ function usableFrame(frame) {
 }
 
 export function takeoffSpawnPlan({
-  frame, baseOffset = [0, 0], anchorBase = [0, 0], groundClearanceM = DEFAULT_CLEARANCE_M,
+  frame, baseOffset = [0, 0], anchorBase = [0, 0], groundClearanceM,
   aircraftId = 'B738',
 } = {}) {
   if (!usableFrame(frame)) return null;
@@ -126,7 +130,7 @@ export function takeoffSpawnPlan({
   const headingDeg = frame.headingDeg;
   return {
     x: world.x,
-    y: frame.threshold.elevationM + numberOr(groundClearanceM, DEFAULT_CLEARANCE_M),
+    y: frame.threshold.elevationM + numberOr(groundClearanceM, clearanceFor(aircraftId)),
     z: world.z,
     vx: 0,
     vy: 0,
@@ -166,13 +170,12 @@ export function cruiseSpawnPlan({
 
 export function approachSpawnPlan({
   frame, baseOffset = [0, 0], anchorBase = [0, 0], distanceM = 5556, glideslopeDeg = 3,
-  lateralOffsetM = 0, interceptOffsetDeg = 0, groundClearanceM = DEFAULT_CLEARANCE_M,
+  lateralOffsetM = 0, interceptOffsetDeg = 0, groundClearanceM,
   aircraftId = 'B738',
 } = {}) {
   if (!usableFrame(frame)) return null;
-  if (![distanceM, glideslopeDeg, lateralOffsetM, interceptOffsetDeg, groundClearanceM].every(finite)) {
-    return null;
-  }
+  if (![distanceM, glideslopeDeg, lateralOffsetM, interceptOffsetDeg].every(finite)
+    || (groundClearanceM !== undefined && !finite(groundClearanceM))) return null;
   const right = frame.right && finite(frame.right.x) && finite(frame.right.z)
     ? frame.right : { x: Math.cos(frame.headingDeg * DEG), z: Math.sin(frame.headingDeg * DEG) };
   const x = frame.threshold.x - distanceM * frame.direction.x + lateralOffsetM * right.x;
@@ -183,7 +186,7 @@ export function approachSpawnPlan({
   const interceptHeading = frame.headingDeg + interceptOffsetDeg;
   return {
     x: world.x,
-    y: frame.threshold.elevationM + groundClearanceM + distanceM * glideTangent,
+    y: frame.threshold.elevationM + numberOr(groundClearanceM, clearanceFor(aircraftId)) + distanceM * glideTangent,
     z: world.z,
     vx: speed * frame.direction.x,
     vy: -speed * glideTangent,
@@ -208,5 +211,5 @@ export function resolveMapFlightPlan({
   const spawn = state === 'runway'
     ? takeoffSpawnPlan({ frame, baseOffset, anchorBase, aircraftId })
     : approachSpawnPlan({ frame, baseOffset, anchorBase, aircraftId });
-  return spawn ? { scenario: state, spawn } : null;
+  return spawn ? { scenario: state, spawn, airportCode: airport?.code ?? null } : null;
 }
