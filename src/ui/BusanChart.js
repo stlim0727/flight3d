@@ -6,6 +6,9 @@ import { isWaterPolygon, overtureBase } from '../geospatial/overtureWater.js';
 import { clipLine, clipRing } from '../geospatial/incheon.js';
 import { t } from '../i18n/index.js';
 
+// A desktop map at the Busan spawn covers about 12 tiles.
+const MAX_CACHED_TILES = 64;
+
 function blankLayers() {
   return { land: new Path2D(), water: new Path2D(), decks: new Path2D(), spans: new Path2D() };
 }
@@ -67,6 +70,7 @@ export class BusanChart {
     this.scale = map.querySelector('.map-scale');
     this.status = map.querySelector('.map-status');
     this.tiles = new Map();
+    this.cachedPaths = new Map();
     this.forward = new Vector3();
     this.heading = 0;
     this.nextDraw = 0;
@@ -84,19 +88,33 @@ export class BusanChart {
     });
   }
 
+  useTilePaths(key, paths, entry) {
+    for (const layer of Object.keys(paths)) this.paths[layer].addPath(paths[layer]);
+    entry.ready = true;
+    this.cachedPaths.delete(key);
+    this.cachedPaths.set(key, paths);
+    if (this.cachedPaths.size > MAX_CACHED_TILES) {
+      this.cachedPaths.delete(this.cachedPaths.keys().next().value);
+    }
+  }
+
   tile(x, y, now) {
     const key = x + '/' + y;
     let entry = this.tiles.get(key);
     if (!entry || entry.retryAt <= now) {
       entry = {};
       this.tiles.set(key, entry);
+      const cached = this.cachedPaths.get(key);
+      if (cached) {
+        this.useTilePaths(key, cached, entry);
+        return entry;
+      }
       overtureBase.getZxy(CHART_ZOOM, x, y, this.controller.signal).then(result => {
         if (this.tiles.get(key) !== entry) return;
         if (result) {
           const paths = blankLayers();
           appendTile(paths, result.data, x, y);
-          for (const layer of Object.keys(paths)) this.paths[layer].addPath(paths[layer]);
-          entry.ready = true;
+          this.useTilePaths(key, paths, entry);
         } else entry.missing = true;
       }).catch(() => {
         entry.retryAt = performance.now() + 10000;
