@@ -323,3 +323,80 @@ test('JejuTileStreamer setConfig cancels in-flight zoom request when reverting t
     globalThis.document = origDoc;
   }
 });
+
+test('JejuTileStreamer falls back to Zoom 10 when a Zoom 11 tile fails on cold cache', async () => {
+  const origDoc = globalThis.document;
+  try {
+    globalThis.document = {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          clearRect() {},
+          drawImage() {},
+        }),
+      }),
+    };
+
+    const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+    const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+    const extraGeo = new THREE.PlaneGeometry(6400, 3000, 2, 2);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+    let z11Attempts = 0;
+    let z10Attempts = 0;
+    let failZ11Tile = true;
+
+    const mockCache = {
+      getTileImage(z, x, y) {
+        if (z === 11) {
+          z11Attempts++;
+          if (failZ11Tile && x === 1742 && y === 821) {
+            return Promise.resolve(null); // Simulated single-tile failure
+          }
+          return Promise.resolve({ width: 256, height: 256 });
+        }
+        if (z === 10) {
+          z10Attempts++;
+          return Promise.resolve({ width: 256, height: 256 });
+        }
+        return Promise.resolve(null);
+      },
+      getMetrics() { return {}; },
+      dispose() {},
+    };
+
+    const streamer = new JejuTileStreamer(mesh, surface, {
+      cacheManager: mockCache,
+      zoom: 11,
+      extraGeometries: [extraGeo],
+    });
+    assert.equal(streamer.zoom, 11);
+    assert.equal(streamer.appliedZoom, null);
+
+    const loaded = await streamer.loadIslandMacroTiles();
+    assert.equal(loaded, true, 'loadIslandMacroTiles should succeed via Zoom 10 fallback');
+    assert.equal(streamer.appliedZoom, 10, 'appliedZoom must be 10 on fallback');
+    assert.equal(streamer.zoom, 10, 'streamer active zoom must adjust to 10');
+    assert.equal(streamer.tilesLoaded, 8, '8 tiles from Zoom 10 should be loaded');
+    assert.ok(streamer.macroTexture, 'Canvas texture must be created');
+    assert.equal(mesh.material.map, streamer.macroTexture, 'Material map must be assigned');
+    assert.equal(mesh.material.vertexColors, false);
+    assert.ok(z11Attempts >= 32, 'All 32 Zoom 11 tiles must be attempted first');
+    assert.equal(z10Attempts, 8, 'All 8 Zoom 10 tiles must be fetched on fallback');
+
+    // Verify extraGeo UVs were updated
+    assert.ok(extraGeo.attributes.uv.getX(0) > 0, 'Extra geometry UVs should be normalized');
+
+    // When network recovers, calling setConfig({ zoom: 11 }) successfully upgrades to Zoom 11
+    failZ11Tile = false;
+    const upgraded = await streamer.setConfig({ zoom: 11 });
+    assert.equal(upgraded, true, 'setConfig should successfully upgrade to Zoom 11 once network recovers');
+    assert.equal(streamer.appliedZoom, 11);
+    assert.equal(streamer.zoom, 11);
+    assert.equal(streamer.tilesLoaded, 32);
+  } finally {
+    globalThis.document = origDoc;
+  }
+});
+

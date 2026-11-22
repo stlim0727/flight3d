@@ -77,6 +77,7 @@ export class JejuTileStreamer {
   constructor(terrainMesh, flightSurface, options = {}) {
     this.terrainMesh = terrainMesh;
     this.flightSurface = flightSurface;
+    this.extraGeometries = options.extraGeometries || [];
     this.origin = options.origin || JEJU_ORIGIN;
     this.cacheManager = options.cacheManager || new TileCacheManager(options.cacheOptions);
 
@@ -162,10 +163,19 @@ export class JejuTileStreamer {
    * from local metric tangent plane into WGS84 and fractional Web Mercator coordinates.
    * Guarantees exact runway, threshold, and coastline visual alignment without nonlinear drift.
    */
-  updateMeshUVs() {
-    if (!this.terrainMesh?.geometry) return;
+  updateMeshUVs(geometry = this.terrainMesh?.geometry) {
+    const geometries = geometry
+      ? [geometry, ...(geometry === this.terrainMesh?.geometry ? this.extraGeometries : [])]
+      : [];
 
-    const geometry = this.terrainMesh.geometry;
+    for (const geo of geometries) {
+      this._updateSingleGeometryUVs(geo);
+    }
+  }
+
+  _updateSingleGeometryUVs(geometry) {
+    if (!geometry) return;
+
     const pos = geometry.attributes.position;
     const uv = geometry.attributes.uv;
     if (!pos || !uv) return;
@@ -227,74 +237,95 @@ export class JejuTileStreamer {
 
       const successful = results.filter((r) => r.img && r.img.width > 0);
 
-      // Thread 2: Only swap material map when ALL macro tiles successfully load.
-      // If any tile fails or network times out, retain the procedural ground shading
-      // so un-covered regions are never rendered black.
-      if (successful.length !== tiles.length) {
-        return false;
+      if (successful.length === tiles.length) {
+        return this._applyStitchedTiles(successful, targetZoom, generation);
       }
 
-      this.tilesLoaded = successful.length;
+      // Graceful cold-cache fallback: If Zoom 11 fails to fetch all 32 tiles,
+      // attempt Zoom 10 (8 macro tiles) to display satellite coverage rather
+      // than dropping completely back to untextured procedural terrain.
+      if (targetZoom === 11) {
+        const z10Tiles = createJejuMacroTiles(10);
+        const z10Promises = z10Tiles.map(async (t) => {
+          const img = await this.cacheManager.getTileImage(t.z, t.x, t.y);
+          return { ...t, img };
+        });
 
-      // Stitch onto canvas (totalTilesX * 256 by totalTilesY * 256)
-      const canvasWidth = this.totalTilesX * 256;
-      const canvasHeight = this.totalTilesY * 256;
+        const z10Results = await Promise.all(z10Promises);
+        if (this.disposed || generation !== this.loadGeneration) return false;
 
-      const dimensionsChanged = Boolean(
-        this.canvas &&
-        (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight)
-      );
-
-      if (!this.canvas) {
-        this.canvas = document.createElement('canvas');
-      }
-      this.canvas.width = canvasWidth;
-      this.canvas.height = canvasHeight;
-
-      const ctx = this.canvas.getContext('2d');
-      if (!ctx || this.disposed || generation !== this.loadGeneration) return false;
-
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-
-      for (const t of successful) {
-        ctx.drawImage(t.img, t.col * 256, t.row * 256, 256, 256);
+        const z10Successful = z10Results.filter((r) => r.img && r.img.width > 0);
+        if (z10Successful.length === z10Tiles.length) {
+          this.setZoomLevel(10);
+          return this._applyStitchedTiles(z10Successful, 10, generation);
+        }
       }
 
-      if (this.disposed || generation !== this.loadGeneration) return false;
-
-      // Update mesh UV mapping
-      this.updateMeshUVs();
-
-      if (this.disposed || generation !== this.loadGeneration) return false;
-
-      // Recreate Three.js texture when dimensions change (WebGL2 immutable storage requirement)
-      if (dimensionsChanged && this.macroTexture) {
-        this.macroTexture.dispose();
-        this.macroTexture = null;
-      }
-
-      if (!this.macroTexture) {
-        this.macroTexture = new THREE.CanvasTexture(this.canvas);
-        this.macroTexture.colorSpace = THREE.SRGBColorSpace;
-        this.macroTexture.wrapS = THREE.ClampToEdgeWrapping;
-        this.macroTexture.wrapT = THREE.ClampToEdgeWrapping;
-      }
-      this.macroTexture.anisotropy = this.anisotropy;
-      this.macroTexture.needsUpdate = true;
-
-      // Thread 3: Check disposed state and generation match before applying texture to terrain material
-      if (this.terrainMesh?.material && !this.disposed && generation === this.loadGeneration) {
-        this.terrainMesh.material.map = this.macroTexture;
-        this.terrainMesh.material.vertexColors = false;
-        this.terrainMesh.material.needsUpdate = true;
-        this.appliedZoom = targetZoom;
-      }
-
-      return true;
+      return false;
     } catch {
       // Graceful offline fallback: preserve procedural terrain
       return false;
     }
+  }
+
+  _applyStitchedTiles(successful, appliedZoom, generation) {
+    this.tilesLoaded = successful.length;
+
+    // Stitch onto canvas (totalTilesX * 256 by totalTilesY * 256)
+    const canvasWidth = this.totalTilesX * 256;
+    const canvasHeight = this.totalTilesY * 256;
+
+    const dimensionsChanged = Boolean(
+      this.canvas &&
+      (this.canvas.width !== canvasWidth || this.canvas.height !== canvasHeight)
+    );
+
+    if (!this.canvas) {
+      this.canvas = document.createElement('canvas');
+    }
+    this.canvas.width = canvasWidth;
+    this.canvas.height = canvasHeight;
+
+    const ctx = this.canvas.getContext('2d');
+    if (!ctx || this.disposed || generation !== this.loadGeneration) return false;
+
+    ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+
+    for (const t of successful) {
+      ctx.drawImage(t.img, t.col * 256, t.row * 256, 256, 256);
+    }
+
+    if (this.disposed || generation !== this.loadGeneration) return false;
+
+    // Update mesh UV mapping
+    this.updateMeshUVs();
+
+    if (this.disposed || generation !== this.loadGeneration) return false;
+
+    // Recreate Three.js texture when dimensions change (WebGL2 immutable storage requirement)
+    if (dimensionsChanged && this.macroTexture) {
+      this.macroTexture.dispose();
+      this.macroTexture = null;
+    }
+
+    if (!this.macroTexture) {
+      this.macroTexture = new THREE.CanvasTexture(this.canvas);
+      this.macroTexture.colorSpace = THREE.SRGBColorSpace;
+      this.macroTexture.wrapS = THREE.ClampToEdgeWrapping;
+      this.macroTexture.wrapT = THREE.ClampToEdgeWrapping;
+    }
+    this.macroTexture.anisotropy = this.anisotropy;
+    this.macroTexture.needsUpdate = true;
+
+    // Check disposed state and generation match before applying texture to terrain material
+    if (this.terrainMesh?.material && !this.disposed && generation === this.loadGeneration) {
+      this.terrainMesh.material.map = this.macroTexture;
+      this.terrainMesh.material.vertexColors = false;
+      this.terrainMesh.material.needsUpdate = true;
+      this.appliedZoom = appliedZoom;
+    }
+
+    return true;
   }
 
   /**

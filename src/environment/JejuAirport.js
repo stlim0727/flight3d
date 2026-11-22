@@ -81,7 +81,10 @@ export async function loadJejuAirport(base = '', options = {}) {
 
   let tileStreamer = null;
   if (options.streamTiles !== false) {
-    tileStreamer = new JejuTileStreamer(terrainMesh, terrain, options.streamerOptions);
+    tileStreamer = new JejuTileStreamer(terrainMesh, terrain, {
+      ...options.streamerOptions,
+      extraGeometries: [airportGeo],
+    });
     tileStreamer.updateMeshUVs(airportGeo);
     terrain.tileStreamer = tileStreamer;
     if (options.autoloadTiles !== false) {
