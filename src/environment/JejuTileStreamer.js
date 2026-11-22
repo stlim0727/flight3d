@@ -119,6 +119,7 @@ export class JejuTileStreamer {
   setZoomLevel(zoom) {
     if (zoom === 11) {
       this.zoom = 11;
+      this.targetZoom = 11;
       this.minTileX = 1740;
       this.totalTilesX = 8;
       this.minTileY = 820;
@@ -126,6 +127,7 @@ export class JejuTileStreamer {
       this.macroTiles = createJejuMacroTiles(11);
     } else {
       this.zoom = 10;
+      this.targetZoom = 10;
       this.minTileX = 870;
       this.totalTilesX = 4;
       this.minTileY = 410;
@@ -311,7 +313,7 @@ export class JejuTileStreamer {
       }
     }
 
-    if (zoom !== undefined && (zoom !== this.appliedZoom || !this.macroTexture)) {
+    if (zoom !== undefined && (zoom !== this.appliedZoom || zoom !== this.targetZoom || !this.macroTexture)) {
       this.setZoomLevel(zoom);
       return this.loadIslandMacroTiles();
     }
@@ -341,6 +343,7 @@ export class JejuTileStreamer {
     this.loadGeneration++;
     this.isStreaming = false;
     this.appliedZoom = null;
+    this.targetZoom = null;
     if (this.macroTexture) {
       this.macroTexture.dispose();
       this.macroTexture = null;

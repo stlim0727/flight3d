@@ -177,7 +177,7 @@ await withBrowserSession(
         s.aircraft.group.quaternion.copy(s.quaternion);
         s.aircraft.group.updateMatrixWorld(true);
 
-        s.cameraSystem.setMode('chase', true);
+        s.cameraSystem.setMode(s.cameraSystem.constructor.MODES.CHASE, true);
         s.cameraSystem.snapToTarget(s.aircraft.group);
 
         // Freeze physics integration so view stays rock-solid during sampling

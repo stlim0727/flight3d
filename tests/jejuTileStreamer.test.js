@@ -262,3 +262,61 @@ test('JejuTileStreamer setConfig allows retry after failure because appliedZoom 
   // It attempted the load twice rather than short-circuiting on attempts
   assert.ok(streamer.loadGeneration >= 2);
 });
+
+test('JejuTileStreamer setConfig cancels in-flight zoom request when reverting to appliedZoom', async () => {
+  const origDoc = globalThis.document;
+  try {
+    globalThis.document = {
+      createElement: () => ({
+        width: 0,
+        height: 0,
+        getContext: () => ({
+          clearRect() {},
+          drawImage() {},
+        }),
+      }),
+    };
+
+    const surface = new JejuFlightSurface(JEJU_AIRFIELD);
+    const geo = new THREE.PlaneGeometry(80000, 56000, 2, 2);
+    const mesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial());
+
+    const resolvers = [];
+    const mockCache = {
+      getTileImage() {
+        return new Promise((resolve) => {
+          resolvers.push(() => resolve({ width: 256, height: 256 }));
+        });
+      },
+      getMetrics() { return {}; },
+      dispose() {},
+    };
+
+    const streamer = new JejuTileStreamer(mesh, surface, { cacheManager: mockCache, zoom: 10 });
+    streamer.appliedZoom = 10;
+    streamer.macroTexture = { needsUpdate: false, dispose() {} };
+
+    // Trigger zoom 11 change (in-flight waiting for tile images)
+    const req11 = streamer.setConfig({ zoom: 11 });
+    assert.equal(streamer.zoom, 11);
+    assert.equal(streamer.targetZoom, 11);
+    assert.equal(streamer.loadGeneration, 1);
+
+    // Before req11 completes, user cancels by reverting to zoom: 10
+    const req10 = streamer.setConfig({ zoom: 10 });
+    assert.equal(streamer.zoom, 10);
+    assert.equal(streamer.targetZoom, 10);
+    assert.equal(streamer.loadGeneration, 2);
+
+    // Now resolve all pending tile fetches
+    resolvers.forEach((r) => r());
+    await Promise.all([req11, req10]);
+
+    // Final requested and target zoom must remain 10, not overridden by zoom 11
+    assert.equal(streamer.zoom, 10);
+    assert.equal(streamer.targetZoom, 10);
+    assert.equal(streamer.appliedZoom, 10);
+  } finally {
+    globalThis.document = origDoc;
+  }
+});
