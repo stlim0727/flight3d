@@ -570,3 +570,96 @@ test('OpenWorldTerrain blends vertices near registered external airport runways'
   assert.equal(Math.round(raw), 25, 'sampleRaw must return the unblended DEM height');
   openWorld.dispose();
 });
+
+test('invalidateArea retains existing tiles until reload finishes without gap', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  let allowDelay = false;
+  let resolveGate;
+  const gate = new Promise(resolve => { resolveGate = resolve; });
+  openWorld.raster = () => {
+    if (allowDelay) {
+      return gate.then(() => raster);
+    }
+    return Promise.resolve(raster);
+  };
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const initialTile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(initialTile);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), true);
+  assert.equal(openWorld.readyAt(0, 0), true);
+
+  allowDelay = true;
+  openWorld.invalidateArea([-1000, -1000, 1000, 1000]);
+
+  // While reloading in background, tile remains accessible and rendered
+  assert.equal(openWorld.tiles.get(`${x}/${y}`), initialTile);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), true);
+  assert.equal(openWorld.readyAt(0, 0), true);
+  assert.equal(openWorld.sample(0, 0)?.height, 50);
+
+  // Complete reload
+  resolveGate();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  const newTile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(newTile && newTile !== initialTile);
+  assert.equal(openWorld.group.children.includes(newTile.mesh), true);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), false);
+
+  openWorld.dispose();
+});
+
+test('sampleRaw matches triangle interpolation on rawHeight matching mesh vertices', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const slopeRaster = new Float32Array(256 * 256);
+  for (let r = 0; r < 256; r++) {
+    for (let c = 0; c < 256; c++) {
+      slopeRaster[r * 256 + c] = 100 + r * 0.5 + c * 0.25;
+    }
+  }
+  const fakeWorld = {
+    regions: new Map([
+      ['RKPK', {
+        extent: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 },
+        terrain: {
+          runways: [{ id: '18R' }],
+          nearest() {
+            return { hit: { distance: 0, elevationM: 10 } };
+          },
+        },
+      }],
+    ]),
+    offsets: new Map([['RKPK', [0, 0]]]),
+  };
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(slopeRaster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const tile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(tile.fullGeometry.attributes.rawHeight, 'rawHeight attribute must be populated on geometry');
+
+  const blended = openWorld.sample(0, 0);
+  assert.equal(blended.height, 10);
+
+  const raw = openWorld.sampleRaw(0, 0);
+  assert.equal(Math.round(raw), 196);
+
+  openWorld.dispose();
+});
