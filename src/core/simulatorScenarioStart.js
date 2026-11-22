@@ -99,9 +99,12 @@ function resolveLobbyMapPlan(sim) {
 async function waitForStreamedAirport(sim, code) {
   const streamer = sim.airportStreamer;
   if (!streamer) return;
+  // A global search result can share a code with another airport's IATA;
+  // its tileId is the only deterministic link to the selected record.
+  const tileId = sim.lobby?.mapPlan?.tileId
+    ?? sim.mapPlaces?.airports?.find(entry => entry.code === code)?.tileId;
   streamer.releaseGroundHold?.();
-  streamer.ensure(code);
-  const deadline = performance.now() + 6000;
+  streamer.ensure(code, { tileId });
   do {
     const status = streamer.statusFor?.(code);
     if (status?.state === 'ready') return;

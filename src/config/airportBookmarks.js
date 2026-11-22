@@ -38,6 +38,9 @@ function validateBookmark(value) {
       bookmark[field] = value[field];
     }
   }
+  if (typeof value.tileId === 'string' && /^\d{1,2}-\d{1,2}$/.test(value.tileId)) {
+    bookmark.tileId = value.tileId;
+  }
   return bookmark;
 }
 

@@ -113,7 +113,7 @@ async function main() {
   const options = parseArgs(process.argv.slice(2));
   const { airportsCsv, runwaysCsv, sources } = await readSources(options);
   const version = versionForSources(sources, options.tileDegrees);
-  const { manifest, tiles } = buildIndex({
+  const { manifest, tiles, searchIndex } = buildIndex({
     airportsCsv,
     runwaysCsv,
     sources,
@@ -125,6 +125,7 @@ async function main() {
   await writeFile(path.join(options.output, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
   await Promise.all([...tiles.entries()].map(([tileId, tile]) =>
     writeFile(path.join(options.output, version, 'tiles', `${tileId}.json`), `${JSON.stringify(tile)}\n`)));
+  await writeFile(path.join(options.output, manifest.searchIndex.path), `${JSON.stringify(searchIndex)}\n`);
   console.log(JSON.stringify({ version, tileCount: tiles.size, ...manifest.counts }));
 }
 
