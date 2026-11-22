@@ -12,7 +12,7 @@ import { AirframeSoundEffects } from './nodes/AirframeSoundEffects.js';
 import { WarningSynthesizer } from './nodes/WarningSynthesizer.js';
 import { CombatSoundEffects } from './nodes/CombatSoundEffects.js';
 import { GpwsCalloutSystem } from './nodes/GpwsCalloutSystem.js';
-import { playPaperUnfold } from './paperMapSound.js';
+import { PAPER_SHEET, playPaperSheet } from './paperMapSound.js';
 
 // Above any aircraft this simulator flies; teleports are identified by their
 // implausible per-frame displacement instead of a low speed clamp.
@@ -289,15 +289,17 @@ export class FlightAudio {
     return (profile === 'bangkok' ? this.bangkokRadio : this.departureRadio).play(stage);
   }
 
-  /** One unfold rustle; silent while muted, paused or after a crash. Returns whether it played. */
-  playMapUnfold() {
+  /** One paper-chart rustle; silent while muted, paused or after a crash. Returns whether it played. */
+  playMapSheet(sheet) {
     if (!this.ctx || !this.masterGain || this.effectiveVolume === 0 || this.crashed) return false;
     this.ensureContextRunning();
     // The chart is in the pilot's hands, so it bypasses the cabin filter and
     // exterior distance attenuation applied to airframe sounds.
-    playPaperUnfold(this.ctx, this.masterGain);
+    playPaperSheet(this.ctx, this.masterGain, sheet);
     return true;
   }
+  playMapUnfold() { return this.playMapSheet(PAPER_SHEET.unfold); }
+  playMapFold() { return this.playMapSheet(PAPER_SHEET.fold); }
 
   playContactNoise(d, f, l, t = 'lowpass') {
     if (this.ctx && this.effectiveVolume !== 0) AirframeSoundEffects.playContactNoise(this.ctx, this.cockpitFilter, d, f, l, t);

@@ -52,13 +52,19 @@ export function commitFlightCamera(select, onSelectCamera) {
 }
 
 /** One stable set of controls, shared by narrow, touch and desktop layouts. */
-export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake, onMapUnfold, toolbarHidden, onToolbarHiddenChange }) {
+export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParkingBrake, onMapUnfold, onMapFold, toolbarHidden, onToolbarHiddenChange }) {
   const hud = document.getElementById('hud-overlay');
   const map = document.getElementById('pilotage-map');
   // `toggle` fires once per open/close of the sheet itself; the north/heading-up
   // button inside the paper never changes `open`, so rotating stays silent.
+  // Folding rustles only when the pilot folded it (summary click, which keys
+  // also raise), not when a crash or leaving the flight closes it.
+  let pilotToggled = false;
+  map.querySelector('summary')?.addEventListener('click', () => { pilotToggled = true; });
   map.addEventListener('toggle', () => {
     if (map.open) onMapUnfold?.();
+    else if (pilotToggled) onMapFold?.();
+    pilotToggled = false;
   });
   map.addEventListener('pointerdown', event => event.target.setPointerCapture(event.pointerId));
   for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel',

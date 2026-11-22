@@ -37,6 +37,7 @@ export class SimulatorInputCoordinator {
   bindFlightPanels({ controls, aero, audio, isCrashedGetter = () => false } = {}) {
     initFlightPanels({
       onMapUnfold: () => audio?.playMapUnfold?.(),
+      onMapFold: () => audio?.playMapFold?.(),
       toolbarHidden: loadSimulatorPreferences().toolbarHidden,
       onToolbarHiddenChange: toolbarHidden => saveSimulatorPreferences({ toolbarHidden }),
       onSelectCamera: mode => controls?.onSelectCamera?.(mode),

@@ -1,21 +1,23 @@
 /**
- * Procedural paper-chart unfold: a soft sweep of the sheet moving air, with
- * crisp crackles where the two folds open. Generated per play so repeated
- * unfolds do not sound like the same sample.
+ * Procedural paper-chart rustle: a soft sweep of the sheet moving air, with
+ * crisp crackles where the folds open or close. Generated per play so
+ * repeated handling does not sound like the same sample.
  */
-export const PAPER_UNFOLD_SECONDS = 0.6;
+export const PAPER_SHEET = Object.freeze({
+  // Three panels opening one after another.
+  unfold: Object.freeze({ seconds: 0.6, level: 0.32, folds: [[0.03, 7], [0.27, 6], [0.46, 3]] }),
+  // Quicker and softer; the last cluster is the creases being pressed flat.
+  fold: Object.freeze({ seconds: 0.45, level: 0.26, folds: [[0.02, 4], [0.16, 5], [0.31, 6]] }),
+});
 
-// Fold openings (seconds) and how many crackles each one makes.
-const FOLDS = [[0.03, 7], [0.27, 6], [0.46, 3]];
-
-export function paperUnfoldSamples(sampleRate, random = Math.random) {
-  const length = Math.ceil(sampleRate * PAPER_UNFOLD_SECONDS);
+export function paperSheetSamples(sampleRate, sheet = PAPER_SHEET.unfold, random = Math.random) {
+  const length = Math.ceil(sampleRate * sheet.seconds);
   const data = new Float32Array(length);
   for (let i = 0; i < length; i++) {
     const swell = Math.sin(Math.PI * i / length) ** 2;
     data[i] = (random() * 2 - 1) * 0.16 * swell;
   }
-  for (const [time, count] of FOLDS) {
+  for (const [time, count] of sheet.folds) {
     for (let k = 0; k < count; k++) {
       const start = Math.floor(sampleRate * (time + random() * 0.09));
       const decay = sampleRate * (0.0015 + random() * 0.003);
@@ -32,9 +34,9 @@ export function paperUnfoldSamples(sampleRate, random = Math.random) {
   return data;
 }
 
-export function playPaperUnfold(ctx, output, random = Math.random) {
+export function playPaperSheet(ctx, output, sheet = PAPER_SHEET.unfold, random = Math.random) {
   const now = ctx.currentTime;
-  const samples = paperUnfoldSamples(ctx.sampleRate, random);
+  const samples = paperSheetSamples(ctx.sampleRate, sheet, random);
   const buffer = ctx.createBuffer(1, samples.length, ctx.sampleRate);
   buffer.getChannelData(0).set(samples);
   const source = ctx.createBufferSource();
@@ -46,7 +48,7 @@ export function playPaperUnfold(ctx, output, random = Math.random) {
   filter.frequency.setValueAtTime(500, now);
   filter.Q.setValueAtTime(0.7, now);
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.32, now);
+  gain.gain.setValueAtTime(sheet.level, now);
   source.connect(filter);
   filter.connect(gain);
   gain.connect(output);
