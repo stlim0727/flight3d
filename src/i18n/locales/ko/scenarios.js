@@ -168,6 +168,7 @@ export default {
   "preset.lukla.runway.24.downhill.takeoff.11": "Preset: 루클라 24번 활주로 절벽 가속 이륙 (11.7% 내리막 질주)",
   "preset.himalayan.cruise.13.000.ft": "Preset: 히말라야 산맥 순항 비행 (13,000 FT)",
   "airport.changed.value": "비행 지역 변경: {value}",
+  "airport.stream.failed": "{code} 데이터를 준비하지 못했습니다. 접근 중 다시 시도합니다",
   "airport.structure.collision": "공항 건물 충돌 (AIRPORT STRUCTURE COLLISION)",
   "airport.lukla.name": "루클라 (VNLK)",
   "lukla.challenge.complete.taking.manual.control": "🎉 루클라 챌린지 데모 완료! 조종사 수동 조종 인계",

@@ -281,8 +281,10 @@ export class HudView {
       const degrees = String(Math.round(destination.bearingDeg)).padStart(3, '0');
       const bearing = destination.synthetic ? `~${degrees}°` : `${degrees}°T`;
       const range = `${destination.synthetic ? '~' : ''}${Math.round(destination.distanceNm)}NM`;
+      const prepare = destination.prepare === 'loading' ? ' PREP'
+        : destination.prepare === 'failed' ? ' NO DATA' : '';
       ctx.fillStyle = '#fbbf24';
-      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}`, cx, hy - font * 2.2);
+      ctx.fillText(`DEST ${destination.code} ${bearing} ${range}${prepare}`, cx, hy - font * 2.2);
       ctx.fillStyle = '#b8ff9b';
     }
   }

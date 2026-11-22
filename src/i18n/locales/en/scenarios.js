@@ -168,6 +168,7 @@ export default {
   "preset.lukla.runway.24.downhill.takeoff.11": "Preset: Lukla runway 24 downhill takeoff (11.7% slope)",
   "preset.himalayan.cruise.13.000.ft": "Preset: Himalayan cruise (13,000 FT)",
   "airport.changed.value": "Flight region changed: {value}",
+  "airport.stream.failed": "Could not prepare {code}; retrying on approach",
   "airport.structure.collision": "AIRPORT STRUCTURE COLLISION",
   "airport.lukla.name": "Lukla (VNLK)",
   "lukla.challenge.complete.taking.manual.control": "🎉 Lukla challenge complete! Taking manual control",

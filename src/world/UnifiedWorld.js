@@ -3,6 +3,7 @@ import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
 import { REAL_AIRPORTS, AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
+import { isExternalDestination } from '../config/externalDestinations.js';
 import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
 /**
@@ -76,6 +77,8 @@ export class UnifiedWorld {
     this.regions = new Map();
     this.anchor = BASE_OFFSETS[anchor] ? anchor : 'incheon';
     this.offsets = new Map();
+    this.dynamicOffsets = new Map();
+    this.dynamicStatus = new Map();
     this.recomputeOffsets();
   }
 
@@ -111,16 +114,41 @@ export class UnifiedWorld {
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */
   register(id, { terrain, airport, group = null, mesh = null, extent }) {
-    if (!BASE_OFFSETS[id]) throw new Error(`Unknown unified region: ${id}`);
+    if (!BASE_OFFSETS[id] && !this.dynamicOffsets.has(id)) throw new Error(`Unknown unified region: ${id}`);
     if (!terrain || !extent) throw new Error(`Unified region ${id} needs terrain and extent`);
     this.regions.set(id, { terrain, airport, group, mesh, extent });
     this.syncMeshes();
     return this;
   }
 
+  /** Add a streamed airport slot whose WGS84 placement is derived from index data. */
+  registerDynamic(id, { baseOffset, extent, terrain, airport, group = null, mesh = null }) {
+    if (BASE_OFFSETS[id] || !Array.isArray(baseOffset) || baseOffset.length !== 2
+      || !baseOffset.every(Number.isFinite)) throw new Error(`Invalid dynamic region: ${id}`);
+    this.dynamicOffsets.set(id, Object.freeze([baseOffset[0], baseOffset[1]]));
+    this.recomputeOffsets();
+    this.register(id, { terrain, airport, group, mesh, extent });
+  }
+
+  unregister(id) {
+    if (!this.dynamicOffsets.delete(id)) return false;
+    this.regions.delete(id);
+    this.offsets.delete(id);
+    this.dynamicStatus.delete(id);
+    this.syncMeshes();
+    return true;
+  }
+
+  setDynamicStatus(id, status) {
+    this.dynamicStatus.set(id, status);
+  }
+
   recomputeOffsets() {
     const anchor = BASE_OFFSETS[this.anchor];
     for (const [id, base] of Object.entries(BASE_OFFSETS)) {
+      this.offsets.set(id, [base[0] - anchor[0], base[1] - anchor[1]]);
+    }
+    for (const [id, base] of this.dynamicOffsets) {
       this.offsets.set(id, [base[0] - anchor[0], base[1] - anchor[1]]);
     }
     this.syncMeshes();
@@ -179,8 +207,34 @@ export class UnifiedWorld {
     return hit ? REGION_CODES[hit.id] ?? null : null;
   }
 
+  externalDestinationInfo(x, z, id) {
+    const anchor = BASE_OFFSETS[this.anchor];
+    const base = this.dynamicOffsets.get(id) ?? [0, 0];
+    const [ox, oz] = this.offsets.get(id) ?? [base[0] - anchor[0], base[1] - anchor[1]];
+    const centre = this.regions.get(id)?.terrain?.centre;
+    const targetX = (centre?.x ?? 0) + ox;
+    const targetZ = (centre?.z ?? 0) + oz;
+    const dx = targetX - x;
+    const dz = targetZ - z;
+    const distanceM = Math.hypot(dx, dz);
+    const status = this.dynamicStatus.get(id);
+    return {
+      id,
+      code: id,
+      nameKey: id,
+      dx, dz,
+      distanceM,
+      distanceNm: distanceM / 1852,
+      bearingDeg: (Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360,
+      synthetic: true,
+      target: 'centre',
+      prepare: status?.state ?? null,
+    };
+  }
+
   /** Bearing and distance from a world position to another airport's approach threshold. */
   destinationInfo(x, z, id) {
+    if (this.dynamicOffsets.has(id) || isExternalDestination(id)) return this.externalDestinationInfo(x, z, id);
     const target = BASE_OFFSETS[id];
     if (!target) return null;
     const anchor = BASE_OFFSETS[this.anchor];

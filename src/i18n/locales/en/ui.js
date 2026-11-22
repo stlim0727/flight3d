@@ -378,6 +378,7 @@ export default {
   "lobby.time": "Time of day",
   "lobby.destination": "Destination airport",
   "lobby.destination.none": "No destination",
+  "lobby.destination.RKSS": "Gimpo Int'l (streamed)",
   "lobby.time.now": "Current time",
   "lobby.applying": "Applying your selection…",
   "lobby.fly": "Fly",

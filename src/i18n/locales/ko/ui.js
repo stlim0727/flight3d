@@ -378,6 +378,7 @@ export default {
   "lobby.time": "시간대",
   "lobby.destination": "목적지 공항",
   "lobby.destination.none": "목적지 없음",
+  "lobby.destination.RKSS": "김포국제공항 (스트리밍)",
   "lobby.time.now": "현재 시각",
   "lobby.applying": "선택을 적용하는 중…",
   "lobby.fly": "비행 시작",

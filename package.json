@@ -32,6 +32,7 @@
     "test:missiles": "node scripts/verify-f16-missiles.mjs",
     "test:flight:visual": "node scripts/test-flight-agent.js --screenshots",
     "test:landing": "node scripts/test-landing-damage.js",
+    "test:airport-landing": "node scripts/verify-airport-landing.mjs",
     "test:crash": "node scripts/test-crash-scenarios.js",
     "test:mobile": "node scripts/test-mobile-touch.js",
     "test:demo": "node scripts/test-demo-stepping.js",
