@@ -79,8 +79,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapZoomIn = document.getElementById('lobby-map-zoom-in');
   const mapZoomOut = document.getElementById('lobby-map-zoom-out');
   let mapFocus = null;
-  let mapZoom = 1;
+  let mapZoom = 0;
   let mapTileSignature = '';
+  let suppressClickUntil = 0;
   let mapSelectionBusy = false;
   let customPoint = null;
   const mapStatus = document.getElementById('lobby-map-search-status');
@@ -252,6 +253,51 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   const svgNamespace = 'http://www.w3.org/2000/svg';
   const mapViewBox = () => mapSvg?.getAttribute?.('viewBox') ?? `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
+  const svgViewBox = () => {
+    const [x, y, width, height] = mapViewBox().split(/\s+/).map(Number);
+    return { x, y, width, height };
+  };
+  const MIN_VIEWBOX_SPAN = Math.min(MAP_WIDTH, MAP_HEIGHT) / 2 ** 12;
+  const clampViewBox = box => {
+    const ratio = box.width > 0 && box.height > 0 ? box.width / box.height : 1;
+    let width = Math.max(MIN_VIEWBOX_SPAN, Math.min(MAP_WIDTH, box.width));
+    let height = width / ratio;
+    if (height > MAP_HEIGHT) {
+      height = MAP_HEIGHT;
+      width = height * ratio;
+    }
+    if (height < MIN_VIEWBOX_SPAN) {
+      height = MIN_VIEWBOX_SPAN;
+      width = height * ratio;
+    }
+    const centerX = box.x + box.width / 2;
+    const centerY = box.y + box.height / 2;
+    return {
+      x: Math.max(0, Math.min(MAP_WIDTH - width, centerX - width / 2)),
+      y: Math.max(0, Math.min(MAP_HEIGHT - height, centerY - height / 2)),
+      width, height,
+    };
+  };
+  const updatePinScale = () => {
+    if (!mapMarkers?.children) return;
+    const scale = Math.max(0.001, Math.min(2, svgViewBox().width / 220));
+    for (const marker of mapMarkers.children) {
+      const x = marker.dataset?.mapX;
+      const y = marker.dataset?.mapY;
+      if (!x || !y || typeof marker.setAttribute !== 'function') continue;
+      marker.setAttribute('transform', `translate(${x} ${y}) scale(${scale.toFixed(3)})`);
+    }
+  };
+  const clientToMap = (clientX, clientY) => {
+    if (typeof mapSvg?.getScreenCTM !== 'function' || typeof mapSvg.createSVGPoint !== 'function') return null;
+    const transform = mapSvg.getScreenCTM();
+    if (!transform) return null;
+    const cursor = mapSvg.createSVGPoint();
+    cursor.x = clientX;
+    cursor.y = clientY;
+    const point = cursor.matrixTransform(transform.inverse());
+    return { x: point.x, y: point.y };
+  };
   function renderMapTiles() {
     if (!mapTiles || typeof mapTiles.replaceChildren !== 'function') return;
     const tiles = tilesForViewBox(mapViewBox());
@@ -274,17 +320,29 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     });
     mapTiles.replaceChildren(...images);
   }
+  function applyViewBox(next, { updateFocus = true, zoom } = {}) {
+    if (!mapSvg?.setAttribute) return null;
+    const box = clampViewBox(next);
+    mapSvg.setAttribute('viewBox', `${box.x.toFixed(2)} ${box.y.toFixed(2)} ${box.width.toFixed(2)} ${box.height.toFixed(2)}`);
+    if (updateFocus) mapFocus = mapCoordinates(box.x + box.width / 2, box.y + box.height / 2);
+    mapZoom = Number.isFinite(zoom)
+      ? Math.max(0, Math.min(12, Math.round(zoom)))
+      : Math.max(0, Math.min(12, Math.round(Math.log2(MAP_WIDTH / box.width))));
+    updatePinScale();
+    renderMapTiles();
+    return box;
+  }
   function setMapView(focus, zoom) {
     if (!mapSvg?.setAttribute) return;
     mapFocus = focus && Number.isFinite(focus.latitude) && Number.isFinite(focus.longitude) ? focus : null;
-    mapZoom = Math.max(1, Math.min(4, Number.isFinite(zoom) ? zoom : 1));
-    const base = mapFocus
-      ? mapViewBoxFor(mapFocus.latitude, mapFocus.longitude, mapZoom)
-      : `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`;
+    mapZoom = Number.isFinite(zoom) ? Math.max(0, Math.min(12, Math.round(zoom))) : 0;
+    const base = mapZoom === 0
+      ? `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`
+      : mapViewBoxFor(mapFocus.latitude, mapFocus.longitude, mapZoom);
     const bounds = typeof mapSvg.getBoundingClientRect === 'function' ? mapSvg.getBoundingClientRect() : null;
     const aspect = bounds?.width > 0 && bounds?.height > 0 ? bounds.width / bounds.height : MAP_WIDTH / MAP_HEIGHT;
-    mapSvg.setAttribute('viewBox', fitMapViewBoxToAspect(base, aspect));
-    renderMapTiles();
+    const fitted = fitMapViewBoxToAspect(base, aspect).split(/\s+/).map(Number);
+    applyViewBox({ x: fitted[0], y: fitted[1], width: fitted[2], height: fitted[3] }, { updateFocus: false, zoom: mapZoom });
   }
   function currentMapFocus() {
     if (mapFocus) return mapFocus;
@@ -308,6 +366,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       : (BUILTIN_REGION_AIRPORT_CODES[airport]
         ? `airport:${BUILTIN_REGION_AIRPORT_CODES[airport]}`
         : (airport ? `region:${airport}` : ''));
+    if (mapSvg && active && activeKey !== mapCenteredKey) setMapView(active, 6);
+    mapCenteredKey = activeKey;
     const formatPlaceItem = item => item.kind === 'region'
       ? { ...item, label: item.nameKey ? t(item.nameKey) : item.label, detail: '' }
       : item;
@@ -334,7 +394,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         const marker = document.createElementNS(svgNamespace, 'g');
         const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
         marker.setAttribute('class', `lobby-map-marker${active ? ' active' : ''}`);
-        marker.setAttribute('transform', `translate(${projected.x.toFixed(1)} ${projected.y.toFixed(1)})`);
+        marker.setAttribute('transform', `translate(${projected.x.toFixed(2)} ${projected.y.toFixed(2)})`);
+        marker.dataset.mapX = projected.x.toFixed(2);
+        marker.dataset.mapY = projected.y.toFixed(2);
         marker.dataset.placeKind = place.kind;
         marker.dataset.placeId = place.id;
         const pin = document.createElementNS(svgNamespace, 'path');
@@ -352,11 +414,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         marker.append(title);
         mapMarkers.append(marker);
       }
+      updatePinScale();
     }
-    if (mapSvg && active && activeKey !== mapCenteredKey) {
-      setMapView(active, 2);
-    }
-    mapCenteredKey = activeKey;
     renderMapSearchStatus(query, results.length);
     if (mapBookmarkToggle) {
       bindText(mapBookmarkToggle, () => t(active && isBookmarked(bookmarkFromPlace(active)) ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
@@ -412,7 +471,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (mapAirportSelect) mapAirportSelect.value = '';
       if (mapRunwaySelect) mapRunwaySelect.value = '';
       if (mapPointSelect) mapPointSelect.value = '';
-      setMapView(null, 1);
+      setMapView(null, 0);
       mapCenteredKey = '';
       onAirport?.(place.id);
       refresh();
@@ -482,7 +541,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   mapBookmarksEl?.addEventListener('click', onMapPlaceClick);
   mapDefaultBookmarks?.addEventListener('click', onMapPlaceClick);
   mapSvg?.addEventListener('click', event => {
-    if (mapSelectionBusy) return;
+    if (mapSelectionBusy || Date.now() < suppressClickUntil) return;
     if (event.target.closest('[data-place-kind]')) {
       onMapPlaceClick(event);
       return;
@@ -499,9 +558,99 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const longitude = coordinates.longitude.toFixed(5);
     selectMapPlace({ ...coordinates, kind: 'point', id: `map:${latitude},${longitude}`, label: `${latitude}, ${longitude}` });
   });
-  mapOverview?.addEventListener('click', () => setMapView(null, 1));
-  mapZoomIn?.addEventListener('click', () => setMapView(currentMapFocus(), Math.min(4, mapZoom * 2)));
-  mapZoomOut?.addEventListener('click', () => setMapView(currentMapFocus(), Math.max(1, mapZoom / 2)));
+  mapOverview?.addEventListener('click', () => setMapView(mapFocus, 0));
+  mapZoomIn?.addEventListener('click', () => setMapView(currentMapFocus(), Math.min(12, mapZoom + 1)));
+  mapZoomOut?.addEventListener('click', () => setMapView(currentMapFocus(), Math.max(0, mapZoom - 1)));
+  const activePointers = new Map();
+  let dragStart = null;
+  let pinchStart = null;
+  mapSvg?.addEventListener?.('pointerdown', event => {
+    if (typeof event.pointerId !== 'number') return;
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (activePointers.size === 1) {
+      dragStart = { clientX: event.clientX, clientY: event.clientY, box: svgViewBox(), moved: false };
+    } else if (activePointers.size === 2) {
+      const [first, second] = [...activePointers.values()];
+      const box = svgViewBox();
+      const midpoint = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+      pinchStart = {
+        distance: Math.max(1, Math.hypot(first.x - second.x, first.y - second.y)),
+        width: box.width,
+        height: box.height,
+        anchor: clientToMap(midpoint.x, midpoint.y)
+          ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+        rect: typeof mapSvg.getBoundingClientRect === 'function' ? mapSvg.getBoundingClientRect() : null,
+      };
+      for (const id of activePointers.keys()) {
+        try { mapSvg.setPointerCapture?.(id); } catch { /* ignored */ }
+      }
+      dragStart = null;
+    }
+  });
+  mapSvg?.addEventListener?.('pointermove', event => {
+    if (!activePointers.has(event.pointerId)) return;
+    activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (activePointers.size >= 2 && pinchStart) {
+      const [first, second] = [...activePointers.values()];
+      const distance = Math.max(1, Math.hypot(first.x - second.x, first.y - second.y));
+      const factor = Math.max(0.05, Math.min(20, pinchStart.distance / distance));
+      const width = Math.max(1, Math.min(MAP_WIDTH, pinchStart.width * factor));
+      const height = Math.min(MAP_HEIGHT, width * (pinchStart.height / pinchStart.width));
+      const midpoint = { x: (first.x + second.x) / 2, y: (first.y + second.y) / 2 };
+      const rect = pinchStart.rect;
+      const anchor = pinchStart.anchor;
+      const relativeX = rect?.width > 0 ? (midpoint.x - rect.x) / rect.width : 0.5;
+      const relativeY = rect?.height > 0 ? (midpoint.y - rect.y) / rect.height : 0.5;
+      applyViewBox({
+        x: anchor.x - relativeX * width,
+        y: anchor.y - relativeY * height,
+        width, height,
+      });
+      suppressClickUntil = Date.now() + 200;
+      return;
+    }
+    if (!dragStart || activePointers.size !== 1) return;
+    const dx = event.clientX - dragStart.clientX;
+    const dy = event.clientY - dragStart.clientY;
+    if (Math.hypot(dx, dy) > 4) {
+      dragStart.moved = true;
+      try { mapSvg.setPointerCapture?.(event.pointerId); } catch { /* ignored */ }
+    }
+    if (!dragStart.moved) return;
+    const bounds = typeof mapSvg.getBoundingClientRect === 'function' ? mapSvg.getBoundingClientRect() : null;
+    if (!bounds?.width || !bounds?.height) return;
+    applyViewBox({
+      ...dragStart.box,
+      x: dragStart.box.x - (dx / bounds.width) * dragStart.box.width,
+      y: dragStart.box.y - (dy / bounds.height) * dragStart.box.height,
+    });
+    suppressClickUntil = Date.now() + 200;
+  });
+  const finishPointer = event => {
+    if (!activePointers.delete(event.pointerId)) return;
+    try { mapSvg.releasePointerCapture?.(event.pointerId); } catch { /* ignored */ }
+    if (activePointers.size < 2) pinchStart = null;
+    if (activePointers.size === 0) {
+      if (dragStart?.moved) suppressClickUntil = Date.now() + 200;
+      dragStart = null;
+    } else if (activePointers.size === 1) {
+      const [remaining] = [...activePointers.values()];
+      dragStart = { clientX: remaining.x, clientY: remaining.y, box: svgViewBox(), moved: true };
+    }
+  };
+  mapSvg?.addEventListener?.('pointerup', finishPointer);
+  mapSvg?.addEventListener?.('pointercancel', finishPointer);
+  mapSvg?.addEventListener?.('wheel', event => {
+    if (typeof event.preventDefault === 'function') event.preventDefault();
+    const box = svgViewBox();
+    const width = Math.max(1, Math.min(MAP_WIDTH, box.width * (event.deltaY > 0 ? 1.25 : 0.8)));
+    const height = Math.min(MAP_HEIGHT, width * (box.height / box.width));
+    const anchor = clientToMap(event.clientX, event.clientY)
+      ?? { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+    const relative = { x: (anchor.x - box.x) / box.width, y: (anchor.y - box.y) / box.height };
+    applyViewBox({ x: anchor.x - relative.x * width, y: anchor.y - relative.y * height, width, height });
+    suppressClickUntil = Date.now() + 200;
+  }, { passive: false });
   if (mapSvg && typeof ResizeObserver !== 'undefined' && typeof mapSvg.getBoundingClientRect === 'function') {
     new ResizeObserver(() => setMapView(mapFocus, mapZoom)).observe(mapSvg);
   }

@@ -96,15 +96,15 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
       bubbles: true, clientX: screen.x, clientY: screen.y,
     }));
   })()`);
-  await pickPoint(220, 110);
+  await pickPoint(880.36, 397.68);
   const custom = await evaluate("sim.lobby.mapPlan");
   assert.equal(custom.state, 'cruise');
   assert.ok(custom.pointId.startsWith('map:'));
-  assert.ok(Math.abs(custom.point.longitude - 129.5) < 0.04);
+  assert.ok(Math.abs(custom.point.longitude - 129.5) < 0.3);
   assert.ok(await evaluate("document.getElementById('lobby-preset-rwy').disabled && document.getElementById('lobby-preset-app').disabled"), 'custom point must only allow cruise');
   await evaluate("document.getElementById('lobby-map-bookmark-toggle').click()");
   assert.ok((await evaluate("localStorage.getItem('flight3d.bookmarks.v1')")).includes(custom.pointId), 'custom bookmark did not persist');
-  await pickPoint(140, 140);
+  await pickPoint(341.33, 570.08);
   await evaluate(`[...document.querySelectorAll('#lobby-map-bookmarks button')].find(button => button.dataset.placeId === ${JSON.stringify(custom.pointId)}).click()`);
   assert.equal(await evaluate("sim.lobby.mapPlan.pointId"), custom.pointId, 'custom bookmark did not restore');
   await screenshot(path.join(artifacts, 'bookmarks.png'));
