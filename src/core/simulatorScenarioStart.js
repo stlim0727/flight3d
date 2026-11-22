@@ -118,7 +118,9 @@ async function waitForStreamedAirport(sim, code) {
 
 function alignMapSpawnToContact(sim, spawn) {
   if (!spawn?.alignToGround) return;
-  const ground = sim.currentTerrain?.getHeight?.(sim.position.x, sim.position.z);
+  const sampleX = spawn.state === 'approach' && Number.isFinite(spawn.surfaceX) ? spawn.surfaceX : sim.position.x;
+  const sampleZ = spawn.state === 'approach' && Number.isFinite(spawn.surfaceZ) ? spawn.surfaceZ : sim.position.z;
+  const ground = sim.currentTerrain?.getHeight?.(sampleX, sampleZ);
   if (!Number.isFinite(ground)) return;
   sim.position.y = ground + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
 }

@@ -127,6 +127,7 @@ export function takeoffSpawnPlan({
   const x = frame.threshold.x + frame.direction.x * TAKEOFF_DISTANCE_M;
   const z = frame.threshold.z + frame.direction.z * TAKEOFF_DISTANCE_M;
   const world = worldXZ(x, z, baseOffset, anchorBase);
+  const surface = worldXZ(frame.threshold.x, frame.threshold.z, baseOffset, anchorBase);
   const headingDeg = frame.headingDeg;
   const clearance = numberOr(groundClearanceM, clearanceFor(aircraftId));
   return {
@@ -143,6 +144,8 @@ export function takeoffSpawnPlan({
     groundClearanceM: clearance,
     glideRiseM: 0,
     alignToGround: true,
+    surfaceX: surface.x,
+    surfaceZ: surface.z,
   };
 }
 
@@ -185,10 +188,11 @@ export function approachSpawnPlan({
   const x = frame.threshold.x - distanceM * frame.direction.x + lateralOffsetM * right.x;
   const z = frame.threshold.z - distanceM * frame.direction.z + lateralOffsetM * right.z;
   const world = worldXZ(x, z, baseOffset, anchorBase);
-  const glideTangent = Math.tan(glideslopeDeg * DEG);
+  const surface = worldXZ(frame.threshold.x, frame.threshold.z, baseOffset, anchorBase);
   const speed = aircraftId === 'B738' ? 74.5 : aircraftId === 'C172' ? 33 : aircraftId === 'F16' ? 90 : 74.5;
   const interceptHeading = frame.headingDeg + interceptOffsetDeg;
   const clearance = numberOr(groundClearanceM, clearanceFor(aircraftId));
+  const glideTangent = Math.tan(glideslopeDeg * DEG);
   const glideRiseM = distanceM * glideTangent;
   return {
     x: world.x,
@@ -203,6 +207,8 @@ export function approachSpawnPlan({
     groundClearanceM: clearance,
     glideRiseM,
     alignToGround: true,
+    surfaceX: surface.x,
+    surfaceZ: surface.z,
   };
 }
 

@@ -41,14 +41,17 @@ four-letter tokens and the six built-in region ids are not external targets.
 then installs the resolved pose and configuration. Runway/approach starts
 release any previous ground hold, wait under the start hold for
 `airportStreamer.ensure()` to reach `ready`, then align the final Y with the
-contact surface `currentTerrain.getHeight()` actually returns. This keeps
-spawns above the surface when a built-in region shares the coordinate with an
-index-generated runway. Gyro permission restoration happens in `prepare()`
-within the original click gesture, before any streaming wait.
+contact surface physics actually returns. A stationary runway start samples
+the aircraft position; an approach samples the selected runway threshold and
+retains its runway-relative glide height. This keeps spawns above the surface
+when a built-in region shares the coordinate with an index-generated runway.
+Approach/cruise flaps are settled before trim. Gyro permission restoration
+happens in `prepare()` within the original click gesture, before any streaming
+wait.
 
 Selecting a normal preset or region clears the map plan; multiplayer room
 preparation also clears it. Restart preserves the active map plan and goes
-through the same spawn path.
+through the coordinated start path so physics stays held during streaming.
 
 Non-map presets, missions, demos, saved URLs and lobby buttons keep their
 existing paths because the map plan is null unless the user selects one.

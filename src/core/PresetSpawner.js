@@ -604,6 +604,16 @@ class PresetSpawnerMethods {
     this.engines.setReverser(false, true);
     if (state === 'runway') this.controls.setParkingBrake?.(true);
     else this.controls.setParkingBrake?.(false);
+    if (state !== 'runway') {
+      this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
+      this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.aero.massProperties.setConfiguration(
+        this.gear.gearState,
+        this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1),
+      );
+      this.aero.syncMassProperties();
+      this.engines.settleSpool();
+    }
     this.applyComputedTrim();
     this.refreshTakeoffPerformance();
     this.aircraft.group.position.copy(this.position);
