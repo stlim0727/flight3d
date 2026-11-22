@@ -1194,7 +1194,7 @@ const frames = {
   lukla: { origin: luklaGrid.origin },
   incheon: { origin: INCHEON_PATCH.origin, protectedAreas: [[-25000, -25000, 25000, 25000]] },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [
-    [-36260, -12000, 43740, 44000],
+    [-3200, -1500, 3200, 1500],
     [chuja[0] - 2500, chuja[1] - 2500, chuja[0] + 2500, chuja[1] + 2500],
   ] },
 };

@@ -18,6 +18,7 @@ import { CDUCanvas } from '../src/aircraft/CDUCanvas.js';
 import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { JEJU_AIRFIELD, JejuFlightSurface, jejuSpawn } from '../src/geospatial/JejuFlightSurface.js';
 import { loadJejuAirport } from '../src/environment/JejuAirport.js';
+import { jejuSurfaceMaterial } from '../src/environment/JejuGround.js';
 import { scenariosForAirport } from '../src/config/scenarioRegistry.js';
 import { airportSpec } from '../src/ui/lobbySpecs.js';
 import jejuMetadata from '../public/scenery/jeju/terrain-metadata.json' with { type: 'json' };
@@ -233,5 +234,28 @@ test('loadJejuAirport integrates CorridorFlightSurface and heading fallback', as
   airport.update(0.1, { x: 200, y: 1000, z: -200 }, 0.2, { hasOpenWorld: true });
   assert.equal(calledWithOpenWorld, false, 'corridorStreamer must stay idle when hasOpenWorld is true');
 });
+
+test('jejuSurfaceMaterial matches OpenWorldTerrain satellite colorimetry and diffuse trim', () => {
+  const dummyMap = new THREE.Texture();
+  dummyMap.wrapS = THREE.ClampToEdgeWrapping;
+  const mat = jejuSurfaceMaterial({ satelliteTexture: dummyMap });
+
+  const fakeShader = {
+    vertexShader: '#include <common>\n#include <begin_vertex>',
+    fragmentShader: '#include <common>\n#include <color_fragment>\n#include <lights_fragment_end>',
+  };
+  mat.onBeforeCompile(fakeShader);
+
+  assert.ok(fakeShader.fragmentShader.includes('reflectedLight.indirectDiffuse *= 0.68;'),
+    'jejuSurfaceMaterial must trim ambient washout on satellite imagery');
+  assert.ok(fakeShader.fragmentShader.includes('reflectedLight.directDiffuse *= 0.88;'),
+    'jejuSurfaceMaterial must trim direct over-exposure');
+  assert.ok(fakeShader.fragmentShader.includes('diffuseColor.rgb = mix(vec3(satLuma), diffuseColor.rgb, 1.14);'),
+    'jejuSurfaceMaterial must apply 14% chroma boost to match OpenWorldTerrain');
+  assert.ok(fakeShader.fragmentShader.includes('pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08))'),
+    'jejuSurfaceMaterial must apply 1.08 gamma contrast enhancement');
+  assert.equal(mat.polygonOffset, true, 'jejuSurfaceMaterial should have polygonOffset enabled');
+});
+
 
 

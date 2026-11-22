@@ -749,3 +749,34 @@ test('aborted load finally does not remove newer pending controller for same til
 
   openWorld.dispose();
 });
+
+test('OpenWorldTerrain jeju frame protects only the airport precinct, leaving Hallasan and island terrain open', () => {
+  const terrain = { mesh: new Group() };
+  const sim = {
+    activeAirport: 'jeju',
+    currentTerrain: terrain,
+    renderQuality: 'medium',
+    position: new Vector3(3741.4, 3048, 16591.7),
+    linearVelocity: new Vector3(0, 0, 100),
+    camera: new PerspectiveCamera(58, 16 / 9, 0.08, 45000),
+    world: null,
+  };
+  updateOpenWorldTerrain(sim);
+
+  const openWorld = terrain.openWorld;
+  assert.ok(openWorld, 'openWorld must be mounted on jeju terrain');
+
+  // RKPC Runway precinct (0, 0) is protected
+  assert.equal(openWorld.protects(0, 0), true, 'RKPC airport precinct must be protected');
+  assert.equal(openWorld.protects(-1463, 621), true, 'Runway 07 threshold must be protected');
+
+  // Mount Hallasan (3741.4, 16591.7) must NOT be protected
+  assert.equal(openWorld.protects(3741.4, 16591.7), false, 'Mount Hallasan must NOT be protected; open-world streams it');
+
+  // Coastal waters and island perimeter must NOT be protected
+  assert.equal(openWorld.protects(20000, 20000), false, 'East island slopes must be open to streaming');
+  assert.equal(openWorld.protects(-20000, 10000), false, 'West island slopes must be open to streaming');
+
+  openWorld.dispose();
+});
+
