@@ -350,7 +350,7 @@ test('UI State Contract: Multi-pause state guard prevents early resume when over
 });
 
 const MAP_SELECT_IDS = ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure'];
-const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview'];
+const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview', 'lobby-map-tiles'];
 
 function setupMapDOM() {
   const { elements, mockDoc } = setupMockDOM();
@@ -546,6 +546,23 @@ test('UI State Contract: an airport without runways never offers a runway start'
     assert.equal(plan?.state, 'cruise');
     assert.equal(plan?.runwayKey, '');
     assert.equal(elements.get('lobby-map-runway').value, '');
+  } finally {
+    globalThis.document = originalDoc;
+  }
+});
+
+test('UI State Contract: lobby map tiles stay deferred until enableMapTiles is called', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+  try {
+    const screen = initLobbyScreen({
+      getAirport: () => 'coastal', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+    });
+    const tilesEl = elements.get('lobby-map-tiles');
+    assert.equal(tilesEl.children.length, 0, 'map tiles should not load during initial boot');
+    screen.enableMapTiles();
+    assert.ok(tilesEl.children.length > 0, 'map tiles should populate after enableMapTiles');
   } finally {
     globalThis.document = originalDoc;
   }

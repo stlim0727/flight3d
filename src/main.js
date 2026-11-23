@@ -1219,6 +1219,7 @@ class FlightSimulator {
     // Hydrate non-blocking environmental/effect/catalog assets after the lobby is interactive.
     this.sky?.loadEnvironmentHdr?.();
     this.loadLobbyMapCatalog?.();
+    this.lobbyScreen?.enableMapTiles?.();
     setTimeout(() => {
       if (this.activeAirport === 'coastal' && this.ships) this.ships.loadAssets();
     }, 0);
