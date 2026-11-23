@@ -84,24 +84,22 @@ function dryRun() {
   console.log('dry-run: phase gates, thrust floor and encode timing OK');
 }
 
-function buildControllerSource() {
+export function buildControllerSource() {
   return `(() => {
     const clamp = ${clamp.toString()};
     const approachPhase = ${approachPhase.toString()};
     const decelerationThrottle = ${decelerationThrottle.toString()};
-    return async () => {
+    return (async () => {
       const [
         { flyBank, flyVerticalPath },
         corridor,
         world,
         approach,
-        tile,
       ] = await Promise.all([
         import('/src/director/PilotControlLaws.js'),
         import('/src/geospatial/CorridorCoordinateSystem.js'),
         import('/src/world/UnifiedWorld.js'),
         import('/src/config/approachData.js'),
-        import('/src/geospatial/TileCoordinateSystem.js'),
       ]);
       const s = window.sim;
       const R = 180 / Math.PI, D = Math.PI / 180;
@@ -135,7 +133,7 @@ function buildControllerSource() {
         const surface = s.currentTerrain;
         for (const ahead of [0, 500, 1500, 3000, 6000, 12000, 20000]) {
           const r = corridor.interpolateRoute(clamp((along + ahead) / total, 0, 1));
-          const [x, z] = tile.wgs84ToLocal(r.latitude, r.longitude, surface.activeOrigin ?? corridor.JEJU_ORIGIN);
+          const [x, z] = corridor.wgs84ToIncheonSceneryLocal(r.latitude, r.longitude);
           const ground = surface.getHeight?.(x, z) ?? 0;
           if (Number.isFinite(ground)) cmd = Math.max(cmd, ground + CLEARANCE_M);
         }
@@ -205,6 +203,9 @@ function buildControllerSource() {
         const aim = { x: apData.threshold.x - Math.sin(course) * 7000,
           z: apData.threshold.z + Math.cos(course) * 7000 };
         const dev = deviation();
+        if (s.autopilot.lateralMode !== 'HDG') {
+          s.autopilot.engage('HDG', s.readAutopilotState());
+        }
         s.autopilot.targets.headingDeg = headingOf(aim.x - p.x, aim.z - p.z);
         s.autopilot.targets.altitudeFt = Math.max(ALT_M, terrainAltitude()) / 0.3048;
         s.autopilot.targets.iasKnots = 250;
@@ -279,7 +280,7 @@ function buildControllerSource() {
         }
       }, 50);
       return { ok: true };
-    };
+    })();
   })()`;
 }
 
