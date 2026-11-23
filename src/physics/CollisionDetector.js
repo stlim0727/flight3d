@@ -917,13 +917,22 @@ export class CollisionDetector {
     // the only excursion fatality on the runtime path — a gentle drift-off is
     // graded by soft-ground drag and damage instead.
     if (groundContact?.catastrophicImpact) {
-      const excursion = !onRunway;
+      const wheelsGrounded = Boolean(groundContact.contacts?.some(c => c.isGrounded));
+      const excursion = !onRunway && gearState >= 0.5 && wheelsGrounded;
+      if (excursion) {
+        return {
+          get name() { return t('runway.excursion'); },
+          point: groundContact.bodyContacts[0]?.worldPos.clone() || aircraftPos.clone(),
+          get description() { return t('the.aircraft.departed.the.runway'); }
+        };
+      }
       return {
-        get name() { return excursion ? t('runway.excursion') : t('catastrophic.landing.impact'); },
+        get name() {
+          if (onRunway) return t('catastrophic.landing.impact');
+          return gearState < 0.25 ? t('gear.up.belly.crash') : t('terrain.body.strike');
+        },
         point: groundContact.bodyContacts[0]?.worldPos.clone() || aircraftPos.clone(),
-        get description() { return excursion
-          ? t('the.aircraft.departed.the.runway')
-          : t('excessive.belly.impact.or.accumulated.structural.damage'); }
+        get description() { return t('excessive.belly.impact.or.accumulated.structural.damage'); }
       };
     }
 

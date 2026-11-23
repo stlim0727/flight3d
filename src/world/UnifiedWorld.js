@@ -72,10 +72,34 @@ export const REGION_CODES = Object.freeze({
 const _normal = new THREE.Vector3();
 const _camera = new THREE.Vector3();
 
+function sameOrigin(a, b) {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return Math.abs(a.latitude - b.latitude) < 1e-6 && Math.abs(a.longitude - b.longitude) < 1e-6;
+}
+
+function createCustomTerrainHost() {
+  const mesh = new THREE.Group();
+  mesh.name = 'Custom origin open-world host';
+  return {
+    mesh,
+    isLoaded: true,
+    openWorld: null,
+    geographicBuildingLayer: null,
+    geographicRoadLayer: null,
+    geographicGreenLayer: null,
+    getHeight() { return 0; },
+    getNaturalHeight() { return 0; },
+    getWaterLevel() { return 0; },
+  };
+}
+
 export class UnifiedWorld {
   constructor(anchor = 'incheon') {
     this.regions = new Map();
     this.anchor = BASE_OFFSETS[anchor] ? anchor : 'incheon';
+    this.customOrigin = null;
+    this.customTerrain = null;
     this.offsets = new Map();
     this.dynamicOffsets = new Map();
     this.destinationOffsets = new Map();
@@ -85,12 +109,54 @@ export class UnifiedWorld {
 
   /** Physics and demo flights must wait while the spawn region's DEM is loading. */
   get isLoaded() {
+    if (this.customOrigin) return true;
     const region = this.regions.get(this.anchor);
     return region ? region.terrain.isLoaded !== false : true;
   }
 
   get anchorTerrain() {
+    if (this.customOrigin && this.customTerrain) return this.customTerrain;
     return this.regions.get(this.anchor)?.terrain;
+  }
+
+  get activeOrigin() {
+    return this.customOrigin ?? AIRPORT_ORIGINS[this.anchor] ?? null;
+  }
+
+  /**
+   * Switch to a local WGS84 tangent plane for distant global map starts so
+   * tiles and streamed runways stay distortion-free near (0, 0). Pass null to
+   * restore the built-in anchor frame.
+   */
+  setCustomOrigin(origin, scene = null) {
+    const next = origin && Number.isFinite(origin.latitude) && Number.isFinite(origin.longitude)
+      ? Object.freeze({ latitude: origin.latitude, longitude: origin.longitude })
+      : null;
+    if (sameOrigin(this.customOrigin, next)) {
+      if (next && this.customTerrain && scene && !this.customTerrain.mesh.parent) {
+        scene.add(this.customTerrain.mesh);
+      }
+      return false;
+    }
+    if (this.customTerrain) {
+      this.customTerrain.openWorld?.dispose?.();
+      this.customTerrain.geographicBuildingLayer?.dispose?.();
+      this.customTerrain.geographicRoadLayer?.dispose?.();
+      this.customTerrain.geographicGreenLayer?.dispose?.();
+      this.customTerrain.openWorld = null;
+      this.customTerrain.geographicBuildingLayer = null;
+      this.customTerrain.geographicRoadLayer = null;
+      this.customTerrain.geographicGreenLayer = null;
+    }
+    this.customOrigin = next;
+    if (next) {
+      this.customTerrain ??= createCustomTerrainHost();
+      if (scene && !this.customTerrain.mesh.parent) scene.add(this.customTerrain.mesh);
+    } else if (this.customTerrain?.mesh) {
+      this.customTerrain.mesh.removeFromParent();
+    }
+    this.recomputeOffsets();
+    return true;
   }
 
   // The open-world terrain and geographic building layers attach their groups
@@ -184,7 +250,7 @@ export class UnifiedWorld {
   }
 
   recomputeOffsets() {
-    const anchor = BASE_OFFSETS[this.anchor];
+    const anchor = this.customOrigin ? [0, 0] : BASE_OFFSETS[this.anchor];
     for (const [id, base] of Object.entries(BASE_OFFSETS)) {
       this.offsets.set(id, [base[0] - anchor[0], base[1] - anchor[1]]);
     }
@@ -197,6 +263,7 @@ export class UnifiedWorld {
 
   /** Incheon world-frame metres -> current anchor's local sample frame. */
   incheonFrameToAnchor(x, z) {
+    if (this.customOrigin) return [x, z];
     const anchor = BASE_OFFSETS[this.anchor];
     return [x - anchor[0], z - anchor[1]];
   }
@@ -212,10 +279,14 @@ export class UnifiedWorld {
   syncMeshes() {
     for (const [id, region] of this.regions) {
       const [x, z] = this.offsets.get(id);
+      const visible = this.customOrigin ? (!BASE_OFFSETS[id] && region.mounted) : region.mounted;
       region.group?.position.set(x, 0, z);
       region.mesh?.position.set(x, 0, z);
-      if (region.group) region.group.visible = region.mounted;
-      if (region.mesh) region.mesh.visible = region.mounted;
+      if (region.group) region.group.visible = visible;
+      if (region.mesh) region.mesh.visible = visible;
+    }
+    if (this.customTerrain?.mesh) {
+      this.customTerrain.mesh.visible = Boolean(this.customOrigin);
     }
   }
 
@@ -232,6 +303,7 @@ export class UnifiedWorld {
 
   regionAt(x, z) {
     for (const [id, region] of this.regions) {
+      if (this.customOrigin && BASE_OFFSETS[id]) continue;
       const [lx, lz] = this.local(id, x, z);
       const e = region.extent;
       if (lx >= e.minX && lx <= e.maxX && lz >= e.minZ && lz <= e.maxZ) {
@@ -255,7 +327,7 @@ export class UnifiedWorld {
   }
 
   externalDestinationInfo(x, z, id) {
-    const anchor = BASE_OFFSETS[this.anchor];
+    const anchor = this.customOrigin ? [0, 0] : BASE_OFFSETS[this.anchor];
     const base = this.destinationOffsets.get(id) ?? this.dynamicOffsets.get(id) ?? null;
     const status = this.dynamicStatus.get(id);
     const prepare = status?.state ?? null;
@@ -297,7 +369,7 @@ export class UnifiedWorld {
     const centreDz = target[1] - anchor[1] - z;
     const planarDistanceM = Math.hypot(centreDx, centreDz);
     const threshold = RUNWAY_THRESHOLDS[id];
-    const from = worldPositionToWgs84(this.anchor, x, z);
+    const from = worldPositionToWgs84(this.anchor, x, z, this.customOrigin);
     const realOffset = realOffsetInIncheonFrame(id);
     const placementIsReal = realOffset
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;

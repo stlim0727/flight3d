@@ -1291,9 +1291,18 @@ function setCorridorStreamersVisible(surface, visible) {
 
 export function updateOpenWorldTerrain(sim) {
   const surface = sim.currentTerrain;
-  const frame = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
-  if (sim.openWorldSurface !== surface || !frame) {
-    const previous = sim.openWorldSurface;
+  const customOrigin = sim.world?.customOrigin ?? null;
+  const frame = customOrigin
+    ? { origin: customOrigin, protectedAreas: [] }
+    : (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport]);
+  const originChanged = Boolean(
+    surface?.openWorld && frame && (
+      Math.abs(surface.openWorld.origin.latitude - frame.origin.latitude) > 1e-6
+      || Math.abs(surface.openWorld.origin.longitude - frame.origin.longitude) > 1e-6
+    )
+  );
+  if (sim.openWorldSurface !== surface || !frame || originChanged) {
+    const previous = originChanged ? surface : sim.openWorldSurface;
     if (previous?.openWorld) {
       previous.openWorld.dispose();
       previous.openWorld = null;
@@ -1304,16 +1313,16 @@ export function updateOpenWorldTerrain(sim) {
   if (!frame) {
     setCorridorStreamersVisible(surface, true);
   }
-  if (frame && surface?.mesh && (sim.activeAirport !== 'lukla' || surface.isLoaded)) {
+  if (frame && surface?.mesh && (customOrigin || sim.activeAirport !== 'lukla' || surface.isLoaded)) {
     if (!surface.openWorld) {
       let localSurface = null;
       let protectedAreas = frame.protectedAreas;
-      const airportMesh = surface.airportMesh ?? surface.anchorTerrain?.airportMesh;
-      if (sim.activeAirport === 'lukla') {
+      const airportMesh = customOrigin ? null : (surface.airportMesh ?? surface.anchorTerrain?.airportMesh);
+      if (!customOrigin && sim.activeAirport === 'lukla') {
         const half = surface.size / 2;
         protectedAreas = [[-half, -half, half, half]];
         localSurface = surface;
-      } else if (airportMesh?.geometry) {
+      } else if (!customOrigin && airportMesh?.geometry) {
         localSurface = {
           geometry: airportMesh.geometry,
           extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },

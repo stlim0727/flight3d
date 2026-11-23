@@ -541,14 +541,21 @@ const frames = {
 };
 
 export function updateGeographicBuildings(sim, elapsed) {
-  const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
+  const customOrigin = sim.world?.customOrigin ?? null;
+  const origin = customOrigin ?? (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport]);
   const terrain = sim.currentTerrain;
-  if (sim.geographicBuildingLayer?.terrain !== terrain || !origin) {
+  const originChanged = Boolean(
+    sim.geographicBuildingLayer?.origin && origin && (
+      Math.abs(sim.geographicBuildingLayer.origin.latitude - origin.latitude) > 1e-6
+      || Math.abs(sim.geographicBuildingLayer.origin.longitude - origin.longitude) > 1e-6
+    )
+  );
+  if (sim.geographicBuildingLayer?.terrain !== terrain || !origin || originChanged) {
     sim.geographicBuildingLayer?.dispose();
     sim.geographicBuildingLayer = null;
   }
   if (origin && terrain?.mesh && !sim.geographicBuildingLayer) {
-    const project = sim.activeAirport === 'incheon' ? projectToLocal
+    const project = (!customOrigin && sim.activeAirport === 'incheon') ? projectToLocal
       : (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
     const airport = sim.currentAirport;
     sim.geographicBuildingLayer = new GeographicBuildings({

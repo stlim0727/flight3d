@@ -586,3 +586,29 @@ test('worldPositionToWgs84 has no frame for fictional anchors', () => {
   }
   assert.ok(worldPositionToWgs84('incheon', 0, 0));
 });
+
+test('custom tangent-plane origin isolates distant global flights from built-in regions and preserves WGS84', () => {
+  const { world, incheon } = makeWorld();
+  const chadOrigin = { latitude: 21.77655, longitude: 19.20233 };
+  assert.equal(world.setCustomOrigin(chadOrigin), true);
+  assert.equal(incheon.group.visible, false, 'built-in Incheon group is hidden under custom origin');
+  assert.equal(world.regionAt(0, 0), null, 'built-in Incheon region does not claim (0, 0) in Chad');
+  assert.ok(world.mesh && world.mesh !== incheon.group, 'custom origin uses its own open-world host group');
+
+  const roundTrip = worldPositionToWgs84('incheon', 0, 0, world.customOrigin);
+  assert.ok(Math.abs(roundTrip.latitude - chadOrigin.latitude) < 1e-6);
+  assert.ok(Math.abs(roundTrip.longitude - chadOrigin.longitude) < 1e-6);
+
+  const jfk = { latitude: 40.6413, longitude: -73.7781 };
+  assert.equal(world.setCustomOrigin(jfk), true);
+  const jfkWgs = worldPositionToWgs84('incheon', 0, 0, world.customOrigin);
+  assert.ok(Math.abs(jfkWgs.latitude - jfk.latitude) < 1e-6, 'JFK does not fold across Incheon horizon');
+  assert.ok(Math.abs(jfkWgs.longitude - jfk.longitude) < 1e-6);
+
+  const dyn = fakeRegion(4, [0, 0]);
+  world.registerDynamic('KJFK', { ...dyn, baseOffset: [0, 0] });
+  assert.equal(world.regionAt(0, 0)?.id, 'KJFK', 'streamed airport resolves in custom origin frame');
+
+  assert.equal(world.setCustomOrigin(null), true);
+  assert.equal(incheon.group.visible, true, 'clearing custom origin restores Incheon group');
+});

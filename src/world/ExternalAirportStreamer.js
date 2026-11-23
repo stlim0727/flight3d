@@ -1,6 +1,7 @@
 import { isExternalDestination, externalDestinationTileId, normalizeExternalTileId } from '../config/externalDestinations.js';
 import { loadAirportManifest, findAirportByCode } from '../geospatial/airportIndex.js';
 import { projectToLocal } from '../geospatial/incheon.js';
+import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
 /**
  * Asset readiness for one externally indexed destination. It mounts a single
@@ -15,9 +16,9 @@ async function defaultLoadAirport(code, { baseUrl, fetchImpl, tileId } = {}) {
   return airport;
 }
 
-async function defaultBuildRegion({ airport, baseOffset, outsideHeight }) {
+async function defaultBuildRegion({ airport, baseOffset, outsideHeight, geoOrigin }) {
   const { createExternalAirportRegion } = await import('../geospatial/externalAirportSurface.js');
-  return createExternalAirportRegion({ airport, baseOffset, outsideHeight });
+  return createExternalAirportRegion({ airport, baseOffset, outsideHeight, geoOrigin });
 }
 
 function errorMessage(error) {
@@ -328,13 +329,16 @@ export class ExternalAirportStreamer {
       if (!Number.isFinite(descriptor?.latitude) || !Number.isFinite(descriptor?.longitude)) {
         throw new Error(`Invalid airport record for ${code}`);
       }
-      // baseOffset is already in the world frame (Incheon scenery origin);
-      // registerDynamic() publishes the anchor-relative offset itself.
-      const baseOffset = projectToLocal(descriptor.latitude, descriptor.longitude);
+      // When the world is anchored to a distant custom tangent-plane origin,
+      // project both the airport offset and its runway geometry in that frame.
+      const geoOrigin = this.world?.customOrigin ?? null;
+      const baseOffset = geoOrigin
+        ? wgs84ToLocal(descriptor.latitude, descriptor.longitude, geoOrigin)
+        : projectToLocal(descriptor.latitude, descriptor.longitude);
       this.world?.rememberDestination?.(code, baseOffset);
       if (this._stale(token, code)) return false;
       region = await this._buildRegion({
-        airport: descriptor, baseOffset, outsideHeight: this.outsideHeight, code,
+        airport: descriptor, baseOffset, outsideHeight: this.outsideHeight, code, geoOrigin,
       });
       if (this._stale(token, code)) {
         this._disposeRegion(region);

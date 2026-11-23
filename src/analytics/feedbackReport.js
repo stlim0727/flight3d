@@ -183,11 +183,12 @@ export function gatherFeedbackDiagnostics(sim) {
     headingDeg: finite(telemetry.headingDeg),
     geoPosition: (() => {
       const anchor = held?.metadata?.airport ?? sim.activeAirport ?? null;
+      const customOrigin = sim.world?.customOrigin ?? null;
       const x = finite(sim.position?.x);
       const z = finite(sim.position?.z);
-      if (!anchor || x === null || z === null) return null;
+      if ((!anchor && !customOrigin) || x === null || z === null) return null;
       try {
-        const position = worldPositionToWgs84(anchor, x, z);
+        const position = worldPositionToWgs84(anchor, x, z, customOrigin);
         return position ? { latitude: finite(position.latitude), longitude: finite(position.longitude), anchor } : null;
       } catch {
         return null;
@@ -199,6 +200,8 @@ export function gatherFeedbackDiagnostics(sim) {
     flightLog: buildFlightLog(sim),
     aircraft: held?.metadata?.aircraft ?? sim.currentAircraftId ?? null,
     airport: held?.metadata?.airport ?? sim.activeAirport ?? null,
+    placeLabel: held?.metadata?.placeLabel ?? sim.activeMapPlace?.label ?? null,
+    airportCode: held?.metadata?.airportCode ?? sim.activeMapPlace?.code ?? null,
     scenario: held?.metadata?.scenario ?? sim.lastPresetType ?? null,
     flightDurationSec: finite(held?.durationSec ?? recorder?.elapsed),
     gForce: finite(telemetry.gForce),

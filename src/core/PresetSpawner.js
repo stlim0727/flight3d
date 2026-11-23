@@ -751,11 +751,32 @@ class PresetSpawnerMethods {
 
     this.currentTerrain = world;
     const mountingChanged = this.updateRegionMounting();
-    const spawnAirport = this.spawnAirportFor(id);
+    const spawnAirport = world.customOrigin ? null : this.spawnAirportFor(id);
     const facade = mountingChanged ? this.currentAirport : createWorldAirportFacade(world, spawnAirport);
     this.currentAirport = facade;
     if (this.collisionDetector) this.collisionDetector.airport = facade;
     return true;
+  }
+
+  /** Set or clear a local WGS84 tangent-plane origin for distant global map flights. */
+  setCustomWorldOrigin(origin) {
+    if (!this.world?.setCustomOrigin) return false;
+    const changed = this.world.setCustomOrigin(origin, this.scene);
+    if (changed) {
+      this.openWorldSurface = null;
+      this.geographicBuildingLayer?.dispose?.();
+      this.geographicBuildingLayer = null;
+      this.geographicRoadLayer?.dispose?.();
+      this.geographicRoadLayer = null;
+      this.geographicGreenLayer?.dispose?.();
+      this.geographicGreenLayer = null;
+      this.geographicLandmarkLayer?.dispose?.();
+      this.geographicLandmarkLayer = null;
+      this.airportStreamer?.setHome?.(null);
+      this.airportStreamer?.setDestination?.(null);
+      this.airportStreamer?.releaseGroundHold?.();
+    }
+    return changed;
   }
 
   spawnAirportFor(id) {
@@ -770,6 +791,7 @@ class PresetSpawnerMethods {
   /** Regions that must stay mounted regardless of distance to the aircraft. */
   requiredMountedRegions() {
     const world = this.world;
+    if (world.customOrigin) return new Set();
     const required = new Set([world.anchor]);
     const x = this.position?.x ?? 0;
     const z = this.position?.z ?? 0;
@@ -799,8 +821,10 @@ class PresetSpawnerMethods {
       const region = world.regions.get(id);
       if (!region) continue;
       const distance = world.distanceToRegion(id, x, z);
-      const mounted = required.has(id)
-        || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin);
+      const mounted = world.customOrigin
+        ? false
+        : (required.has(id)
+          || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin));
       if (world.setMounted(id, mounted)) changed = true;
       this.setSceneObject(region.group, mounted);
       if (region.mesh !== region.group) this.setSceneObject(region.mesh, mounted);
@@ -811,7 +835,7 @@ class PresetSpawnerMethods {
     if (this.foliage?.group) this.foliage.group.visible = coastalMounted;
     if (this.ships?.group) this.ships.group.visible = coastalMounted;
     if (!changed) return false;
-    const facade = createWorldAirportFacade(world, this.spawnAirportFor(world.anchor));
+    const facade = createWorldAirportFacade(world, world.customOrigin ? null : this.spawnAirportFor(world.anchor));
     this.currentAirport = facade;
     this.collisionDetector?.setEnvironment(
       world,
@@ -1006,7 +1030,7 @@ class PresetSpawnerMethods {
 
   /** Stream neighboring unified regions only as the aircraft approaches their 65 km perimeter. */
   updateUnifiedRegionStreaming(nowMs = performance.now()) {
-    if (!this.world || !this.position || !WORLD_REGIONS.includes(this.activeAirport)) return;
+    if (!this.world || this.world.customOrigin || !this.position || !WORLD_REGIONS.includes(this.activeAirport)) return;
     const x = this.position.x;
     const z = this.position.z;
     const movedSq = this._lastRegionStreamX === undefined

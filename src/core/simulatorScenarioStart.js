@@ -3,7 +3,7 @@ import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
-import { mapCruisePoint } from '../config/mapFlightPlaces.js';
+import { mapCruisePoint, mapPlanCustomOrigin, mapPlanLabel } from '../config/mapFlightPlaces.js';
 import { resolveMapFlightPlan } from '../config/mapFlightPlan.js';
 import { BASE_OFFSETS } from '../world/UnifiedWorld.js';
 import { projectToLocal } from '../geospatial/incheon.js';
@@ -40,6 +40,10 @@ export function createSimulatorScenarioStart(sim) {
       // PresetSpawner owns the recording after pose installation; mission adapters
       // own recording before course preparation. Neither is restarted at commit.
       async preset(request) {
+        sim.setCustomWorldOrigin?.(request.mapPlan?.origin ?? null);
+        sim.activeMapPlace = request.mapPlan
+          ? { label: request.mapPlan.placeLabel ?? null, code: request.mapPlan.placeCode ?? request.mapPlan.airportCode ?? null }
+          : null;
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
         const setIncheonRunwayVisible = visible => {
@@ -87,16 +91,20 @@ export function createSimulatorScenarioStart(sim) {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
           alignMapSpawnToContact(sim, request.mapPlan.spawn);
         }
-        if (!regionalCruise(request.scenario)) return result;
+        if (!regionalCruise(request.scenario) && !(request.mapPlan?.scenario === 'cruise' && request.mapPlan?.origin)) return result;
         return waitForRegionalTerrain(sim);
       },
       demo(request) {
+        sim.setCustomWorldOrigin?.(null);
+        sim.activeMapPlace = null;
         if (sim.demoDirector.start(null, request.demoProfile) === false) {
           throw new Error('Demo scenario could not start.');
         }
         sim.beginFlightRecording();
       },
       valley(request) {
+        sim.setCustomWorldOrigin?.(null);
+        sim.activeMapPlace = null;
         sim.lastPresetType = 'valley';
         return sim.startValleyMission({ pilotKind: request.pilotMode });
       },
@@ -123,9 +131,10 @@ function resolveLobbyMapPlan(sim) {
   const airport = catalog?.airports?.find(entry => entry.code === choice.airportCode);
   const point = mapCruisePoint(choice, catalog);
   const [runwayId, endId] = (choice.runwayKey ?? '').split(':');
-  const baseOffset = airport ? projectToLocal(airport.latitude, airport.longitude) : [0, 0];
-  const anchorBase = BASE_OFFSETS[sim.activeAirport] ?? [0, 0];
-  return resolveMapFlightPlan({
+  const origin = mapPlanCustomOrigin(choice, catalog, sim.lobby?.airport ?? sim.activeAirport);
+  const baseOffset = origin ? [0, 0] : (airport ? projectToLocal(airport.latitude, airport.longitude) : [0, 0]);
+  const anchorBase = origin ? [0, 0] : (BASE_OFFSETS[sim.activeAirport] ?? [0, 0]);
+  const plan = resolveMapFlightPlan({
     state: choice.state,
     airport: applyAirportOverrides(airport),
     runwayId,
@@ -134,7 +143,15 @@ function resolveLobbyMapPlan(sim) {
     baseOffset,
     anchorBase,
     aircraftId: sim.lobby.aircraft ?? sim.currentAircraftId,
+    origin,
   });
+  if (!plan) return null;
+  return {
+    ...plan,
+    origin,
+    placeLabel: mapPlanLabel(choice, catalog),
+    placeCode: airport?.code ?? null,
+  };
 }
 
 async function waitForStreamedAirport(sim, code) {

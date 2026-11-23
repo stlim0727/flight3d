@@ -276,6 +276,27 @@ test('CollisionDetector (Multi-Obstacle & Crash Detection System)', async (t) =>
     assert.ok(result !== null, 'Should detect mountain ridge collision');
     assert.equal(result.type, 'TERRAIN');
   });
+
+  await t.test('gear-up mountain impact with solver catastrophicImpact is not mislabeled as runway excursion', () => {
+    const pos = new THREE.Vector3(2600, 150, 500);
+    const quat = new THREE.Quaternion();
+    const vel = new THREE.Vector3(180, -10, 0);
+    const groundContact = {
+      onGround: true,
+      catastrophicImpact: true,
+      contacts: [
+        { id: 'nose', isGrounded: false, damageState: 'normal' },
+        { id: 'mainLeft', isGrounded: false, damageState: 'normal' },
+        { id: 'mainRight', isGrounded: false, damageState: 'normal' },
+      ],
+      bodyContacts: [{ worldPos: pos.clone() }],
+    };
+    const result = detector.checkCollision(pos, quat, vel, 0.0, -3, -20, groundContact);
+    assert.ok(result !== null);
+    assert.equal(result.type, 'TERRAIN');
+    assert.doesNotMatch(result.name, /RUNWAY EXCURSION|활주로 이탈/);
+    assert.match(result.name, /GEAR-UP BELLY CRASH|동체 착륙/);
+  });
 });
 
 test('airport switches reuse the spatial grids of an unchanged foliage source', () => {

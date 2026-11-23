@@ -338,13 +338,20 @@ export function updateGeographicGreenSpace(sim) {
     setMapAttributionSource('geographic-green-attribution', false);
     return;
   }
-  const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
-  if (sim.geographicGreenLayer?.terrain !== terrain || !origin) {
+  const customOrigin = sim.world?.customOrigin ?? null;
+  const origin = customOrigin ?? (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport]);
+  const originChanged = Boolean(
+    sim.geographicGreenLayer?.origin && origin && (
+      Math.abs(sim.geographicGreenLayer.origin.latitude - origin.latitude) > 1e-6
+      || Math.abs(sim.geographicGreenLayer.origin.longitude - origin.longitude) > 1e-6
+    )
+  );
+  if (sim.geographicGreenLayer?.terrain !== terrain || !origin || originChanged) {
     sim.geographicGreenLayer?.dispose();
     sim.geographicGreenLayer = null;
   }
   if (origin && terrain?.mesh && !sim.geographicGreenLayer) {
-    const project = sim.activeAirport === 'incheon' ? projectToLocal
+    const project = (!customOrigin && sim.activeAirport === 'incheon') ? projectToLocal
       : (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
     const airport = sim.currentAirport;
     sim.geographicGreenLayer = new GeographicGreenSpace({

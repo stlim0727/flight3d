@@ -820,7 +820,9 @@ class FlightSimulator {
     this.debriefReplay = null;
     const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
-      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay };
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
+      ...(this.activeMapPlace?.label ? { placeLabel: this.activeMapPlace.label } : {}),
+      ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}) };
     this.flightRecorder?.start(sortie);
     this.replayRecorder?.start(sortie);
   }
