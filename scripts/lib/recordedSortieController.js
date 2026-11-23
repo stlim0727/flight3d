@@ -39,6 +39,20 @@ export function nextRolloutPitch(pitchDeg, dtSeconds) {
   return Math.max(6.7, pitchDeg - 3 * dtSeconds);
 }
 
+/** Terrain clearance along the actual bearing to a target, not a fixed corridor. */
+export function terrainAltitudeAhead(position, target, surface, { minAltM = 200, clearanceM = 60 } = {}) {
+  const dx = target.x - position.x, dz = target.z - position.z;
+  const remaining = Math.hypot(dx, dz) || 1;
+  const ux = dx / remaining, uz = dz / remaining;
+  let cmd = minAltM;
+  for (const ahead of [0, 500, 1500, 3000, 6000, 12000, 20000]) {
+    const distance = Math.min(ahead, remaining);
+    const ground = surface?.getHeight?.(position.x + ux * distance, position.z + uz * distance) ?? 0;
+    if (Number.isFinite(ground)) cmd = Math.max(cmd, ground + clearanceM);
+  }
+  return cmd;
+}
+
 const degrees = radians => (radians * 180 / Math.PI + 360) % 360;
 const headingOf = (dx, dz) => degrees(Math.atan2(dx, -dz));
 
@@ -105,6 +119,10 @@ function makeRoute(s, destination) {
         const p = local();
         return headingOf(data.threshold.x - p.x, data.threshold.z - p.z);
       },
+      // The Jeju corridor projection is meaningless for a north-east Gimpo
+      // sortie; sample the terrain actually ahead of the aircraft instead.
+      terrainAltitude: () => terrainAltitudeAhead(s.position,
+        { x: OX + data.threshold.x, z: OZ + data.threshold.z }, s.currentTerrain),
     };
   }
 

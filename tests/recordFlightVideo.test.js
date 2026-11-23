@@ -6,7 +6,7 @@ import {
   decelerationThrottle,
   rolloutReason,
   nextRolloutPitch,
-  streamedApproach,
+  streamedApproach, terrainAltitudeAhead,
 } from '../scripts/lib/recordedSortieController.js';
 
 describe('recorded sortie guards', () => {
@@ -78,5 +78,10 @@ describe('Gimpo sortie destination', () => {
     assert.ok(Math.abs(data.elevationFt - 10.36 / 0.3048) < 0.01);
     assert.equal(data.gsAngleDeg, 3);
     assert.equal(streamedApproach({ terrain: { runways: [] } }), null);
+  });
+  it('samples terrain along the flown bearing rather than the Jeju corridor', () => {
+    const surface = { getHeight: x => (x >= 1500 ? 500 : 0) };
+    const altitude = terrainAltitudeAhead({ x: 0, z: 0 }, { x: 3000, z: 0 }, surface);
+    assert.equal(altitude, 560);
   });
 });
