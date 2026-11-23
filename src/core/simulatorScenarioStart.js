@@ -46,22 +46,24 @@ export function createSimulatorScenarioStart(sim) {
           : null;
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
-        const setIncheonRunwayVisible = visible => {
-          const airport = sim.incheonAirport;
-          if (!airport) return;
-          if (airport.legacyRunwayDetails) airport.legacyRunwayDetails.visible = visible;
-          for (const child of airport.pavement?.children ?? []) {
-            if ((child.name ?? '').startsWith('incheon-runway')) child.visible = visible;
+        const clearHandoff = () => {
+          for (const objects of Object.values(sim._handedOffRunways ?? {})) {
+            for (const object of objects) if (object) object.visible = true;
           }
+          sim._handedOffRunways = {};
         };
-        if (request.airport !== 'lukla'
-          || !['runway', 'cliff', 'approach'].includes(request.scenario)) {
-          if (sim.luklaAirport?.runwayGroup) sim.luklaAirport.runwayGroup.visible = true;
-        }
-        if (request.airport !== 'incheon'
-          || !['runway', 'approach', 'challenge'].includes(request.scenario)) {
-          setIncheonRunwayVisible(true);
-        }
+        const registerHandoff = (code, objects) => {
+          clearHandoff();
+          sim._handedOffRunways = { [code]: objects.filter(Boolean) };
+          sim.syncLegacyRunwayHandoff?.();
+        };
+        const incheonRunwayMeshes = () => {
+          const airport = sim.incheonAirport;
+          if (!airport) return [];
+          return [airport.legacyRunwayDetails, ...(airport.pavement?.children ?? [])
+            .filter(child => (child.name ?? '').startsWith('incheon-runway'))];
+        };
+        clearHandoff();
         if (!request.mapPlan && request.airport === 'jeju'
           && (request.scenario === 'runway' || request.scenario === 'approach')) {
           const spawn = airportSpawnPlan('RKPC', request.scenario, {
@@ -76,16 +78,16 @@ export function createSimulatorScenarioStart(sim) {
           && ['runway', 'cliff', 'approach'].includes(request.scenario)) {
           sim.airportStreamer?.setHome?.('VNLK');
           await waitForStreamedAirport(sim, 'VNLK');
-          const commonRegion = sim.airportStreamer?.regionFor?.('VNLK');
-          const legacyRunway = sim.luklaAirport?.runwayGroup
-            ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway');
-          if (commonRegion && legacyRunway) legacyRunway.visible = false;
+          if (sim.airportStreamer?.regionFor?.('VNLK')) {
+            registerHandoff('VNLK', [sim.luklaAirport?.runwayGroup
+              ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway')]);
+          }
         }
         if (!request.mapPlan && request.airport === 'incheon'
           && ['runway', 'approach', 'challenge'].includes(request.scenario)) {
           sim.airportStreamer?.setHome?.('RKSI');
           await waitForStreamedAirport(sim, 'RKSI');
-          if (sim.airportStreamer?.regionFor?.('RKSI')) setIncheonRunwayVisible(false);
+          if (sim.airportStreamer?.regionFor?.('RKSI')) registerHandoff('RKSI', incheonRunwayMeshes());
         }
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
@@ -162,23 +164,29 @@ async function waitForStreamedAirport(sim, code) {
   // its tileId is the only deterministic link to the selected record.
   const tileId = sim.lobby?.mapPlan?.tileId
     ?? sim.mapPlaces?.airports?.find(entry => entry.code === code)?.tileId;
-  streamer.releaseGroundHold?.();
-  streamer.ensure(code, { tileId });
-  do {
-    const status = streamer.statusFor?.(code);
-    if (status?.state === 'ready') return;
-    streamer.update?.({
-      x: sim.position.x,
-      z: sim.position.z,
-      speedMps: 0,
-      onGround: Boolean(sim.telemetry?.onGround),
-      onRunway: Boolean(sim.currentAirport?.isOnRunway?.(sim.position.x, sim.position.z)),
-      destinationCode: code,
-    });
-    await new Promise(resolve => setTimeout(resolve, 50));
-  } while (performance.now() < deadline);
-}
+  streamer.holdDestination?.(code);
+  try {
+    streamer.ensure(code, { tileId });
+    streamer.releaseGroundHold?.();
+    streamer.ensure(code, { tileId });
+    do {
+      const status = streamer.statusFor?.(code);
+      if (status?.state === 'ready') return;
+      streamer.update?.({
+        x: sim.position.x,
+        z: sim.position.z,
+        speedMps: 0,
+        onGround: Boolean(sim.telemetry?.onGround),
+        onRunway: Boolean(sim.currentAirport?.isOnRunway?.(sim.position.x, sim.position.z)),
+        destinationCode: code,
+      });
+      await new Promise(resolve => setTimeout(resolve, 50));
+    } while (performance.now() < deadline);
+  } finally {
+    streamer.releaseDestinationHold?.();
+  }
 
+}
 function alignMapSpawnToContact(sim, spawn) {
   if (!spawn?.alignToGround) return;
   const sampleX = spawn.state === 'approach' && Number.isFinite(spawn.surfaceX) ? spawn.surfaceX : sim.position.x;

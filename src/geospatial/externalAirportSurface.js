@@ -66,6 +66,7 @@ export function buildExternalRunwayDescriptors(airport, overrides, { geoOrigin =
   for (let index = 0; index < airport.runways.length; index++) {
     const runway = airport.runways[index];
     if (!runway || !Array.isArray(runway.ends) || runway.ends.length < 2) continue;
+    if (overrides?.hideRunways?.some(id => String(id) === String(runway?.id))) continue;
     let ends;
     const hasElevOverride = finite(overrides?.elevationM);
     try {
@@ -347,8 +348,8 @@ export class ExternalAirportSurface {
         let qx = 0;
         let qz = 0;
         if (rot !== 0) {
-          const cos = Math.cos(-rot);
-          const sin = Math.sin(-rot);
+          const cos = Math.cos(rot);
+          const sin = Math.sin(rot);
           const dx = x - fx;
           const dz = z - fz;
           const lx = Math.abs(dx * cos - dz * sin);
@@ -871,10 +872,10 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
           let dx = x - pos[0];
           let dz = z - pos[2];
           if (rotY !== 0) {
-            const cosR = Math.cos(-rotY);
-            const sinR = Math.sin(-rotY);
-            const lx = dx * cosR - dz * sinR;
-            const lz = dx * sinR + dz * cosR;
+            const cos = Math.cos(rotY);
+            const sin = Math.sin(rotY);
+            const lx = dx * cos - dz * sin;
+            const lz = dx * sin + dz * cos;
             dx = lx;
             dz = lz;
           }

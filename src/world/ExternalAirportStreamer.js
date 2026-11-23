@@ -61,6 +61,7 @@ export class ExternalAirportStreamer {
     this._state = 'idle';
     this._code = null;
     this._home = null;
+    this._hold = null;
     this._tileId = null;
     this._error = null;
     this._distanceM = null;
@@ -91,6 +92,15 @@ export class ExternalAirportStreamer {
 
   get homeCode() {
     return this._home;
+  }
+
+  /** Pin a destination for the duration of a spawn load. */
+  holdDestination(code) {
+    this._hold = isExternalDestination(code) ? code.trim().toUpperCase() : null;
+  }
+
+  releaseDestinationHold() {
+    this._hold = null;
   }
 
   /** Loaded common region for a code, or null when not streamed. */
@@ -202,7 +212,7 @@ export class ExternalAirportStreamer {
     if (this._disposed) return;
     try {
       if (destinationCode !== undefined) {
-        const requested = isExternalDestination(destinationCode) ? destinationCode : this._home;
+        const requested = this._hold ?? (isExternalDestination(destinationCode) ? destinationCode : this._home);
         this.setDestination(requested);
       }
       if (this._retired) {
@@ -241,6 +251,7 @@ export class ExternalAirportStreamer {
     this._retired = null;
     this._code = null;
     this._home = null;
+    this._hold = null;
     this._loadingPromise = null;
     this._state = 'idle';
     this._error = null;

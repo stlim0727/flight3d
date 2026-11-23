@@ -358,3 +358,14 @@ test('resetForOriginChange clears cached offsets so distant destinations load ne
   await flush();
   assert.equal(h.events.loads.length, 2, 'new destination loads immediately after origin reset');
 });
+
+test('destination hold overrides frame-loop destination until released', () => {
+  const h = harness();
+  h.streamer.setHome('RKSS');
+  h.streamer.holdDestination('RKSS');
+  h.streamer.update({ x: 0, z: 0, destinationCode: 'RKPC' });
+  assert.equal(h.streamer.status.code, 'RKSS', 'spawn load must not be cancelled by the frame loop');
+  h.streamer.releaseDestinationHold();
+  h.streamer.update({ x: 0, z: 0, destinationCode: 'RKPC' });
+  assert.equal(h.streamer.status.code, 'RKPC', 'chosen destination applies after spawn');
+});
