@@ -377,7 +377,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const formatPlaceItem = item => item.kind === 'region'
       ? { ...item, label: item.nameKey ? t(item.nameKey) : item.label, detail: '' }
       : item;
-    renderPlaceList(mapResults, results.map(formatPlaceItem), 'lobby.map.search.empty', activeKey);
+    if (query.trim()) {
+      renderPlaceList(mapResults, results.map(formatPlaceItem), 'lobby.map.search.empty', activeKey);
+    } else {
+      mapResults?.replaceChildren();
+    }
     const withBookmarkLabels = bookmark => formatPlaceItem({
       ...bookmark,
       key: bookmarkKey(bookmark),

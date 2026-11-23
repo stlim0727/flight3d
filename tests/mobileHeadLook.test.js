@@ -1,5 +1,6 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { MobileHeadTracking } from '../src/cameras/MobileHeadTracking.js';
@@ -260,6 +261,12 @@ describe('mobile head look', () => {
       ui.toggleCollapse();
       assert.equal(ui.collapsed, false);
       assert.equal(ui.body.style.display, 'flex');
+
+      const css = fs.readFileSync(new URL('../src/styles/lobby-and-overlays.css', import.meta.url), 'utf8');
+      assert.ok(
+        css.includes('#head-tracking-panel') && css.includes('body:not([data-flow="flight"])'),
+        'head tracking panel must be hidden outside active flight in lobby CSS',
+      );
     } finally {
       Object.defineProperty(globalThis, 'document', { configurable: true, value: previousDocument });
     }

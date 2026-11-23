@@ -394,20 +394,98 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-map-marker-pin { fill: #4285f4; stroke: #fff; stroke-width: 1.2px; }
 .lobby-map-marker-dot { fill: #fff; }
 .lobby-map-marker.active .lobby-map-marker-pin { fill: #ea4335; }
+.lobby-map-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8px * var(--ui-scale, 1));
+  min-height: calc(20px * var(--ui-scale, 1));
+}
 .lobby-map-status { margin: 0; color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
-.lobby-map-results, .lobby-map-bookmarks { display: flex; flex-wrap: wrap; gap: calc(5px * var(--ui-scale, 1)); }
-.lobby-map-results .btn, .lobby-map-bookmarks .btn {
-  min-height: calc(28px * var(--ui-scale, 1));
-  color: #202124;
+.lobby-card #lobby-map-search-retry {
+  min-height: calc(24px * var(--ui-scale, 1));
+  padding: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  font-size: calc(10px * var(--ui-scale, 1));
+  border-radius: calc(6px * var(--ui-scale, 1));
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, .35);
+  background: rgba(14, 165, 233, .1);
+  white-space: nowrap;
+}
+.lobby-card #lobby-map-search-retry:hover {
+  background: rgba(14, 165, 233, .22);
+  color: #e0f2fe;
+}
+.lobby-card #lobby-map-overview {
+  min-height: calc(26px * var(--ui-scale, 1));
+  padding: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  font-size: calc(11px * var(--ui-scale, 1));
+  white-space: nowrap;
+}
+.lobby-card .lobby-map-toolbar .btn-bookmark {
+  min-height: calc(40px * var(--ui-scale, 1));
+  padding: 0 calc(14px * var(--ui-scale, 1));
+  color: #1a73e8;
   background: #fff;
   border: 1px solid #dadce0;
   border-radius: 999px;
-  font-size: calc(10px * var(--ui-scale, 1));
+  box-shadow: 0 1px 4px rgba(60, 64, 67, .2);
+  font-weight: 600;
+  font-size: calc(11px * var(--ui-scale, 1));
+  white-space: nowrap;
 }
-.lobby-map-results .btn.active, .lobby-map-bookmarks .btn.active {
-  color: #174ea6;
-  background: #d2e3fc;
+.lobby-card .lobby-map-toolbar .btn-bookmark:hover {
+  background: #f8fafd;
   border-color: #4285f4;
+  color: #174ea6;
+}
+.lobby-card .lobby-map-toolbar .btn-bookmark.active {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+.lobby-card .lobby-map-results,
+.lobby-card .lobby-map-bookmarks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(5px * var(--ui-scale, 1));
+}
+.lobby-card .lobby-map-results .btn,
+.lobby-card .lobby-map-bookmarks .btn {
+  min-width: 0;
+  min-height: calc(28px * var(--ui-scale, 1));
+  padding: calc(4px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, .7);
+  border: 1px solid rgba(148, 163, 184, .25);
+  border-radius: 999px;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.lobby-card .lobby-map-results .btn:hover,
+.lobby-card .lobby-map-bookmarks .btn:hover {
+  background: rgba(51, 65, 85, .9);
+  border-color: rgba(148, 163, 184, .45);
+  color: #ffffff;
+}
+.lobby-card .lobby-map-results .btn.active,
+.lobby-card .lobby-map-bookmarks .btn.active {
+  color: #bae6fd;
+  background: rgba(14, 165, 233, .22);
+  border-color: #0ea5e9;
+  box-shadow: 0 0 10px rgba(14, 165, 233, .3);
+}
+.lobby-card .lobby-map-results > span,
+.lobby-card .lobby-map-bookmarks > span {
+  display: block;
+  color: #94a3b8;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  padding: calc(3px * var(--ui-scale, 1)) 0;
 }
 
 @media (max-width: 600px) and (orientation: portrait) {
@@ -929,7 +1007,8 @@ body:is([data-flow="lobby"], .booting) #cockpit-pov-panel,
 body:is([data-flow="lobby"], .booting) .btn-gaze-exit,
 body:is([data-flow="lobby"], .booting) #btn-gaze-exit,
 body:is([data-flow="lobby"], .booting) .pov-actions-bar,
-body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
+body:is([data-flow="lobby"], .booting) .touch-controls-overlay,
+body:not([data-flow="flight"]) #head-tracking-panel { display: none !important; }
 /* Keep the menu affordance available during play; hide it until startup ends. */
 body.booting .menu-toggle { display: none !important; }
 
@@ -1066,6 +1145,29 @@ body[data-flow="lobby"] .menu-toggle {
 }
 .compact-ui .lobby-card .btn,
 .compact-ui .lobby-settings #touch-btn-gyro { min-height: 44px; }
+.compact-ui .lobby-card .lobby-map-results .btn,
+.compact-ui .lobby-card .lobby-map-bookmarks .btn {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+.compact-ui .lobby-card #lobby-map-overview {
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.compact-ui .lobby-card #lobby-map-search-retry {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.compact-ui .lobby-card .lobby-map-toolbar input {
+  min-height: 38px;
+}
+.compact-ui .lobby-card .lobby-map-toolbar .btn-bookmark {
+  min-height: 38px;
+  padding: 0 12px;
+}
 .compact-ui .lobby-card .lobby-header { gap: 8px; }
 .compact-ui .lobby-header-actions { gap: 6px; }
 .compact-ui .lobby-language {
