@@ -66,11 +66,15 @@ preflight, CDP screencast frames and ffmpeg encoding.
 
 ```sh
 node scripts/record-flight-video.mjs --dry-run
+node scripts/record-flight-video.mjs --controller-check
 node scripts/record-flight-video.mjs --speed 1 --output ~/fff/sortie.mp4
 ```
 
-- `--dry-run` is mandatory before a long take: it checks the phase gates,
-  deceleration thrust floor and encode timing without launching a browser.
+- `--dry-run` checks pure helpers; `--controller-check` is also mandatory before
+  a long take. It boots hardware Chrome, installs the controller from
+  `scripts/lib/recordedSortieController.js` directly (no `Runtime.evaluate`
+  source string), forces `enroute → intercept → final → flare → rollout`, and
+  asserts AP modes, targets, gear and virtual inputs.
 - The simulation always runs at 1×. Playback speed is an encode-time choice:
   `--speed 1` (default) or `--speed 3`. Never accelerate the sim clock to fake
   video speed.
