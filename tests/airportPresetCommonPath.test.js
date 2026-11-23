@@ -139,3 +139,29 @@ test('Jeju preset start streams RKPC and aligns the pose with the common surface
 test('RKPC remains a streamable destination without the map catalog', () => {
   assert.equal(isExternalDestination('RKPC'), true);
 });
+
+test('RKSI and VNLK presets keep their validated poses', () => {
+  const cases = [
+    ['RKSI', 'runway', 'B738', 3.5, [-1588.118893, 10.5, -3665.574192, -2.525181, 0, 0, 0], 0],
+    ['RKSI', 'approach', 'B738', 3.5, [-2513.096606, 89.111669, -4971.107121, -2.525181, 43.069275, -3.90438, 60.788877], 2.291831],
+    ['RKSI', 'cruise', 'B738', 3.5, [-1356.874465, 750, -3339.19096, -2.525181, 62.435996, 0, 88.123473], 0],
+    ['RKSI', 'challenge', 'B738', 3.5, [-5111.126218, 363.742786, -8032.60057, -2.176115, 69.897269, -2.5, 48.367053], 0.572958],
+    ['RKSI', 'approach', 'C172', 1.4, [-2513.096606, 87.011669, -4971.107121, -2.525181, 19.077665, -1.729457, 26.926617], 2.291831],
+    ['RKSI', 'cruise', 'F16', 3.5, [-1356.874465, 750, -3339.19096, -2.525181, 104.059993, 0, 146.872455], 0],
+    ['VNLK', 'runway', 'B738', 3.5, [162.719765, 2862.441176, -107.574445, -4.153884, 0, 0, 0], -6.71],
+    ['VNLK', 'runway', 'F16', 3.5, [166.960005, 2863.029412, -110.22404, -4.153884, 0, 0, 0], -6.71],
+    ['VNLK', 'cliff', 'B738', 3.5, [162.719765, 2862.441176, -107.574445, -4.153884, 0, 0, 0], -6.71],
+    ['VNLK', 'approach', 'B738', 3.5, [-3222.5824, 3070, 2013.6922, -1.012291, 58.854531, -5.2, -36.776379], 1],
+    ['VNLK', 'cruise', 'B738', 3.5, [-1500, 3960, -800, -0.942478, 80, 0, -60], 0],
+    ['VNLK', 'cruise', 'C172', 1.4, [-1500, 3960, -800, -0.942478, 42.4, 0, -31.8], 0],
+  ];
+  for (const [code, scenario, aircraftId, clearance, expected, pitchDeg] of cases) {
+    const plan = airportSpawnPlan(code, scenario, { groundClearanceM: clearance, aircraftId });
+    assert.ok(plan, `${code}/${scenario}/${aircraftId} must have a plan`);
+    closePose(plan, {
+      x: expected[0], y: expected[1], z: expected[2], yaw: expected[3],
+      vx: expected[4], vy: expected[5], vz: expected[6],
+    }, 0.01);
+    assert.ok(Math.abs(plan.pitchDeg - pitchDeg) < 0.001, `${code}/${scenario}/${aircraftId} pitch`);
+  }
+});
