@@ -1,5 +1,6 @@
-// Low-level Incheon→Jeju F-16 controller used by scripts/record-flight-video.mjs.
+// Low-level Incheon → Jeju/Gimpo F-16 controller used by scripts/record-flight-video.mjs.
 // Browser-safe: imported directly by the page from /scripts/lib/... via Vite.
+import { approachDeviation as calculateDeviation } from '@stlim0727/flightsim-core/navigation/approachDeviation.js';
 import { flyBank, flyVerticalPath } from '../../src/director/PilotControlLaws.js';
 import * as corridor from '../../src/geospatial/CorridorCoordinateSystem.js';
 import { BASE_OFFSETS } from '../../src/world/UnifiedWorld.js';
@@ -38,46 +39,114 @@ export function nextRolloutPitch(pitchDeg, dtSeconds) {
   return Math.max(6.7, pitchDeg - 3 * dtSeconds);
 }
 
-/** Install the 20 Hz controller on a live simulator. Returns {ok:true} when armed. */
-export function installSortieController(s) {
-  const R = 180 / Math.PI, D = Math.PI / 180;
-  const ALT_M = 200, CLEARANCE_M = 60;
+const degrees = radians => (radians * 180 / Math.PI + 360) % 360;
+const headingOf = (dx, dz) => degrees(Math.atan2(dx, -dz));
+
+/**
+ * Approach geometry for a streamed airport's first runway, in that airport's
+ * local frame. RKSS is mounted from the indexed airport tile; its runway
+ * descriptors carry local threshold coordinates and elevation.
+ */
+export function streamedApproach(region) {
+  const ends = region?.terrain?.runways?.[0]?.ends;
+  if (!Array.isArray(ends) || ends.length < 2 || !ends[0]?.threshold || !ends[1]?.threshold) return null;
+  const a = ends[0].threshold, b = ends[1].threshold;
+  return {
+    threshold: { x: a.x, z: a.z },
+    headingDeg: headingOf(b.x - a.x, b.z - a.z),
+    gsAngleDeg: 3,
+    elevationFt: (Number.isFinite(a.elevationM) ? a.elevationM : 11) / 0.3048,
+  };
+}
+
+function makeRoute(s, destination) {
+  const wgs = () => corridor.incheonSceneryLocalToWgs84(s.position.x, s.position.z);
+  const alongRouteM = () => corridor.projectPointOnRoute(wgs().latitude, wgs().longitude).distanceAlongRouteM;
+  const common = {
+    routeDistanceM: alongRouteM,
+    terrainAltitude: () => {
+      const along = alongRouteM();
+      const total = corridor.getCorridorDistanceM();
+      let cmd = 200;
+      const surface = s.currentTerrain;
+      for (const ahead of [0, 500, 1500, 3000, 6000, 12000, 20000]) {
+        const r = corridor.interpolateRoute(Math.max(0, Math.min(1, (along + ahead) / total)));
+        const [x, z] = corridor.wgs84ToIncheonSceneryLocal(r.latitude, r.longitude);
+        const ground = surface.getHeight?.(x, z) ?? 0;
+        if (Number.isFinite(ground)) cmd = Math.max(cmd, ground + 60);
+      }
+      return cmd;
+    },
+  };
+
+  if (destination === 'RKSS' || destination === 'rkss' || destination === 'gimpo') {
+    const offset = s.world?.offsets?.get?.('RKSS');
+    const data = streamedApproach(s.world?.regions?.get?.('RKSS'));
+    if (!offset || !data) return null;
+    const [OX, OZ] = offset;
+    const local = () => ({ x: s.position.x - OX, z: s.position.z - OZ });
+    return {
+      ...common,
+      key: 'RKSS',
+      lateralMode: 'HDG',
+      approach: data,
+      local,
+      deviation: () => {
+        const p = local();
+        return calculateDeviation(data, { x: p.x, z: p.z,
+          altitudeFt: s.telemetry.altitudeFt, tasKnots: s.telemetry.tasKnots || 250 });
+      },
+      // Indexed RW14R threshold (airport tile 12-30). Centre fixes are ~1 km off.
+      distanceM: () => {
+        const here = wgs();
+        return corridor.haversineDistanceM(here.latitude, here.longitude, 37.568001, 126.776001);
+      },
+      enrouteHeading: () => {
+        const p = local();
+        return headingOf(data.threshold.x - p.x, data.threshold.z - p.z);
+      },
+    };
+  }
+
+  if (destination !== 'jeju') return null;
   const [JX, JZ] = BASE_OFFSETS.jeju;
-  const state = { phase: 'init', done: false, crashed: false, reason: null,
+  const data = approach.APPROACH_DATA.jeju;
+  const local = () => ({ x: s.position.x - JX, z: s.position.z - JZ });
+  return {
+    ...common,
+    key: 'jeju',
+    // The Incheon → Jeju corridor is the LNAV flight plan; a streamed Gimpo
+    // destination has no corridor and must be steered in HDG.
+    lateralMode: 'LNAV',
+    approach: data,
+    local,
+    deviation: () => {
+      const p = local();
+      return approach.approachDeviation('jeju', { x: p.x, z: p.z,
+        altitudeFt: s.telemetry.altitudeFt, tasKnots: s.telemetry.tasKnots || 250 });
+    },
+    distanceM: () => {
+      const here = wgs();
+      return corridor.haversineDistanceM(here.latitude, here.longitude, 33.5113, 126.493);
+    },
+    enrouteHeading: null,
+  };
+}
+
+/** Install the 20 Hz controller on a live simulator. Returns {ok:true} when armed. */
+export function installSortieController(s, destination = 'jeju') {
+  const route = makeRoute(s, destination);
+  if (!route) return { ok: false, error: `destination ${destination} is not ready` };
+  const R = 180 / Math.PI, D = Math.PI / 180;
+  const state = { phase: 'init', destination: route.key, courseDeg: route.approach.headingDeg,
+    done: false, crashed: false, reason: null,
     log: [], touchdowns: [], rolloutPitchDeg: 10 };
   window.__flight = state;
 
-  const jejuLocal = () => ({ x: s.position.x - JX, z: s.position.z - JZ });
-  const headingOf = (dx, dz) => (Math.atan2(dx, -dz) * R + 360) % 360;
   const wrap = d => ((d + 180) % 360 + 360) % 360 - 180;
   const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-  const deviation = () => {
-    const p = jejuLocal();
-    return approach.approachDeviation('jeju', { x: p.x, z: p.z,
-      altitudeFt: s.telemetry.altitudeFt, tasKnots: s.telemetry.tasKnots || 250 });
-  };
-  const routeDistanceM = () => {
-    const wgs = corridor.incheonSceneryLocalToWgs84(s.position.x, s.position.z);
-    return corridor.projectPointOnRoute(wgs.latitude, wgs.longitude).distanceAlongRouteM;
-  };
-  const jejuDistanceM = () => {
-    const wgs = corridor.incheonSceneryLocalToWgs84(s.position.x, s.position.z);
-    return corridor.haversineDistanceM(wgs.latitude, wgs.longitude, 33.5113, 126.493);
-  };
-  const terrainAltitude = () => {
-    const wgs = corridor.incheonSceneryLocalToWgs84(s.position.x, s.position.z);
-    const along = corridor.projectPointOnRoute(wgs.latitude, wgs.longitude).distanceAlongRouteM;
-    const total = corridor.getCorridorDistanceM();
-    let cmd = ALT_M;
-    const surface = s.currentTerrain;
-    for (const ahead of [0, 500, 1500, 3000, 6000, 12000, 20000]) {
-      const r = corridor.interpolateRoute(clamp((along + ahead) / total, 0, 1));
-      const [x, z] = corridor.wgs84ToIncheonSceneryLocal(r.latitude, r.longitude);
-      const ground = surface.getHeight?.(x, z) ?? 0;
-      if (Number.isFinite(ground)) cmd = Math.max(cmd, ground + CLEARANCE_M);
-    }
-    return cmd;
-  };
+  const deviation = route.deviation;
+  const terrainAltitude = route.terrainAltitude;
 
   let apEngaged = false, gearDown = false, flapsDown = false, interceptCaptured = false;
   let lastLog = -1, ticks = 0, rolloutStart = 0, rolloutPitchDeg = 10;
@@ -89,8 +158,8 @@ export function installSortieController(s) {
     state.log.push({ t, phase: state.phase, altFt: Math.round(s.telemetry.altitudeFt),
       ias: +s.telemetry.iasKnots.toFixed(1), hdg: +s.telemetry.headingDeg.toFixed(0),
       vsi: Math.round(s.telemetry.vsiFpm), g: +(s.telemetry.gForce ?? 0).toFixed(2),
-      routeKm: +(routeDistanceM() / 1000).toFixed(1),
-      jejuKm: +(jejuDistanceM() / 1000).toFixed(1),
+      routeKm: +(route.routeDistanceM() / 1000).toFixed(1),
+      destKm: +(route.distanceM() / 1000).toFixed(1),
       crossTrackM: Math.round(dev.crossTrackM), fuel: Math.round(s.telemetry.fuelKg ?? 0),
       onGround: !!s.telemetry.onGround, ap: s.autopilot.annunciation() });
     if (state.log.length > 5000) state.log.shift();
@@ -117,28 +186,30 @@ export function installSortieController(s) {
     if (!apEngaged) {
       const snap = s.readAutopilotState();
       s.autopilot.reset();
-      s.autopilot.engage('LNAV', snap);
+      if (route.enrouteHeading) s.autopilot.targets.headingDeg = route.enrouteHeading();
+      s.autopilot.engage(route.lateralMode, snap);
       s.autopilot.engage('ALT', snap);
       s.autopilot.engage('SPD', snap);
       apEngaged = true;
     }
-    s.autopilot.targets.altitudeFt = ALT_M / 0.3048;
+    s.autopilot.targets.altitudeFt = 200 / 0.3048;
     s.autopilot.targets.iasKnots = 450;
     s.autopilot.refreshTrim(s.readAutopilotState());
     state.phase = 'enroute';
   };
   const enroute = () => {
     s.autopilot.targets.altitudeFt = terrainAltitude() / 0.3048;
-    const distanceM = jejuDistanceM();
+    const distanceM = route.distanceM();
     if (!gearDown && distanceM < 25000) {
       s.gear.setGearTarget(true);
       gearDown = true;
     }
     s.autopilot.targets.iasKnots = gearDown ? 250 : 450;
+    if (route.enrouteHeading) s.autopilot.targets.headingDeg = route.enrouteHeading();
     if (distanceM < 22000) state.phase = 'intercept';
   };
   const intercept = () => {
-    const p = jejuLocal(), apData = approach.APPROACH_DATA.jeju;
+    const p = route.local(), apData = route.approach;
     const course = apData.headingDeg * D;
     const aim = { x: apData.threshold.x - Math.sin(course) * 7000,
       z: apData.threshold.z + Math.cos(course) * 7000 };
@@ -151,7 +222,7 @@ export function installSortieController(s) {
       ? apData.headingDeg - clamp(dev.crossTrackM * 0.05, -25, 25)
       : headingOf(aim.x - p.x, aim.z - p.z);
     s.autopilot.targets.headingDeg = targetHeading;
-    s.autopilot.targets.altitudeFt = Math.max(ALT_M, terrainAltitude()) / 0.3048;
+    s.autopilot.targets.altitudeFt = Math.max(200, terrainAltitude()) / 0.3048;
     s.autopilot.targets.iasKnots = 250;
     if (!gearDown) { s.gear.setGearTarget(true); gearDown = true; }
     if (!flapsDown && s.telemetry.iasKnots < 260) { s.aero.setFlapPosition(20); flapsDown = true; }
@@ -162,7 +233,7 @@ export function installSortieController(s) {
     }
   };
   const steerRunway = () => {
-    const apData = approach.APPROACH_DATA.jeju;
+    const apData = route.approach;
     const dev = deviation();
     const courseErr = wrap(apData.headingDeg - s.telemetry.headingDeg) -
       clamp(dev.crossTrackM * 0.05, -25, 25);
@@ -170,7 +241,7 @@ export function installSortieController(s) {
   };
   const finalApproach = () => {
     if (apEngaged || s.autopilot.master) { s.autopilot.disengage(); apEngaged = false; s.controls.clearVirtualInputs(); }
-    const apData = approach.APPROACH_DATA.jeju;
+    const apData = route.approach;
     const dev = deviation();
     steerRunway();
     const gsAltM = apData.elevationFt * 0.3048 +

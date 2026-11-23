@@ -1,11 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { playbackDurations } from '../scripts/record-flight-video.mjs';
+import { playbackDurations, resolveSortieDestination } from '../scripts/record-flight-video.mjs';
 import {
   approachPhase,
   decelerationThrottle,
   rolloutReason,
   nextRolloutPitch,
+  streamedApproach,
 } from '../scripts/lib/recordedSortieController.js';
 
 describe('recorded sortie guards', () => {
@@ -51,5 +52,31 @@ describe('recorded sortie guards', () => {
     assert.equal(nextRolloutPitch(10, 0.05), 9.85);
     assert.equal(nextRolloutPitch(6.8, 0.05), 6.7);
     assert.equal(nextRolloutPitch(6.7, 0.05), 6.7);
+  });
+});
+
+describe('Gimpo sortie destination', () => {
+  it('routes the rkss option to a streamed Gimpo landing and its own mp4', () => {
+    const destination = resolveSortieDestination('rkss');
+    assert.equal(destination.lobby, 'RKSS');
+    assert.equal(destination.controller, 'RKSS');
+    assert.equal(destination.output, 'f16-icn-gimpo.mp4');
+    assert.equal(resolveSortieDestination('jeju').controller, 'jeju');
+    assert.throws(() => resolveSortieDestination('london'), /Unknown destination/);
+  });
+
+  it('derives the streamed runway course and threshold elevation for approach guidance', () => {
+    const heading = 135.8, length = 3200, d = Math.PI / 180;
+    const a = { x: 100, z: 200, elevationM: 10.36 };
+    const b = { x: a.x + Math.sin(heading * d) * length,
+      z: a.z - Math.cos(heading * d) * length, elevationM: 12.5 };
+    const data = streamedApproach({ terrain: { runways: [{ ends: [
+      { threshold: a }, { threshold: b },
+    ] }] } });
+    assert.ok(Math.abs(data.headingDeg - heading) < 0.01, `course ${data.headingDeg}`);
+    assert.deepEqual(data.threshold, { x: a.x, z: a.z });
+    assert.ok(Math.abs(data.elevationFt - 10.36 / 0.3048) < 0.01);
+    assert.equal(data.gsAngleDeg, 3);
+    assert.equal(streamedApproach({ terrain: { runways: [] } }), null);
   });
 });

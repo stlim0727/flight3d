@@ -1,5 +1,8 @@
 // Record a hardware-GPU browser sortie and encode it as an mp4.
 // Speed is applied at encode time; the simulation itself always runs at 1x.
+// Incheon → Jeju is the default; `--destination rkss` flies to the streamed
+// Gimpo airport (RW14R). The flight-persona anomaly evaluator samples the
+// sortie into `<output>.frames/flight-report.json`.
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -11,9 +14,24 @@ import {
   decelerationThrottle,
 } from './lib/recordedSortieController.js';
 
-const INSTALL_CONTROLLER = `(async () => {
+/** Lobby destination, controller target and default output per supported sortie. */
+export const SORTIE_DESTINATIONS = Object.freeze({
+  jeju: { lobby: 'jeju', controller: 'jeju', label: 'jeju', output: 'f16-icn-jeju-200m.mp4' },
+  rkss: { lobby: 'RKSS', controller: 'RKSS', label: 'gimpo', output: 'f16-icn-gimpo.mp4' },
+});
+
+export function resolveSortieDestination(value = 'jeju') {
+  const key = String(value).toLowerCase();
+  const destination = SORTIE_DESTINATIONS[key];
+  if (!destination) {
+    throw new Error(`Unknown destination ${value}; supported: ${Object.keys(SORTIE_DESTINATIONS).join(', ')}`);
+  }
+  return { key, ...destination };
+}
+
+const installController = destination => `(async () => {
   const mod = await import('/scripts/lib/recordedSortieController.js');
-  return mod.installSortieController(window.s);
+  return mod.installSortieController(window.s, ${JSON.stringify(destination.controller)});
 })()`;
 
 /** Concat durations in ms. Dividing by speed here is the whole playback change. */
@@ -39,11 +57,13 @@ function parseArgs(argv) {
   }
   const speed = Number(args.get('speed') ?? 1);
   if (!Number.isFinite(speed) || speed <= 0) throw new Error('--speed must be a positive number');
+  const destination = resolveSortieDestination(args.get('destination') ?? 'jeju');
   return {
     dryRun: args.has('dry-run'),
     controllerCheck: args.has('controller-check'),
     speed,
-    output: resolve(args.get('output') ?? '.tmp/flight-video/f16-icn-jeju-200m.mp4'),
+    destination,
+    output: resolve(args.get('output') ?? `.tmp/flight-video/${destination.output}`),
     maxSeconds: Number(args.get('max-seconds') ?? 3600),
     width: Number(args.get('width') ?? 1280),
     height: Number(args.get('height') ?? 720),
@@ -90,6 +110,11 @@ async function controllerCheck(options) {
     await ev(`(async () => {
       const s = window.simulator; window.s = s;
       s.lobby.airport = 'incheon'; s.lobby.aircraft = 'F16'; s.lobby.preset = 'runway';
+      const select = document.getElementById('lobby-destination');
+      if (select) {
+        select.value = ${JSON.stringify(options.destination.lobby)};
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else s.lobby.destination = ${JSON.stringify(options.destination.lobby)};
       await s.fly();
     })()`);
     let ready = false;
@@ -99,9 +124,17 @@ async function controllerCheck(options) {
       await delay(200);
     }
     check(ready, 'flight start did not reach FLIGHT');
+    if (options.destination.key === 'rkss') {
+      let mounted = false;
+      for (let i = 0; i < 600; i++) {
+        mounted = await ev("window.s?.airportStreamer?.status?.state === 'ready' && !!window.s?.world?.offsets?.get?.('RKSS') && !!window.s?.world?.regions?.get?.('RKSS')?.terrain?.runways?.length");
+        if (mounted) break;
+        await delay(200);
+      }
+      check(mounted, 'RKSS did not mount');
+    }
 
-    const installed = await ev(INSTALL_CONTROLLER);
-    check(installed?.ok === true, `controller installer: ${JSON.stringify(installed)}`);
+    const installed = await ev(installController(options.destination));
     await delay(1500);
     const started = await ev(`(() => ({ phase: window.__flight.phase,
       samples: window.__flight.log.length, error: window.__flight.error ?? null }))()`);
@@ -111,12 +144,18 @@ async function controllerCheck(options) {
     const forceAt = (phase, alongM, crossM, speedMps = 0, simTime = null) =>
       ev(`(async () => {
         const w = await import('/src/world/UnifiedWorld.js');
-        const [jx, jz] = w.BASE_OFFSETS.jeju;
-        const th = 67 * Math.PI / 180;
-        const lx = -1463.6 - Math.sin(th) * ${alongM} + Math.cos(th) * ${crossM};
-        const lz = 621.3 + Math.cos(th) * ${alongM} + Math.sin(th) * ${crossM};
+        const a = await import('/src/config/approachData.js');
+        const c = await import('/scripts/lib/recordedSortieController.js');
         const s = window.s;
-        s.position.set(jx + lx, 200, jz + lz);
+        const dest = ${JSON.stringify(options.destination.controller)};
+        const [ox, oz] = dest === 'RKSS' ? s.world.offsets.get('RKSS') : w.BASE_OFFSETS.jeju;
+        const ap = dest === 'RKSS'
+          ? c.streamedApproach(s.world.regions.get('RKSS'))
+          : a.APPROACH_DATA.jeju;
+        const th = ap.headingDeg * Math.PI / 180;
+        const lx = ap.threshold.x - Math.sin(th) * ${alongM} + Math.cos(th) * ${crossM};
+        const lz = ap.threshold.z + Math.cos(th) * ${alongM} + Math.sin(th) * ${crossM};
+        s.position.set(ox + lx, 200, oz + lz);
         s.linearVelocity.set(${speedMps}, 0, 0);
         ${simTime === null ? '' : `s.totalSimTime = ${simTime};`}
         s.isCrashed = false;
@@ -136,9 +175,10 @@ async function controllerCheck(options) {
     await forceAt('intercept', 7000, 0);
     await delay(2000);
     const intercept = await ev(`(() => ({ lateral: window.s.autopilot.lateralMode,
-      heading: Math.round(window.s.autopilot.targets.headingDeg), error: window.__flight.error ?? null }))()`);
-    check(intercept.lateral === 'HDG' && Math.abs(intercept.heading - 67) <= 5 && !intercept.error,
-      `intercept guidance: ${JSON.stringify(intercept)}`);
+      heading: Math.round(window.s.autopilot.targets.headingDeg), course: window.__flight.courseDeg,
+      error: window.__flight.error ?? null }))()`);
+    check(intercept.lateral === 'HDG' && Math.abs(intercept.heading - intercept.course) <= 5
+      && !intercept.error, `intercept guidance: ${JSON.stringify(intercept)}`);
 
     await forceAt('final', 4000, 0);
     await delay(2000);
@@ -202,7 +242,11 @@ async function record(options) {
       s.lobby.airport = 'incheon';
       s.lobby.aircraft = 'F16';
       s.lobby.preset = 'runway';
-      s.lobby.destination = 'jeju';
+      const select = document.getElementById('lobby-destination');
+      if (select) {
+        select.value = ${JSON.stringify(options.destination.lobby)};
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      } else s.lobby.destination = ${JSON.stringify(options.destination.lobby)};
       await s.fly();
     })()`);
     let flightReady = false;
@@ -212,8 +256,29 @@ async function record(options) {
       await delay(200);
     }
     if (!flightReady) throw new Error('flight start did not reach FLIGHT; aborting before screencast');
+    if (options.destination.key === 'rkss') {
+      let mounted = false;
+      for (let i = 0; i < 600; i++) {
+        mounted = await ev("window.s?.airportStreamer?.status?.state === 'ready' && !!window.s?.world?.offsets?.get?.('RKSS') && !!window.s?.world?.regions?.get?.('RKSS')?.terrain?.runways?.length");
+        if (mounted) break;
+        await delay(200);
+      }
+      if (!mounted) throw new Error('RKSS did not mount; aborting before screencast');
+    }
     await ev(`(() => { window.s.cameraSystem.setMode(1); return true; })()`);
-    console.log('CONTROLLER', JSON.stringify(await ev(INSTALL_CONTROLLER)));
+    const installed = await ev(installController(options.destination));
+    if (installed?.ok !== true) throw new Error(`controller install failed: ${JSON.stringify(installed)}`);
+    console.log('CONTROLLER', JSON.stringify(installed));
+    await ev(`(async () => {
+      const m = await import('/src/persona/flight_persona.js');
+      window.__personaModule = m;
+      window.__persona = { anomalies: [] };
+      const evaluator = m.createAnomalyEvaluator({ sampleIntervalMs: 500,
+        onAnomaly: anomaly => window.__persona.anomalies.push(anomaly) });
+      window.__personaEvaluator = evaluator;
+      evaluator.start(window.s);
+      return true;
+    })()`);
 
     const target = (await (await fetch(`http://127.0.0.1:${cdpPort}/json`)).json()).find(t => t.type === 'page');
     const ws = new WebSocket(target.webSocketDebuggerUrl);
@@ -270,10 +335,17 @@ async function record(options) {
 
     const flight = await ev(`(() => ({ ...window.__flight,
       log: window.__flight?.log ?? [], touchdowns: window.__flight?.touchdowns ?? [] }))()`);
-    await writeFile(report, JSON.stringify({ gpuAngle, flight, frames: frameTimes.length,
+    const persona = await ev(`(() => {
+      window.__personaEvaluator?.stop();
+      return { anomalies: window.__persona?.anomalies ?? [],
+        summary: window.__personaModule?.summarizeFlight?.(window.s) ?? null };
+    })()`);
+    await writeFile(report, JSON.stringify({ gpuAngle, destination: options.destination.key,
+      flight, persona, frames: frameTimes.length,
       exceptions, consoleErrors: consoleMessages.filter(m => m.type === 'error').slice(-20) }, null, 2));
     console.log('FLIGHT', JSON.stringify({ done: flight.done, reason: flight.reason,
-      crashed: flight.crashed, samples: flight.log.length }));
+      crashed: flight.crashed, samples: flight.log.length,
+      anomalies: persona.anomalies.length }));
 
     const durations = playbackDurations(frameTimes, options.speed);
     const lines = [];
