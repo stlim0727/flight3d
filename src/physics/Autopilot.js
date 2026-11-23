@@ -14,6 +14,26 @@ function clamp(v, lo, hi) {
 
 const MAX_ELEVATOR_RAD = Math.PI / 9; // ±20° surface travel, as in the trim solver.
 
+const REFERENCE_ELEVATOR_KTS = 220; // gains were tuned near this approach speed.
+
+/**
+ * Elevator authority is proportional to dynamic pressure. Fixed gains tuned at
+ * ~220 kt become five times too strong at 450 kt, exciting a short-period
+ * oscillation. Scale only the error-correction terms, never the solved trim
+ * feedforward, so the loop damping stays roughly constant across the envelope.
+ */
+export function elevatorGainScale(telemetry, referenceKts = REFERENCE_ELEVATOR_KTS) {
+  const tasKts = Number.isFinite(telemetry.tasKnots) ? telemetry.tasKnots : telemetry.iasKnots;
+  if (!Number.isFinite(tasKts) || tasKts <= 0) return 1;
+  const altitudeM = Math.max(0, Atmosphere.feetToMeters(telemetry.altitudeFt ?? 0));
+  const density = Atmosphere.getConditions(altitudeM).density;
+  const speed = Atmosphere.knotsToMs(Math.max(1, tasKts));
+  const qDyn = 0.5 * density * speed * speed;
+  const referenceSpeed = Atmosphere.knotsToMs(Math.max(1, referenceKts));
+  const referenceQ = 0.5 * Atmosphere.getConditions(0).density * referenceSpeed * referenceSpeed;
+  return clamp(referenceQ / Math.max(referenceQ, qDyn), 0.25, 1);
+}
+
 /**
  * solveTrim returns the total tail deflection needed for equilibrium, while
  * the autopilot's elevator feedforward is applied on top of the installed
@@ -141,6 +161,11 @@ export class AutopilotController extends CoreAutopilot {
 
     telemetry = autopilotState(telemetry, this._snapshot);
 
+    // PITCH/VS/APP come from the core law. Scale their correction around the
+    // solved trim; ALT/VNAV below recompute with the same scaled gains.
+    const elevatorGain = elevatorGainScale(telemetry);
+    out.elevator = this.trim.elevator + (out.elevator - this.trim.elevator) * elevatorGain;
+
     // Handle LNAV lateral guidance
     if (this.lateralMode === 'LNAV') {
       const airport = telemetry.airportKey === 'incheon' ? 'incheon' : 'jeju';
@@ -157,9 +182,8 @@ export class AutopilotController extends CoreAutopilot {
       const targetAltFt = leg.activeWaypoint.altitudeFt;
       const altErrFt = targetAltFt - telemetry.altitudeFt;
       out.elevator = clamp(
-        this.trim.elevator +
-        altErrFt * this.elevatorPerFtAlt -
-        telemetry.vsiFpm * this.elevatorPerFpmDamp,
+        this.trim.elevator + (altErrFt * this.elevatorPerFtAlt -
+          telemetry.vsiFpm * this.elevatorPerFpmDamp) * elevatorGain,
         -1, 1
       );
     }
@@ -173,8 +197,8 @@ export class AutopilotController extends CoreAutopilot {
         this._altIntegralActive = true;
       }
       const error = this.targets.altitudeFt - telemetry.altitudeFt;
-      const command = this.trim.elevator + error * this.elevatorPerFtAlt -
-        telemetry.vsiFpm * this.elevatorPerFpmDamp + this._altIntegral * this.altKi;
+      const command = this.trim.elevator + (error * this.elevatorPerFtAlt -
+        telemetry.vsiFpm * this.elevatorPerFpmDamp + this._altIntegral * this.altKi) * elevatorGain;
       out.elevator = clamp(command, -1, 1);
       if (!((out.elevator >= 1 && error > 0) || (out.elevator <= -1 && error < 0))) {
         this._altIntegral = clamp(
