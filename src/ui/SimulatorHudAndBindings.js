@@ -20,6 +20,7 @@ import { defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from 
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
+import { SoutheastAtlas } from './SoutheastAtlas.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -145,6 +146,15 @@ class SimulatorHudAndBindingsMethods {
       this.showToast(() => t('sound.value', { value: this.audio.getVolumeState().text }));
     };
 
+    this.controls.onToggleMap = () => {
+      const map = document.getElementById('pilotage-map');
+      // Clicking the summary toggles the sheet like a pilot's tap, so the
+      // unfold/fold rustle follows the same path as the on-screen button.
+      if (map && !map.hidden && this.gameFlow.state === FLOW.FLIGHT) map.querySelector('summary')?.click();
+      // M used to mute; flights without a chart point players to the new key.
+      else this.showToast(() => t('notice.mapUnavailable'));
+    };
+
     this.controls.onResetLook = () => {
       this.cameraSystem.resetLook();
       this.showToast(() => t('camera.view.centered'));
@@ -223,6 +233,27 @@ class SimulatorHudAndBindingsMethods {
     }
     const fuel = document.getElementById('hud-fuel');
     if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
+    const map = document.getElementById('pilotage-map');
+    if (map) {
+      const available = this.currentAircraftId === 'C172' && this.lastPresetType === 'busan'
+        && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
+      if (map.hidden === available) map.hidden = !available;
+      if (!available && map.open) map.open = false;
+      this.pilotageFlight = available;
+      let layout = '';
+      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+        if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) layout = 'cockpit';
+        else {
+          this.mobileChartQuery ??= window.matchMedia('(pointer: coarse), (max-width: 600px)');
+          if (this.mobileChartQuery.matches) layout = 'external';
+        }
+      }
+      this.setPilotageLayout(layout);
+      if (available && map.open) {
+        this.busanChart ??= new SoutheastAtlas(map);
+        this.busanChart.update(this.position, this.quaternion);
+      }
+    }
     this.updateAutopilotUI();
     updateControlState(this.telemetry, this.cameraSystem, {
       demoActive: Boolean(this.demoDirector?.isActive),
@@ -1011,9 +1042,21 @@ class SimulatorHudAndBindingsMethods {
     }
   }
 
+  setPilotageLayout(layout) {
+    if ((this.pilotageLayout || '') === layout) return;
+    const resize = layout === 'external' || this.pilotageLayout === 'external';
+    this.pilotageLayout = layout;
+    document.body.dataset.pilotageLayout = layout;
+    this.cameraSystem.chartPitchOffset = layout === 'cockpit' ? -0.12 : 0;
+    if (resize) this.handleResize();
+  }
+
   handleResize() {
     applyUiScale(computeUiScale(window.innerWidth, window.innerHeight));
-    this.camera.aspect = window.innerWidth / window.innerHeight;
+    const split = this.pilotageLayout === 'external';
+    const width = split ? this.container.clientWidth : window.innerWidth;
+    const height = split ? this.container.clientHeight : window.innerHeight;
+    this.camera.aspect = width / height;
     const isCockpit = this.cameraSystem && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     let targetFov = isCockpit ? 60 : 54;
     if (this.camera.aspect < 1.0) {
@@ -1032,7 +1075,7 @@ class SimulatorHudAndBindingsMethods {
     if (!this.renderDiagnostics?.active || this.renderDiagnostics.options.resolution === 'default') {
       this.renderer.setPixelRatio(ratio);
     }
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setSize(width, height);
     if (this.cockpitPhotoOverlay) {
       this.cockpitPhotoOverlay.onResize(window.innerWidth, window.innerHeight);
     }

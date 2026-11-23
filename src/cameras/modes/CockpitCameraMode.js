@@ -38,7 +38,7 @@ export class CockpitCameraMode {
     const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
     const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
     const forwardLocal = new THREE.Vector3(0, 0, -100);
-    const pitch = THREE.MathUtils.clamp(cs.lookPitch + headPitch, -COCKPIT_PITCH_LIMIT, COCKPIT_PITCH_LIMIT);
+    const pitch = THREE.MathUtils.clamp(cs.lookPitch + headPitch + (cs.chartPitchOffset || 0), -COCKPIT_PITCH_LIMIT, COCKPIT_PITCH_LIMIT);
     forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
     const forwardWorld = forwardLocal.applyQuaternion(aircraftMesh.quaternion);
     camera.lookAt(eyeWorld.clone().add(forwardWorld));
@@ -123,7 +123,7 @@ export class CockpitCameraMode {
       ? 0
       : (cs.opticalZoom - 1) * cs.cockpitZoomGazeLift * cs.zoomGazeBlend();
     const effectivePitch = THREE.MathUtils.clamp(
-      basePitch + zoomGazeLift + cursorPitch + headPitch,
+      basePitch + zoomGazeLift + cursorPitch + headPitch + (cs.chartPitchOffset || 0),
       -COCKPIT_PITCH_LIMIT,
       COCKPIT_PITCH_LIMIT
     );

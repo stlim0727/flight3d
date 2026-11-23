@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PMTiles } from 'pmtiles';
+import { overtureBase as waterArchive, isWaterPolygon } from '../geospatial/overtureWater.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { applyFarSunShadow } from './FarSunShadow.js';
@@ -25,9 +25,6 @@ const stride = segments + 1;
 const sampleStep = samples / segments;
 const isolatedHeightDelta = 180;
 const elevationUrl = 'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png';
-const waterArchive = new PMTiles(
-  'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/base.pmtiles',
-);
 
 const keyOf = (x, y) => `${x}/${y}`;
 const wrapX = x => (x + tilesAcross) % tilesAcross;
@@ -94,8 +91,7 @@ function readWaterMask(data) {
   const layer = new VectorTile(new PbfReader(data)).layers.water;
   for (let i = 0; i < (layer?.length ?? 0); i++) {
     const feature = layer.feature(i);
-    if (feature.type !== 3 || feature.properties.is_intermittent
-      || feature.properties.class === 'swimming_pool') continue;
+    if (!isWaterPolygon(feature)) continue;
     const scale = samples / feature.extent;
     context.beginPath();
     for (const ring of feature.loadGeometry()) {

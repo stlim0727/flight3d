@@ -92,6 +92,7 @@ export default {
   "notice.cockpit.loading": "기내 환경을 불러오는 중입니다…",
   "notice.cockpit.unavailable": "기내 환경을 불러올 수 없어 외부 시점을 표시합니다",
   "notice.lights": "조명: {state}",
+  "notice.mapUnavailable": "이 비행에는 지도가 없습니다 · 소리 켜기/끄기는 Shift+M",
   "notice.time": "시간대: {time}",
   "notice.hotasConnected": "컨트롤러 연결됨: {name}",
   "notice.hotasDisconnected": "컨트롤러 연결 해제됨: {name}",

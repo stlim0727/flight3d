@@ -5,7 +5,7 @@
 export function isInteractiveUI(target) {
   if (!target || typeof target.closest !== 'function') return false;
   return !!target.closest(
-    '#pilot-arena, #pilot-score-overlay, #feedback-dialog-overlay, .flight-panel, .flight-strip-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #btn-cockpit-pov, .btn-cockpit-pov, #cockpit-pov-panel, .cockpit-pov-panel, #btn-gaze-exit, .btn-gaze-exit, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
+    '#pilotage-map, #pilot-arena, #pilot-score-overlay, #feedback-dialog-overlay, .flight-panel, .flight-strip-panel, .flight-toolbar, dialog, button, a, input, select, .btn, .modal-card, .presets-bar, .action-panel, .mobile-menu, .hud-strip, #demo-banner, .toast, .stall-banner, .touch-quadrant, .touch-card-header, .touch-throttle-card, .touch-stick-card, .touch-rudder-card, .btn-touch-pill, .btn-touch-brake, .demo-pill-btn, #btn-reset-pov, .btn-reset-pov, #btn-cockpit-pov, .btn-cockpit-pov, #cockpit-pov-panel, .cockpit-pov-panel, #btn-gaze-exit, .btn-gaze-exit, #help-modal, #demo-restart-dialog, #diagnostics-overlay, .menu-backdrop, .debrief-overlay'
   );
 }
 
