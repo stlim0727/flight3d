@@ -525,6 +525,14 @@ body:not([data-flow="flight"]) #pilotage-map,
   padding: .2rem .45rem; font: 600 12px/1.25 Georgia, Batang, serif;
 }
 .map-area { bottom: .5rem; left: .5rem; border-left: 2px solid #975537; }
+.map-aircraft {
+  position: absolute; width: 16px; height: 20px; pointer-events: none;
+  filter: drop-shadow(0 0 1px #fff8e3) drop-shadow(0 1px 1px #fff8e3);
+}
+.map-aircraft::before {
+  content: ''; display: block; height: 100%; background: #9c351e;
+  clip-path: polygon(50% 0, 96% 91%, 50% 72%, 4% 91%);
+}
 .map-paper .map-credit { right: .45rem; bottom: .5rem; font-size: 10px; }
 
 body[data-pilotage-layout="cockpit"] #pilotage-map {

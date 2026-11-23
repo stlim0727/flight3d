@@ -1,7 +1,7 @@
 export default {
   "ui.unfoldMap": "Unfold map",
   "ui.foldMap": "Fold map",
-  "ui.busanChart": "Regional chart of South Gyeongsang, Busan and Ulsan",
+  "ui.busanChart": "Regional chart of South Gyeongsang, Busan and Ulsan with aircraft position and heading",
   "ui.mapMark": "Mark as next checkpoint",
   "ui.mapCheckpoint": "Checkpoint · {name}",
   "ui.mapNorthUp": "North up",

@@ -1,7 +1,7 @@
 export default {
   "ui.unfoldMap": "지도 펼치기",
   "ui.foldMap": "지도 접기",
-  "ui.busanChart": "경상남도·부산·울산 권역도",
+  "ui.busanChart": "현재 기체 위치와 기수 방향이 표시된 경상남도·부산·울산 권역도",
   "ui.mapMark": "다음 확인 지점으로 표시",
   "ui.mapCheckpoint": "확인 지점 · {name}",
   "ui.mapNorthUp": "북쪽 위",

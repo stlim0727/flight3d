@@ -1,8 +1,7 @@
 import data from '../geospatial/southeastAtlas.json' with { type: 'json' };
-import { INCHEON_PATCH } from '../geospatial/incheon.js';
-import { localToWgs84 } from '../geospatial/TileCoordinateSystem.js';
+import { Vector3 } from 'three';
 import { getLanguage } from '../i18n/index.js';
-import { chartPoint } from '../geospatial/busanChart.js';
+import { chartAircraft, chartPoint } from '../geospatial/busanChart.js';
 
 // Natural Earth 1:10m admin-1 boundaries, roads and river centerlines.
 // Coordinates are simplified for the printed regional scale, in WGS84.
@@ -33,6 +32,9 @@ const lettering = [
 export class SoutheastAtlas {
   constructor(map) {
     this.canvas = map.querySelector('canvas');
+    this.aircraft = map.querySelector('.map-aircraft');
+    this.forward = new Vector3();
+    this.heading = 0;
     this.status = map.querySelector('.map-area');
     this.ids = Object.keys(data.regions);
     this.regions = Object.values(data.regions).map(rings => ink(rings, true));
@@ -56,18 +58,32 @@ export class SoutheastAtlas {
     return 'outside';
   }
 
-  update(position) {
+  update(position, quaternion) {
     const now = performance.now();
     if (now < this.nextUpdate) return;
     this.nextUpdate = now + 250;
     const { clientWidth: width, clientHeight: height } = this.canvas;
     if (!width || !height) return;
     const language = getLanguage();
-    const area = this.areaAt(...chartPoint(localToWgs84(position.x, position.z, INCHEON_PATCH.origin)));
+    this.forward.set(0, 0, -1).applyQuaternion(quaternion);
+    const { point, heading } = chartAircraft(position, this.forward, this.heading);
+    this.heading = heading;
+    const area = this.areaAt(...point);
     const ratio = window.devicePixelRatio || 1;
     const key = [width, height, ratio, language, area].join('/');
-    if (key === this.key) return;
-    this.key = key;
+    if (key !== this.key) {
+      this.print(width, height, ratio, language, area);
+      this.key = key;
+    }
+    const { m, tx, ty } = this.projection;
+    const x = tx + point[0] / m, y = ty + point[1] / m;
+    this.aircraft.hidden = x < 0 || x > width || y < 0 || y > height;
+    this.aircraft.style.left = x + 'px';
+    this.aircraft.style.top = y + 'px';
+    this.aircraft.style.transform = `translate(-50%, -50%) rotate(${heading}rad)`;
+  }
+
+  print(width, height, ratio, language, area) {
     const names = { 'KR-48': ['경상남도 일대', 'South Gyeongsang area'], 'KR-26': ['부산 일대', 'Busan area'],
       'KR-31': ['울산 일대', 'Ulsan area'], outside: ['표시 권역 밖', 'Outside charted regions'] };
     this.status.textContent = names[area][language === 'ko' ? 0 : 1];
@@ -80,6 +96,7 @@ export class SoutheastAtlas {
     const m = Math.max((east - west) / (width * .89), (south - north) / (height * .84));
     const tx = width / 2 - (west + east) / (2 * m);
     const ty = height / 2 - (north + south) / (2 * m);
+    this.projection = { m, tx, ty };
 
     ctx.fillStyle = '#b8b4a0';
     ctx.fillRect(0, 0, width, height);
