@@ -340,3 +340,21 @@ test('releaseGroundHold clears the previous runway before a new map start', asyn
   assert.equal(await h.streamer.ensure('RKPK'), true);
   assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });
+
+test('resetForOriginChange clears cached offsets so distant destinations load near new origin', async () => {
+  registerExternalDestinations(['KJFK']);
+  const h = harness({
+    descriptor: {
+      icao: 'RKPC', latitude: 33.5113, longitude: 126.493, elevationM: 36, runways: [],
+    },
+  });
+  assert.equal(await h.streamer.ensure('RKPC'), true);
+  h.streamer.resetForOriginChange();
+  assert.deepEqual(h.events.unregistered, ['RKPC']);
+  assert.equal(h.streamer._lastOffset, null, 'stale offset from previous origin must be cleared');
+
+  // Under a new custom origin near KJFK, update() should not be blocked by RKPC's old ~450km offset.
+  h.streamer.update({ x: 0, z: 0, onGround: false, onRunway: false, destinationCode: 'KJFK' });
+  await flush();
+  assert.equal(h.events.loads.length, 2, 'new destination loads immediately after origin reset');
+});

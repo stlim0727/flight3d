@@ -155,6 +155,14 @@ export class ExternalAirportStreamer {
     this._report();
   }
 
+  /** Clear cached offsets and unmount any airport from a previous coordinate origin. */
+  resetForOriginChange() {
+    this._home = null;
+    this.setDestination(null);
+    this.releaseGroundHold();
+    this._lastOffset = null;
+  }
+
   /** Release a ground-hold from a previous airport before starting at another. */
   releaseGroundHold() {
     if (!this._retired) return null;

@@ -208,7 +208,7 @@ class PhysicsIntegratorMethods {
     // Enrich telemetry with simulator/app-level fields
     this.telemetry = result.telemetry;
     this.telemetry.apEngaged = this.autopilot.master;
-    this.telemetry.airportKey = this.activeAirport;
+    this.telemetry.airportKey = this.world?.customOrigin ? null : this.activeAirport;
     this.telemetry.destination = this.destinationAirport && this.destinationAirport !== 'none'
       ? this.world?.destinationInfo?.(this.position.x, this.position.z, this.destinationAirport) ?? null
       : null;

@@ -772,9 +772,17 @@ class PresetSpawnerMethods {
       this.geographicGreenLayer = null;
       this.geographicLandmarkLayer?.dispose?.();
       this.geographicLandmarkLayer = null;
-      this.airportStreamer?.setHome?.(null);
-      this.airportStreamer?.setDestination?.(null);
-      this.airportStreamer?.releaseGroundHold?.();
+      this.airportStreamer?.resetForOriginChange?.();
+      this.ndCanvas?.setAirport?.(this.world.customOrigin ? 'custom' : this.activeAirport);
+      if (this.collisionDetector && this.currentTerrain === this.world) {
+        this.collisionDetector.setEnvironment(
+          this.world,
+          this.currentAirport,
+          this.worldObstacles(),
+          this.world.customOrigin ? null : this.ships,
+          !this.world.customOrigin && this.activeAirport === 'coastal' ? this.water : null,
+        );
+      }
     }
     return changed;
   }
@@ -841,8 +849,8 @@ class PresetSpawnerMethods {
       world,
       facade,
       this.worldObstacles(),
-      this.ships,
-      this.activeAirport === 'coastal' ? this.water : null,
+      world.customOrigin ? null : this.ships,
+      !world.customOrigin && this.activeAirport === 'coastal' ? this.water : null,
     );
     return true;
   }
@@ -859,7 +867,7 @@ class PresetSpawnerMethods {
   /** Static obstacles from all mounted regions, translated into world coordinates. */
   worldObstacles() {
     const world = this.world;
-    if (!world) return null;
+    if (!world || world.customOrigin) return null;
     const [cx, cz] = world.offsets.get('coastal') ?? [0, 0];
     const [nx, nz] = world.offsets.get('neon') ?? [0, 0];
     const shifted = (data, ox, oz) => (data ?? []).map(item => ({ ...item, x: item.x + ox, z: item.z + oz }));
@@ -1058,12 +1066,13 @@ class PresetSpawnerMethods {
     if (WORLD_REGIONS.includes(this.activeAirport)) {
       this.syncUnifiedWorld(this.activeAirport);
       if (this.collisionDetector) {
+        const custom = Boolean(this.world?.customOrigin);
         this.collisionDetector.setEnvironment(
           this.currentTerrain,
           this.currentAirport,
           this.worldObstacles(),
-          this.ships,
-          this.activeAirport === 'coastal' ? this.water : null,
+          custom ? null : this.ships,
+          !custom && this.activeAirport === 'coastal' ? this.water : null,
         );
       }
       if (id === 'coastal' && this.startupReady && this.ships) {
@@ -1189,8 +1198,15 @@ class PresetSpawnerMethods {
     this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
+      const custom = Boolean(this.world?.customOrigin);
       const obstacles = this.worldObstacles();
-      this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
+      this.collisionDetector.setEnvironment(
+        this.currentTerrain,
+        this.currentAirport,
+        obstacles,
+        custom ? null : this.ships,
+        !custom && isCoastal ? this.water : null,
+      );
     }
 
     if (this.explosionSystem) {
@@ -1234,7 +1250,7 @@ class PresetSpawnerMethods {
 
     // Reconfigure cockpit navigation displays for active airport
     if (this.ndCanvas && typeof this.ndCanvas.setAirport === 'function') {
-      this.ndCanvas.setAirport(id);
+      this.ndCanvas.setAirport(this.world?.customOrigin ? 'custom' : id);
     }
     if (this.cduCanvas && typeof this.cduCanvas.setAirport === 'function') {
       this.cduCanvas.setAirport(id);
