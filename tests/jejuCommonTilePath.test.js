@@ -160,6 +160,48 @@ test('updateImageryDetail respects imageryBudget limits during inset promotion',
   openWorld.dispose();
 });
 
+test('updateImageryDetail promotes from zoom 13 to 14 when highDetail slots are at capacity', () => {
+  const rkpcInsets = getInsetsForRegion('jeju');
+  // High-detail capacity is 1, ultra-detail capacity is 1
+  const openWorld = new OpenWorldTerrain({
+    origin: JEJU_ORIGIN,
+    protectedAreas: [[-3200, -1500, 3200, 1500]],
+    insets: rkpcInsets,
+    imageryBudget: {
+      detailTileLimit: 4,
+      highDetailTileLimit: 1, // exactly 1 high-detail slot allowed
+      ultraDetailTileLimit: 1, // 1 ultra-detail slot allowed
+    },
+    imageryCache: { getTileImage: async () => null, dispose: () => {} },
+  });
+
+  const mockMesh = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial());
+  mockMesh.geometry.computeBoundingSphere();
+  const entry = {
+    mesh: mockMesh,
+    bounds: [-4000, -2000, 4000, 2000],
+    detail: { map: { value: null }, blend: { value: 0 } },
+    detailLevel: 11,
+    baseMap: new THREE.Texture(),
+  };
+  openWorld.tiles.set('1743/821', entry);
+
+  // Set the tile as already wanted at level 13
+  openWorld.detailWanted.set('1743/821', 13);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 10, 50000);
+  camera.position.set(0, 200, 500); // Close approach (< 4000m)
+  camera.lookAt(0, 0, 0);
+
+  openWorld.updateImageryDetail(camera, 768, 1000);
+
+  // Even though highDetailCount reached highDetailTileLimit (1), promoting existing 13 to 14 does not consume
+  // an extra high-detail slot and ultra-detail slot is available, so it must promote to 14.
+  assert.equal(openWorld.detailWanted.get('1743/821'), 14, 'Must promote from zoom 13 to 14 without being blocked by highDetailTileLimit');
+
+  openWorld.dispose();
+});
+
 test('updateImageryDetail measures both surrounding DEM mesh and localMesh', () => {
   const openWorld = new OpenWorldTerrain({
     origin: JEJU_ORIGIN,

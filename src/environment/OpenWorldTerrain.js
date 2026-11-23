@@ -916,18 +916,21 @@ export class OpenWorldTerrain {
             for (const [key, entry] of this.tiles) {
               const b = entry.bounds;
               if (b && b[0] < maxX && b[2] > minX && b[1] < maxZ && b[3] > minZ) {
+                if (!wanted.has(key) && wanted.size >= budget.detailTileLimit) continue;
+                const current = wanted.get(key) ?? zoom;
                 let targetLevel = distToInset <= approachDist * 0.5
                   ? (inset.maxDetailLevel ?? 14)
                   : (inset.minDetailLevel ?? 13);
-                if (targetLevel >= 14 && (budget.ultraDetailTileLimit <= 0 || ultraDetailCount >= budget.ultraDetailTileLimit)) {
+                const needsUltra = targetLevel >= 14 && !(current >= 14);
+                if (needsUltra && (budget.ultraDetailTileLimit <= 0 || ultraDetailCount >= budget.ultraDetailTileLimit)) {
                   targetLevel = 13;
                 }
-                if (targetLevel >= 13 && (budget.highDetailTileLimit <= 0 || highDetailCount >= budget.highDetailTileLimit)) {
+                const needsHigh = targetLevel >= 13 && !(current >= 13);
+                if (needsHigh && (budget.highDetailTileLimit <= 0 || highDetailCount >= budget.highDetailTileLimit)) {
                   targetLevel = 12;
                 }
                 if (budget.detailTileLimit <= 0) targetLevel = zoom;
-                const current = wanted.get(key) ?? zoom;
-                if (current < targetLevel && (wanted.has(key) || wanted.size < budget.detailTileLimit)) {
+                if (current < targetLevel) {
                   wanted.set(key, targetLevel);
                   entry.detailLastVisibleAt = now;
                   if (targetLevel >= 13 && !(current >= 13)) highDetailCount++;
