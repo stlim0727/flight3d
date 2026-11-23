@@ -109,6 +109,22 @@ test('additional map catalog airports can stream a runway region', async () => {
   assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });
 
+test('spawn home survives a none destination while the chosen destination still wins', async () => {
+  const h = harness();
+  h.streamer.setHome('RKSS');
+  assert.equal(h.streamer.homeCode, 'RKSS');
+  assert.equal(await h.streamer.ensure('RKSS'), true);
+
+  h.streamer.update({ x: 0, z: 0, onGround: true, onRunway: true, destinationCode: 'none' });
+  assert.equal(h.streamer.status.code, 'RKSS');
+  assert.equal(h.streamer.status.state, 'ready');
+  assert.equal(h.events.removed.length, 0, 'no destination selection must not unmount the spawn airport');
+
+  h.streamer.update({ x: 0, z: 0, onGround: false, onRunway: false, destinationCode: 'RKPC' });
+  assert.equal(h.streamer.status.code, 'RKPC', 'a real destination takes precedence');
+  assert.deepEqual(h.events.unregistered, ['RKSS']);
+});
+
 test('concurrent ensures share one load; completions after a destination change are discarded', async () => {
   const h = harness();
   let resolveLoad;

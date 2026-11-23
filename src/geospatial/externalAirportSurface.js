@@ -60,8 +60,8 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
     const runway = airport.runways[index];
     if (!runway || !Array.isArray(runway.ends) || runway.ends.length < 2) continue;
     let ends;
+    const hasElevOverride = finite(overrides?.elevationM);
     try {
-      const hasElevOverride = finite(overrides?.elevationM);
       ends = runway.ends.slice(0, 2).map(end => {
         if (!end || !end.physical || !end.threshold) throw new Error('Incomplete runway end');
         const elev = hasElevOverride
@@ -82,11 +82,6 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
     } catch {
       continue;
     }
-    const a = ends[0].physical;
-    const b = ends[1].physical;
-    const length = Math.hypot(b.x - a.x, b.z - a.z);
-    if (!(length > EPSILON)) continue;
-
     const end0 = ends[0].ident;
     const end1 = ends[1].ident;
     const runwayOverride = overrides?.runways?.find(ro => {
@@ -94,6 +89,23 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
       if (ro.id && (ro.id === runway.id || ro.id === String(index))) return true;
       return false;
     });
+    const correctedEnds = runwayOverride?.ends
+      ? ends.map(end => {
+        const corrected = runwayOverride.ends.find(entry => entry.ident === end.ident);
+        if (!corrected) return end;
+        return {
+          ...end,
+          physical: localPoint(corrected.physical, origin, fallbackElevation, hasElevOverride),
+          threshold: localPoint(corrected.threshold, origin, fallbackElevation, hasElevOverride),
+          displacedThresholdM: finite(corrected.displacedThresholdM)
+            ? Math.max(0, corrected.displacedThresholdM) : 0,
+        };
+      })
+      : ends;
+    const a = correctedEnds[0].physical;
+    const b = correctedEnds[1].physical;
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    if (!(length > EPSILON)) continue;
 
     const widthM = finite(runwayOverride?.widthM)
       ? runwayOverride.widthM
@@ -119,7 +131,7 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
       widthM,
       surface: typeof runway.surface === 'string' ? runway.surface : '',
       centre: { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 },
-      ends,
+      ends: correctedEnds,
       lighted: isLighted,
       lighting: runwayOverride?.lighting ?? defaultLighting,
     });

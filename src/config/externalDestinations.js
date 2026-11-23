@@ -1,7 +1,7 @@
 // Externally indexed destinations that the runtime can actually stream.
-// The map catalog registers its index-backed codes here at load time; no
-// arbitrary token is accepted.
-export const EXTERNAL_DESTINATION_CODES = Object.freeze(['RKSS']);
+// RKPC is required by the built-in Jeju preset, so it must not depend on the
+// optional map catalog; other index-backed codes register at catalog load.
+export const EXTERNAL_DESTINATION_CODES = Object.freeze(['RKSS', 'RKPC']);
 const RESERVED_REGION_IDS = new Set(['coastal', 'incheon', 'jeju', 'lukla', 'neon', 'valley']);
 // OurAirports idents also use digits and hyphens (01A, SA34, BR-1941, US-6882).
 // The bounded shape still rejects paths, whitespace, stray separators and

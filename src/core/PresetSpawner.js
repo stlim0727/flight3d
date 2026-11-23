@@ -14,7 +14,7 @@ import { setSimulationWind, WindField } from '../physics/WindField.js';
 import { UrbanWindField } from '../physics/UrbanWindField.js';
 import { alignSpawnToWind } from './windSpawn.js';
 import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
-import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
+import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 import { RENDER_QUALITY } from '../config/renderQuality.js';
 import { APPROACH_DATA } from '../config/approachData.js';
 import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
@@ -270,7 +270,10 @@ class PresetSpawnerMethods {
       const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise', challenge: 'incheon.challenge' }[type];
       this.showToast(() => t(label));
     } else if (this.activeAirport === 'jeju') {
-      const spawn = jejuSpawn(type, groundClearance, this.currentAircraftId);
+      const spawn = airportSpawnPlan('RKPC', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);

@@ -59,6 +59,7 @@ export class ExternalAirportStreamer {
 
     this._state = 'idle';
     this._code = null;
+    this._home = null;
     this._tileId = null;
     this._error = null;
     this._distanceM = null;
@@ -80,6 +81,15 @@ export class ExternalAirportStreamer {
       loaded: Boolean(this._loaded),
       distanceM: this._distanceM,
     };
+  }
+
+  /** Spawn airport kept ready independently of the player's navigation target. */
+  setHome(code) {
+    this._home = isExternalDestination(code) ? code.trim().toUpperCase() : null;
+  }
+
+  get homeCode() {
+    return this._home;
   }
 
   statusFor(code) {
@@ -176,7 +186,10 @@ export class ExternalAirportStreamer {
   update({ x, z, speedMps = 0, onGround = false, onRunway = false, destinationCode, now } = {}) {
     if (this._disposed) return;
     try {
-      if (destinationCode !== undefined) this.setDestination(destinationCode);
+      if (destinationCode !== undefined) {
+        const requested = isExternalDestination(destinationCode) ? destinationCode : this._home;
+        this.setDestination(requested);
+      }
       if (this._retired) {
         if (onGround || onRunway) return;
         this._retired = null;
@@ -211,8 +224,9 @@ export class ExternalAirportStreamer {
     this._token += 1;
     this._unmount();
     this._retired = null;
-    this._loadingPromise = null;
     this._code = null;
+    this._home = null;
+    this._loadingPromise = null;
     this._state = 'idle';
     this._error = null;
     this._tileId = null;

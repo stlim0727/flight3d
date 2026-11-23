@@ -8,7 +8,8 @@ import { resolveMapFlightPlan } from '../config/mapFlightPlan.js';
 import { BASE_OFFSETS } from '../world/UnifiedWorld.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import { t } from '../i18n/index.js';
-
+import { applyAirportOverrides } from '../config/airportOverrides.js';
+import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 /** Composition of scenario policy, simulator operations and durable preferences. */
 export function createSimulatorScenarioStart(sim) {
   return new ScenarioStartCoordinator({
@@ -41,6 +42,16 @@ export function createSimulatorScenarioStart(sim) {
       async preset(request) {
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+        if (!request.mapPlan && request.airport === 'jeju'
+          && (request.scenario === 'runway' || request.scenario === 'approach')) {
+          const spawn = airportSpawnPlan('RKPC', request.scenario, {
+            groundClearanceM: sim.gear?.cgGroundHeightM ?? 3.5,
+            aircraftId: request.aircraft,
+          });
+          sim.airportStreamer?.setHome?.('RKPC');
+          await waitForStreamedAirport(sim, 'RKPC');
+          alignMapSpawnToContact(sim, spawn);
+        }
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
           alignMapSpawnToContact(sim, request.mapPlan.spawn);
@@ -85,7 +96,7 @@ function resolveLobbyMapPlan(sim) {
   const anchorBase = BASE_OFFSETS[sim.activeAirport] ?? [0, 0];
   return resolveMapFlightPlan({
     state: choice.state,
-    airport,
+    airport: applyAirportOverrides(airport),
     runwayId,
     endId,
     point,
@@ -96,6 +107,7 @@ function resolveLobbyMapPlan(sim) {
 }
 
 async function waitForStreamedAirport(sim, code) {
+  const deadline = performance.now() + 6000;
   const streamer = sim.airportStreamer;
   if (!streamer) return;
   // A global search result can share a code with another airport's IATA;
