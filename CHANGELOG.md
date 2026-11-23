@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(camera):** add opt-in webcam head look for mobile and desktop
+  - A new head-tracking panel requests the front camera on click, detects a face with locally hosted MediaPipe assets, and drives a dedicated yaw/pitch channel in cockpit, wing and gear views.
+  - Explicit mouse/touch look keeps precedence over head look, and the tracking assets load only when the feature is enabled. Reset zeroes at the current head position; Calibrate uses recent head movement as the full look range.
+  - MediaPipe assets are served from `public/mediapipe` with the Apache-2.0 licence in `public/licenses/mediapipe-LICENSE.txt`.
 - **feat(landmarks):** automatically discover, rank, and display major landmarks from Overture Maps
   - `GeographicLandmarks` and `src/geospatial/overtureLandmarks.js` automatically extract cities, districts, airports, bridges, towers, peaks, national parks, large campuses, and tall non-residential buildings from streamed Overture Maps PMTiles (`divisions` z9–z10, `base` z11/z13 with camera look-ahead, and shared `GeographicGreenSpace` / `GeographicBuildings` tiles) without requiring manual per-place configuration.
   - `nearestLandmarks()` now ranks candidates by prominence-weighted priority (`landmarkPriorityScore`) and resolves dynamic terrain-relative heights (`resolveLandmarkHeight`), while `dedupeLandmarks()` collapses duplicate names/Wikidata IDs and `LandmarkPins` adds `city`, `bridge`, `park`, and `water` pin icons.

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+const COCKPIT_PITCH_LIMIT = Math.PI * 0.48;
 
 /**
  * CockpitCameraMode — first-person captain's eye POV.
@@ -34,9 +35,11 @@ export class CockpitCameraMode {
     camera.position.copy(eyeWorld);
     const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
     camera.up.copy(upWorld);
+    const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
+    const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
     const forwardLocal = new THREE.Vector3(0, 0, -100);
-    forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), cs.lookPitch);
-    forwardLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), cs.lookYaw);
+    const pitch = THREE.MathUtils.clamp(cs.lookPitch + headPitch, -COCKPIT_PITCH_LIMIT, COCKPIT_PITCH_LIMIT);
+    forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), pitch);
     const forwardWorld = forwardLocal.applyQuaternion(aircraftMesh.quaternion);
     camera.lookAt(eyeWorld.clone().add(forwardWorld));
   }
@@ -103,11 +106,13 @@ export class CockpitCameraMode {
     const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(planeQuat);
     camera.up.copy(upWorld);
 
-    // 7. Forward look direction: yaw + pitch + subtle cursor tracking
+    // 7. Forward look direction: yaw + pitch + cursor and head-tracking offsets
     const cursorYaw   = cs.enableCursorTrack ? (-cs.cursorNormX * 0.18) : 0;
     const cursorPitch = cs.enableCursorTrack ? (-cs.cursorNormY * 0.12) : 0;
+    const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
+    const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
 
-    const effectiveYaw = cs.lookYaw + cursorYaw;
+    const effectiveYaw = cs.lookYaw + cursorYaw + headYaw;
     const isPhoto = cs.photoCockpit && cs.supportsPhotoCockpit;
     const basePitch = (isPhoto && !cs.isLookingAwayFromCenter())
       ? (cs.lookPitch * 0.2 - 0.04)
@@ -117,7 +122,11 @@ export class CockpitCameraMode {
     const zoomGazeLift = isPhoto
       ? 0
       : (cs.opticalZoom - 1) * cs.cockpitZoomGazeLift * cs.zoomGazeBlend();
-    const effectivePitch = basePitch + zoomGazeLift + cursorPitch;
+    const effectivePitch = THREE.MathUtils.clamp(
+      basePitch + zoomGazeLift + cursorPitch + headPitch,
+      -COCKPIT_PITCH_LIMIT,
+      COCKPIT_PITCH_LIMIT
+    );
 
     const forwardLocal = new THREE.Vector3(0, 0, -100);
     forwardLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), effectivePitch);
