@@ -341,6 +341,8 @@ export class DemoFlightDirector {
       && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
+    this.sim.setCustomWorldOrigin?.(null);
+    this.sim.activeMapPlace = null;
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');

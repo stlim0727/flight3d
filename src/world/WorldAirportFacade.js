@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { BASE_OFFSETS } from './UnifiedWorld.js';
 
 /**
  * The render loop and collision detector expect one airport object with an
@@ -10,13 +11,14 @@ export function createWorldAirportFacade(world, spawnAirport) {
   const localPosition = new THREE.Vector3();
   const localCamera = new THREE.Vector3();
   const localOptions = {};
+  const isRegionActive = id => !(world.customOrigin && BASE_OFFSETS[id]);
   const facade = {
     isOnRunway: (x, z) => world.isOnRunway(x, z),
     isRunwaySafetyArea: (x, z) => world.isRunwaySafetyArea(x, z),
     nightLighting: { update: sunY => world.nightLightingUpdate(sunY) },
     update(dt, position, time, options = {}) {
       for (const [regionId, region] of world.regions) {
-        if (!region.airport?.update) continue;
+        if (!isRegionActive(regionId) || !region.airport?.update) continue;
         const [ox, oz] = world.offsets.get(regionId);
         localPosition.set(position.x - ox, position.y, position.z - oz);
         localOptions.cameraPosition = options.cameraPosition
@@ -32,21 +34,23 @@ export function createWorldAirportFacade(world, spawnAirport) {
     },
     getGazeTargets() {
       const targets = [];
-      for (const region of world.regions.values()) {
+      for (const [regionId, region] of world.regions) {
+        if (!isRegionActive(regionId)) continue;
         targets.push(...(region.airport?.getGazeTargets?.() ?? []));
       }
       return targets;
     },
     hasModeledBuilding(x, z) {
       for (const [regionId, region] of world.regions) {
-        if (!region.airport?.hasModeledBuilding) continue;
+        if (!isRegionActive(regionId) || !region.airport?.hasModeledBuilding) continue;
         const [ox, oz] = world.offsets.get(regionId);
         if (region.airport.hasModeledBuilding(x - ox, z - oz)) return true;
       }
       return false;
     },
     updateRenderLights(cameraY, limit) {
-      for (const region of world.regions.values()) {
+      for (const [regionId, region] of world.regions) {
+        if (!isRegionActive(regionId)) continue;
         region.airport?.updateRenderLights?.(cameraY, limit);
       }
     },
@@ -58,10 +62,12 @@ export function createWorldAirportFacade(world, spawnAirport) {
   Object.defineProperty(facade, 'airportRegions', {
     get() {
       if (customAirportRegions) return customAirportRegions;
-      return [...world.regions].map(([id, region]) => ({
-        airport: region.airport,
-        offset: world.offsets.get(id) || [0, 0],
-      })).filter(entry => entry.airport);
+      return [...world.regions]
+        .filter(([id, region]) => isRegionActive(id) && region.airport)
+        .map(([id, region]) => ({
+          airport: region.airport,
+          offset: world.offsets.get(id) || [0, 0],
+        }));
     },
     set(val) {
       customAirportRegions = val;

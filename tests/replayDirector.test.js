@@ -661,3 +661,29 @@ test('room replay crashes sound once per impact crossing, not once per seek (#72
   assert.equal(sounds.length, 2, 'leaving the impact and crossing it again stages it again');
   f.director.stop();
 });
+
+test('replay load restores customOrigin and placeLabel metadata for distant map flights', async () => {
+  const sim = fakeSim();
+  const originCalls = [];
+  sim.setCustomWorldOrigin = origin => { originCalls.push(origin); };
+  sim.syncUnifiedWorld = () => {};
+  const director = new ReplayDirector(sim);
+  const chadOrigin = { latitude: 21.77655, longitude: 19.20233 };
+  const source = track(20);
+  source.metadata.airport = 'incheon';
+  source.metadata.scenario = 'cruise';
+  source.metadata.customOrigin = chadOrigin;
+  source.metadata.placeLabel = '21.78°N, 19.20°E';
+  assert.equal(await director.load(source), true);
+  assert.deepEqual(originCalls.at(-1), chadOrigin);
+  assert.deepEqual(sim.activeMapPlace, { label: '21.78°N, 19.20°E', code: null });
+  director.stop();
+
+  const regional = track(20);
+  regional.metadata.airport = 'incheon';
+  regional.metadata.scenario = 'runway';
+  assert.equal(await director.load(regional), true);
+  assert.equal(originCalls.at(-1), null);
+  assert.equal(sim.activeMapPlace, null);
+  director.stop();
+});

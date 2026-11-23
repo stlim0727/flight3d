@@ -64,7 +64,7 @@ export class ReplayDirector {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) return false;
     if (track.remotes?.some(pilot => !Object.hasOwn(AIRCRAFT_REGISTRY, pilot.aircraft)
       || !Array.isArray(pilot.samples) || pilot.samples.length !== track.samples.length)) return false;
-    const { airport, aircraft, scenario, demoProfile, timeOfDay, seed } = track.metadata || {};
+    const { airport, aircraft, scenario, demoProfile, timeOfDay, seed, customOrigin, placeLabel, airportCode } = track.metadata || {};
     const valley = scenario === 'valley';
     if (!Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) || !isScenarioAvailable(airport, scenario)
       || (valley && (!Number.isSafeInteger(seed) || seed < 0))) return false;
@@ -73,6 +73,7 @@ export class ReplayDirector {
     this.stop();
     const view = this._captureView();
     Object.assign(sim.lobby, { airport, aircraft, preset: scenario, demoProfile });
+    if (sim.lobby.mapPlan) sim.lobby.mapPlan = null;
     // The swap holds `startingFlight`, so no frame can render the new aircraft inside old terrain.
     this.loading = true;
     try {
@@ -109,6 +110,15 @@ export class ReplayDirector {
     } finally { this.loading = false; }
     sim.demoDirector?.stop();
     sim.pilotArena?.stop('replay');
+    if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
+      sim.setCustomWorldOrigin?.(customOrigin);
+      sim.syncUnifiedWorld?.(sim.activeAirport);
+    } else {
+      sim.setCustomWorldOrigin?.(null);
+    }
+    sim.activeMapPlace = (placeLabel || airportCode)
+      ? { label: placeLabel ?? null, code: airportCode ?? null }
+      : null;
     if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
     if (sim.gameFlow.state !== FLOW.FLIGHT) {
       this._view = null;

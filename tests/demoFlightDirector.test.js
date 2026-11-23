@@ -615,3 +615,15 @@ it('blocks direct demo starts and stale restart confirmations until the room is 
   director.confirmRestart();
   assert.strictEqual(director.isActive, true);
 });
+
+it('clears custom world origin and map place when demo starts directly', () => {
+  const sim = createMockSimulator('coastal');
+  const origins = [];
+  sim.setCustomWorldOrigin = origin => { origins.push(origin); };
+  sim.activeMapPlace = { label: '21.78°N, 19.20°E', code: null };
+  const director = new DemoFlightDirector(sim);
+  director.setStage = () => {};
+  director.start('coastal');
+  assert.deepStrictEqual(origins, [null]);
+  assert.strictEqual(sim.activeMapPlace, null);
+});

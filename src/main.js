@@ -818,11 +818,13 @@ class FlightSimulator {
     this.crashDebriefRemaining = null;
     this.debriefReport = null;
     this.debriefReplay = null;
+    const customOrigin = this.world?.customOrigin;
     const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
       demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
       ...(this.activeMapPlace?.label ? { placeLabel: this.activeMapPlace.label } : {}),
-      ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}) };
+      ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}),
+      ...(customOrigin ? { customOrigin: { latitude: customOrigin.latitude, longitude: customOrigin.longitude } } : {}) };
     this.flightRecorder?.start(sortie);
     this.replayRecorder?.start(sortie);
   }

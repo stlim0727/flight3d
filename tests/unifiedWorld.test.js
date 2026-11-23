@@ -606,8 +606,18 @@ test('custom tangent-plane origin isolates distant global flights from built-in 
   assert.ok(Math.abs(jfkWgs.longitude - jfk.longitude) < 1e-6);
 
   const dyn = fakeRegion(4, [0, 0]);
+  dyn.airport.checkBuildingCollision = () => ({ point: new THREE.Vector3(0, 10, 0), part: 'JFK Terminal' });
   world.registerDynamic('KJFK', { ...dyn, baseOffset: [0, 0] });
   assert.equal(world.regionAt(0, 0)?.id, 'KJFK', 'streamed airport resolves in custom origin frame');
+
+  // Built-in airport colliders must be excluded when customOrigin is active,
+  // while dynamic streamed airports at the custom origin remain active.
+  incheon.airport.checkBuildingCollision = () => ({ point: new THREE.Vector3(0, 10, 0), part: 'Incheon Terminal' });
+  const facade = createWorldAirportFacade(world, null);
+  assert.deepEqual(facade.airportRegions.map(entry => entry.airport), [dyn.airport]);
+  const detector = new CollisionDetector(world, facade, null, null, null);
+  const hit = detector.checkAirportBuildings(new THREE.Vector3(0, 10, 0), [{ pos: new THREE.Vector3(0, 10, 0), radius: 1, desc: 'nose' }]);
+  assert.equal(hit?.part, 'JFK Terminal', 'only dynamic airport collider is active under custom origin');
 
   assert.equal(world.setCustomOrigin(null), true);
   assert.equal(incheon.group.visible, true, 'clearing custom origin restores Incheon group');
