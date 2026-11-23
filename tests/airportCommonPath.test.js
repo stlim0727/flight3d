@@ -641,3 +641,35 @@ test('VNLK override preserves the sloped 06/24 runway grade', () => {
   assert.ok(Math.abs(surface.getHeight(0, 0) - 2836) < 3, 'runway centre keeps the surveyed grade');
   assert.ok(surface.isOnRunway(0, 0), 'common surface owns the runway footprint');
 });
+
+test('RKSI override reproduces the surveyed 15R/33L runway geometry', async () => {
+  const record = {
+    ident: 'RKSI',
+    latitude: 37.469101,
+    longitude: 126.450996,
+    elevationM: 7.01,
+    runways: [{
+      id: '237288',
+      lengthM: 3750,
+      widthM: 60,
+      ends: [
+        { ident: '15R', physical: { latitude: 37.4818, longitude: 126.435997, elevationM: 7.01 },
+          threshold: { latitude: 37.4818, longitude: 126.435997, elevationM: 7.01 } },
+        { ident: '33L', physical: { latitude: 37.4545, longitude: 126.461, elevationM: 7.01 },
+          threshold: { latitude: 37.4545, longitude: 126.461, elevationM: 7.01 } },
+      ],
+    }],
+  };
+  const descriptors = buildExternalRunwayDescriptors(record, getAirportOverride('RKSI'));
+  const ends = descriptors[0].ends;
+  const fifteenR = ends.find(end => end.ident === '15R');
+  assert.ok(Math.abs(fifteenR.physical.x + 1291.73) < 1, '15R keeps the authored world X');
+  assert.ok(Math.abs(fifteenR.physical.z + 1405.24) < 1, '15R keeps the authored world Z');
+  const dx = ends[1].physical.x - ends[0].physical.x;
+  const dz = ends[1].physical.z - ends[0].physical.z;
+  const heading = Math.atan2(dx, -dz) * 180 / Math.PI;
+  assert.ok(Math.abs(heading - 144.682205) < 0.5, `surveyed heading (${heading.toFixed(2)}°)`);
+
+  const { isExternalDestination } = await import('../src/config/externalDestinations.js');
+  assert.equal(isExternalDestination('RKSI'), true);
+});

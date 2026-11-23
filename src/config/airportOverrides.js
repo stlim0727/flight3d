@@ -173,6 +173,48 @@ export const AIRPORT_OVERRIDES = {
   RKSI: {
     ident: 'RKSI',
     elevationM: 7.0,
+    // Surveyed 15R/33L and 15L/33R endpoints from incheonAirfield.json, kept
+    // so common descriptors reproduce the legacy runway world positions.
+    runways: [
+      {
+        ident: '15R/33L',
+        widthM: 60.0,
+        lengthM: 3750,
+        ends: [
+          {
+            ident: '15R',
+            physical: { latitude: 37.48176097002019, longitude: 126.43639076503925, elevationM: 7.0 },
+            threshold: { latitude: 37.48176097002019, longitude: 126.43639076503925, elevationM: 7.0 },
+            displacedThresholdM: 0,
+          },
+          {
+            ident: '33L',
+            physical: { latitude: 37.45427703801685, longitude: 126.46082463701009, elevationM: 7.0 },
+            threshold: { latitude: 37.45427703801685, longitude: 126.46082463701009, elevationM: 7.0 },
+            displacedThresholdM: 0,
+          },
+        ],
+      },
+      {
+        ident: '15L/33R',
+        widthM: 60.0,
+        lengthM: 3750,
+        ends: [
+          {
+            ident: '15L',
+            physical: { latitude: 37.48392158616689, longitude: 126.44019363573169, elevationM: 7.0 },
+            threshold: { latitude: 37.48392158616689, longitude: 126.44019363573169, elevationM: 7.0 },
+            displacedThresholdM: 0,
+          },
+          {
+            ident: '33R',
+            physical: { latitude: 37.45638479357091, longitude: 126.4646985821534, elevationM: 7.0 },
+            threshold: { latitude: 37.45638479357091, longitude: 126.4646985821534, elevationM: 7.0 },
+            displacedThresholdM: 0,
+          },
+        ],
+      },
+    ],
     spawn: {
       poses: {
         runway: {
