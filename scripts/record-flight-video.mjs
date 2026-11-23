@@ -222,13 +222,18 @@ export function buildControllerSource() {
           state.phase = 'final';
         }
       };
-      const finalApproach = () => {
-        if (apEngaged) { s.autopilot.disengage(); apEngaged = false; s.controls.clearVirtualInputs(); }
-        const p = jejuLocal(), apData = approach.APPROACH_DATA.jeju;
+      const steerRunway = () => {
+        const apData = approach.APPROACH_DATA.jeju;
         const dev = deviation();
         const courseErr = wrap(apData.headingDeg - s.telemetry.headingDeg) -
           clamp(dev.crossTrackM * 0.05, -25, 25);
         flyBank(s, clamp(s.telemetry.rollDeg + courseErr, -35, 35), s.telemetry);
+      };
+      const finalApproach = () => {
+        if (apEngaged) { s.autopilot.disengage(); apEngaged = false; s.controls.clearVirtualInputs(); }
+        const p = jejuLocal(), apData = approach.APPROACH_DATA.jeju;
+        const dev = deviation();
+        steerRunway();
         const gsAltM = apData.elevationFt * 0.3048 +
           Math.hypot(dev.crossTrackM, dev.distanceToThresholdM) * Math.tan(apData.gsAngleDeg * D);
         const vz = clamp((gsAltM - s.position.y) * 0.45 -
@@ -244,7 +249,7 @@ export function buildControllerSource() {
         if (s.telemetry.onGround) state.phase = 'rollout';
       };
       const flare = () => {
-        s.autopilot.disengage();
+        steerRunway();
         s.controls.setVirtualInput('throttle', 0);
         s.controls.setVirtualInput('brakes', 0);
         s.aero.spoilers = 0.4;
@@ -253,6 +258,8 @@ export function buildControllerSource() {
       };
       const rollout = () => {
         s.autopilot.disengage();
+        if (s.telemetry.groundSpeedKnots > 30) steerRunway();
+        else s.controls.setVirtualInput('aileron', 0);
         s.controls.setVirtualInput('throttle', 0);
         s.controls.setVirtualInput('brakes', 1);
         s.aero.spoilers = 1;
@@ -320,10 +327,13 @@ async function record(options) {
       s.lobby.destination = 'jeju';
       await s.fly();
     })()`);
+    let flightReady = false;
     for (let i = 0; i < 600; i++) {
-      if (await ev('!!window.s && !window.s.startingFlight && window.s.gameFlow.state === "flight"')) break;
+      flightReady = await ev('!!window.s && !window.s.startingFlight && window.s.gameFlow.state === "flight"');
+      if (flightReady) break;
       await delay(200);
     }
+    if (!flightReady) throw new Error('flight start did not reach FLIGHT; aborting before screencast');
     await ev(`(() => { window.s.cameraSystem.setMode(1); return true; })()`);
     console.log('CONTROLLER', JSON.stringify(await ev(buildControllerSource())));
 
