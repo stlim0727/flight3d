@@ -1,4 +1,5 @@
 import '../styles/feedback-dialog.css';
+import { buildFeedbackArchive } from './feedbackArchive.js';
 import {
   gatherUserFeedbackContext,
   gatherUserFeedbackFullReport,
@@ -430,9 +431,10 @@ function createFeedbackOverlay(getSim) {
   overlay.querySelector('[data-feedback-download]').addEventListener('click', () => {
     const report = reportForForm();
     if (!report) return;
-    const url = URL.createObjectURL(new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }));
+    const { bytes } = buildFeedbackArchive(report);
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/zip' }));
     const link = document.createElement('a');
-    link.href = url; link.download = `flight3d-report-${report.reportId}.json`;
+    link.href = url; link.download = `flight3d-report-${report.reportId}.zip`;
     document.body.appendChild(link); link.click(); link.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
     setStatus('신고 파일 다운로드를 시작했습니다.');

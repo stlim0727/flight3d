@@ -108,14 +108,15 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
     await evaluate(() => document.querySelector('[data-feedback-download]').click());
     let downloaded;
     for (let i = 0; i < 40; i++) {
-      try { downloaded = JSON.parse(await readFile(`${artifacts}/flight3d-report-${failed.id}.json`, 'utf8')); break; }
-      catch { await delay(50); }
+      try {
+        downloaded = await readFile(`${artifacts}/flight3d-report-${failed.id}.zip`);
+        if (downloaded.length > 0) break;
+      } catch { await delay(50); }
     }
-    assert.equal(downloaded?.reportId, failed.id, 'actual report JSON downloaded');
-    assert.equal(downloaded.properties.peakG, 50.25);
-    assert.ok(downloaded.properties.screenshot?.startsWith('data:image/jpeg;base64,'),
-      'downloaded report keeps the screenshot');
-    assert.equal(downloaded.api_key, undefined);
+    assert.ok(downloaded?.length, 'actual report archive downloaded');
+    assert.equal(downloaded.subarray(0, 4).toString('hex'), '504b0304', 'ZIP local header');
+    assert.ok(downloaded.includes(Buffer.from('report.json')), 'archive contains report.json');
+    assert.ok(downloaded.includes(Buffer.from('screenshot.jpg')), 'archive contains screenshot.jpg');
     await evaluate(() => {
       window.feedbackMode = 'waiting';
       document.querySelector('[data-feedback-form]').requestSubmit();
