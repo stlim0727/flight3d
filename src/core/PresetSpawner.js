@@ -64,6 +64,7 @@ class PresetSpawnerMethods {
     this.shadowDemo?.stop();
     this.replayDirector?.stop();
     this.lastPresetType = type;
+    this.busanChart?.landmarks.reset();
     const aircraft = requiredAircraft(type);
     if (aircraft && this.currentAircraftId !== aircraft) this.setAircraft(aircraft);
     this.audio?.reset();

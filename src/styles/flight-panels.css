@@ -538,6 +538,25 @@ body:not([data-flow="flight"]) #pilotage-map,
   cursor: pointer;
 }
 .map-north { font-size: 18px; line-height: 1; }
+.map-landmarks { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.map-landmark {
+  position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px;
+  padding: 0; border: 0; background: transparent; pointer-events: auto; cursor: pointer;
+}
+.map-landmark::after {
+  content: ''; display: block; margin: auto; width: 7px; height: 7px;
+  border: 2px solid #fff9e9; border-radius: 50%; background: #324e50; box-shadow: 0 0 0 1px #324e50;
+}
+.map-landmark[aria-pressed="true"]::after { background: #943e28; box-shadow: 0 0 0 2px #943e28; }
+.map-landmark:focus-visible { outline: 2px solid #324e50; }
+.map-inspector {
+  position: absolute; left: .5rem; bottom: 2rem; max-width: calc(100% - 1rem);
+  display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; padding: .35rem .5rem;
+  background: #fff9e9f2; color: #393529; border: 1px solid #968c74; border-radius: 3px;
+  font: 600 12px/1.4 system-ui, sans-serif;
+}
+.map-inspector[hidden], .map-mark[hidden] { display: none; }
+.map-mark { font: inherit; color: inherit; cursor: pointer; }
 .map-scale {
   left: .6rem;
   bottom: .45rem;

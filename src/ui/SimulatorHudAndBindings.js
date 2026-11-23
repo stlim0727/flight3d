@@ -238,7 +238,7 @@ class SimulatorHudAndBindingsMethods {
       this.setPilotageLayout(layout);
       if (available && map.open) {
         this.busanChart ??= new BusanChart(map);
-        this.busanChart.update(this.position, this.quaternion);
+        this.busanChart.update(this.position, this.quaternion, this.geographicLandmarkLayer?.records);
       }
     }
     this.updateAutopilotUI();

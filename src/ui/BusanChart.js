@@ -1,7 +1,9 @@
 import { Vector3 } from 'three';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
-import { CHART_ZOOM, chartAircraft, chartTilePoint, chartView } from '../geospatial/busanChart.js';
+import { CHART_ZOOM, chartAircraft, chartPoint, chartTilePoint, chartView } from '../geospatial/busanChart.js';
+import { featureGeometryMeta, parseOvertureNames } from '../geospatial/overtureLandmarks.js';
+import { ChartLandmarks } from './ChartLandmarks.js';
 import { isWaterPolygon, overtureBase } from '../geospatial/overtureWater.js';
 import { clipLine, clipRing } from '../geospatial/incheon.js';
 import { t } from '../i18n/index.js';
@@ -14,6 +16,7 @@ function blankLayers() {
 }
 
 function appendTile(paths, data, x, y) {
+  const bridges = [];
   const layers = new VectorTile(new PbfReader(data)).layers;
   const border = paths.land;
   for (const [i, j] of [[0, 0], [1, 0], [1, 1], [0, 1]]) {
@@ -30,7 +33,8 @@ function appendTile(paths, data, x, y) {
         if (!isWaterPolygon(feature)) continue;
       } else if (feature.properties.subtype !== 'bridge' || ![2, 3].includes(feature.type)) continue;
       const polygon = feature.type === 3;
-      const path = name === 'water' ? paths.water : polygon ? paths.decks : paths.spans;
+      const deck = name === 'infrastructure' && polygon;
+      const path = deck ? new Path2D() : name === 'water' ? paths.water : paths.spans;
       const half = feature.extent / 2;
       for (const ring of feature.loadGeometry()) {
         const local = ring.map(p => [p.x - half, p.y - half]);
@@ -45,8 +49,18 @@ function appendTile(paths, data, x, y) {
           if (polygon) path.closePath();
         }
       }
+      if (deck) {
+        paths.decks.addPath(path);
+        const names = parseOvertureNames(feature.properties);
+        const anchor = names && featureGeometryMeta(feature, { x, y }, CHART_ZOOM);
+        if (anchor) {
+          const id = feature.properties.wikidata || feature.properties.id || names.en;
+          bridges.push({ id, names, point: chartPoint(anchor), path });
+        }
+      }
     }
   }
+  return bridges;
 }
 
 function drawBase(ctx, paths, metersPerPixel) {
@@ -69,6 +83,7 @@ export class BusanChart {
     this.mode = map.querySelector('.map-mode');
     this.scale = map.querySelector('.map-scale');
     this.status = map.querySelector('.map-status');
+    this.landmarks = new ChartLandmarks(map, this.canvas);
     this.tiles = new Map();
     this.cachedPaths = new Map();
     this.forward = new Vector3();
@@ -82,17 +97,20 @@ export class BusanChart {
       if (map.open) return;
       this.controller?.abort();
       this.tiles.clear();
+      this.landmarks.inspected = null;
       this.paths = null;
       this.center = null;
       this.nextDraw = 0;
     });
   }
 
-  useTilePaths(key, paths, entry) {
+  useTilePaths(key, tile, entry) {
+    const { paths, bridges } = tile;
     for (const layer of Object.keys(paths)) this.paths[layer].addPath(paths[layer]);
     entry.ready = true;
+    entry.bridges = bridges;
     this.cachedPaths.delete(key);
-    this.cachedPaths.set(key, paths);
+    this.cachedPaths.set(key, tile);
     if (this.cachedPaths.size > MAX_CACHED_TILES) {
       this.cachedPaths.delete(this.cachedPaths.keys().next().value);
     }
@@ -113,8 +131,8 @@ export class BusanChart {
         if (this.tiles.get(key) !== entry) return;
         if (result) {
           const paths = blankLayers();
-          appendTile(paths, result.data, x, y);
-          this.useTilePaths(key, paths, entry);
+          const bridges = appendTile(paths, result.data, x, y);
+          this.useTilePaths(key, { paths, bridges }, entry);
         } else entry.missing = true;
       }).catch(() => {
         entry.retryAt = performance.now() + 10000;
@@ -123,7 +141,7 @@ export class BusanChart {
     return entry;
   }
 
-  update(position, quaternion) {
+  update(position, quaternion, records) {
     const now = performance.now();
     if (now < this.nextDraw) return;
     this.nextDraw = now + 100;
@@ -151,9 +169,13 @@ export class BusanChart {
     ctx.save();
     ctx.transform(...view.transform);
     let loading = false, missing = false;
+    const bridges = [];
     for (const { x, y } of view.tiles) {
       const entry = this.tile(x, y, now);
-      if (entry.ready) continue;
+      if (entry.ready) {
+        bridges.push(...entry.bridges);
+        continue;
+      }
       if (entry.missing || entry.retryAt) missing = true;
       else loading = true;
     }
@@ -173,6 +195,7 @@ export class BusanChart {
     ctx.strokeStyle = '#fffaf0';
     ctx.stroke();
     ctx.restore();
+    this.landmarks.update(view, point, width, height, bridges, records);
 
     this.mode.querySelector('.map-north').style.transform = 'rotate(' + (-angle) + 'rad)';
     this.mode.querySelector('.map-mode-label').textContent = t(this.headingUp ? 'ui.mapHeadingUp' : 'ui.mapNorthUp');
