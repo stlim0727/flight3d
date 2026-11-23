@@ -11,8 +11,10 @@ import {
 import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.js';
 import { WaterDitching } from '../src/physics/WaterDitching.js';
 import { BODY_SUPPORT_POINTS } from '../src/physics/groundContacts.js';
-import { jejuSpawn } from '../src/geospatial/JejuFlightSurface.js';
-import { loadJejuAirport } from '../src/environment/JejuAirport.js';
+import { airportSpawnPlan } from '../src/config/airportSpawnPlan.js';
+import { OpenWorldRegionSurface } from '../src/environment/OpenWorldRegionSurface.js';
+import { CorridorTileStreamer } from '../src/environment/CorridorTileStreamer.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { DEV_SCENARIOS } from '../src/dev/scenarios/index.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 
@@ -74,11 +76,10 @@ test('CorridorFlightSurface flattens Chuja emergency strip and recognizes runway
   assert.equal(surface.isRunwaySafetyArea(mx, mz), false);
 });
 
-test('jejuSpawn challenge initializes dual engine-out glide towards Chuja Island', () => {
-  const spawnB738 = jejuSpawn('challenge', 3.5, 'B738');
+test('common RKPC challenge pose initializes dual engine-out glide towards Chuja Island', () => {
+  const spawnB738 = airportSpawnPlan('RKPC', 'challenge', { groundClearanceM: 3.5, aircraftId: 'B738' });
   assert.equal(spawnB738.y, 2400, 'Challenge altitude should be 2,400m MSL (~7,870 ft)');
-  assert.equal(spawnB738.yaw, -Math.PI, 'Heading should be 180° South');
-  assert.equal(spawnB738.vx, 0);
+  assert.ok(Math.abs(spawnB738.vx) < 1e-9, 'Heading is due south');
   assert.equal(spawnB738.vz, 110, 'Glide forward velocity should be 110 m/s');
   assert.equal(spawnB738.vy, -2.8, 'Descent velocity should be -2.8 m/s (~550 fpm)');
 
@@ -88,7 +89,7 @@ test('jejuSpawn challenge initializes dual engine-out glide towards Chuja Island
   assert.ok(distToChuja > 14000 && distToChuja < 16000, `Distance to Chuja should be ~15km, got ${distToChuja}m`);
 
   // Light aircraft C172 configuration
-  const spawnC172 = jejuSpawn('challenge', 1.8, 'C172');
+  const spawnC172 = airportSpawnPlan('RKPC', 'challenge', { groundClearanceM: 1.8, aircraftId: 'C172' });
   assert.equal(spawnC172.vz, 45, 'C172 glide speed should be 45 m/s');
 });
 
@@ -204,16 +205,21 @@ test('DEV_SCENARIOS.corridor-ditching is registered and properly configured', ()
   assert.equal(scenario.verdict(obs), true, 'Verdict must pass on safe ditching with flooding');
 });
 
-test('loadJejuAirport defaults to corridor streaming and attaches Chuja island 3D mesh', async () => {
-  const airport = await loadJejuAirport('', { loadSatellite: false });
-  assert.ok(airport.corridorStreamer, 'Corridor streamer must be active by default');
-  assert.ok(airport.terrain.corridorLengthM > 450000);
+test('common Jeju anchor mounts the Chuja strip and keeps corridor tiles clear of Hallasan', async () => {
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+  });
+  assert.equal(surface.stripMeshes.length, 1, 'Chuja strip mesh must be present');
+  const corridorSurface = new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN });
+  assert.ok(corridorSurface.corridorLengthM > 450000);
+  const corridorStreamer = new CorridorTileStreamer(corridorSurface, { origin: JEJU_ORIGIN });
 
-  // Chuja mesh must be attached to terrain.mesh
-  assert.ok(airport.terrain.mesh.children.length >= 2, 'Must include island terrain and Chuja patch');
+  // Chuja strip geometry is owned by the common anchor surface, not the island mesh.
 
   // Verify background tile geometry near Chuja does not bulge above 12.0m on the runway
-  const { geo } = airport.corridorStreamer.createTileGeometry({ x: 871, y: 409, zoom: 10 });
+  const { geo } = corridorStreamer.createTileGeometry({ x: 871, y: 409, zoom: 10 });
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
@@ -223,7 +229,7 @@ test('loadJejuAirport defaults to corridor streaming and attaches Chuja island 3
   }
 
   // Verify that tile covering Jeju Island mainland excludes triangles over the high-res mesh
-  const jejuTile = airport.corridorStreamer.createTileGeometry({ x: 871, y: 410, zoom: 10 });
+  const jejuTile = corridorStreamer.createTileGeometry({ x: 871, y: 410, zoom: 10 });
   const jejuIndices = jejuTile.geo.index.array;
   const jejuPos = jejuTile.geo.attributes.position;
   for (let i = 0; i < jejuIndices.length; i += 3) {
@@ -237,6 +243,7 @@ test('loadJejuAirport defaults to corridor streaming and attaches Chuja island 3
     const isHallasanTriangle = Math.hypot(triCenterX - 10000, triCenterZ - 15000) < 5000;
     assert.equal(isHallasanTriangle, false, 'No low-res corridor triangle should exist over Hallasan');
   }
+  surface.dispose();
 });
 
 

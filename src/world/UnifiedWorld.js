@@ -44,8 +44,8 @@ export const BASE_OFFSETS = Object.freeze({
 export const WORLD_REGIONS = Object.freeze(Object.keys(BASE_OFFSETS));
 
 // Extents in each region's own local frame. Jeju's north edge includes the
-// Chuja emergency strip at roughly (-18300, -50008), which is rendered by
-// JejuAirport but lies far outside the island's main terrain box.
+// Chuja emergency strip at roughly (-18300, -50008), rendered by the common
+// open-world anchor surface.
 export const REGION_EXTENTS = Object.freeze({
   incheon: Object.freeze({ minX: -7000, maxX: 22000, minZ: -7000, maxZ: 22000 }),
   jeju: Object.freeze({ minX: -30000, maxX: 45000, minZ: -54000, maxZ: 45000 }),

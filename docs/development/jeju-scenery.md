@@ -72,6 +72,6 @@ Discussion / Issue: [#858](https://github.com/stlim0727/flight3d/issues/858)
 - [x] **Phase 1**: 인천공항 12km 위성 텍스처 드레이핑 및 표면 머티리얼 구현 (#864)
 - [x] **Phase 1.5**: 인천-제주 항로 규격 및 웨이포인트 데이터셋 구축 (`koreaFlightRoutes.json`)
 - [ ] **Phase 2**: 제주도 Copernicus DEM 추출 및 OSM RKPC 공항 데이터 전처리 스크립트 작성 (`scripts/terrain/build-jeju.py`)
-- [ ] **Phase 3**: 제주공항 3D 메쉬 생성 및 시너리 로더 구현 (`src/environment/JejuAirport.js`, `JejuFlightSurface.js`)
+- [x] **Phase 3**: RKPC 3D surface, facilities and DEM delivered by the common indexed-airport tile path (`OpenWorldTerrain`, `ExternalAirportSurface`) and declarative `airportOverrides`; regional loaders retired (#956)
 - [ ] **Phase 4**: B737 CDU / ND 및 자동항법에 인천-제주 항로 웨이포인트 연결
 - [ ] **Phase 5**: 로비 공항 선택 UI 확장 및 제주 비행 시나리오 등록

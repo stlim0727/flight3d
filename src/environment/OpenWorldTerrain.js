@@ -212,6 +212,13 @@ function imageryTexture(image, anisotropy = defaultAnisotropy) {
   return texture;
 }
 
+function parentImageryTexture(image, x, y, anisotropy) {
+  const texture = imageryTexture(image, anisotropy);
+  texture.repeat.set(0.5, 0.5);
+  texture.offset.set((x % 2) * 0.5, (y % 2 === 0) ? 0.5 : 0);
+  return texture;
+}
+
 function installFarTerrainShader(material, opacity) {
   material.onBeforeCompile = shader => {
     shader.uniforms.farTerrainOpacity = opacity;
@@ -805,13 +812,26 @@ export class OpenWorldTerrain {
   }
 
   async loadBaseImagery({ x, y, key }, entry) {
-    const image = await this.imageryCache.getTileImage(zoom, x, y);
+    let image = await this.imageryCache.getTileImage(zoom, x, y);
+    let fromParent = false;
+    if (!image) {
+      // Cold-cache partial outage: use the z10 parent quadrant until the
+      // preferred z11 tile succeeds on retry.
+      const parent = await this.imageryCache.getTileImage(zoom - 1, Math.floor(x / 2), Math.floor(y / 2));
+      if (parent) {
+        image = parent;
+        fromParent = true;
+      }
+    }
     if (this.tiles.get(key) !== entry) return;
     if (!image) {
       entry.imageryRetryAt = performance.now() + 8000;
       return;
     }
-    entry.baseMap = imageryTexture(image, this.imageryBudget.anisotropy);
+    entry.baseMap = fromParent
+      ? parentImageryTexture(image, x, y, this.imageryBudget.anisotropy)
+      : imageryTexture(image, this.imageryBudget.anisotropy);
+    entry.baseFromParent = fromParent;
     entry.detail.base.value = entry.baseMap;
     this.applyImagery(entry, entry.baseMap);
   }

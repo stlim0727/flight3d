@@ -1,6 +1,6 @@
 import { approachDeviation as calculateDeviation } from '@stlim0727/flightsim-core/navigation/approachDeviation.js';
 import incheon from './incheonAirfield.json' with { type: 'json' };
-import jeju from './jejuAirfield.json' with { type: 'json' };
+import { getAirportOverride } from './airportOverrides.js';
 /**
  * Final-approach geometry per airport, derived from the flight presets in
  * src/main.js (threshold world position, runway heading, glideslope angle,
@@ -12,7 +12,16 @@ import jeju from './jejuAirfield.json' with { type: 'json' };
  */
 export const APPROACH_DATA = {
   incheon: incheon.approach,
-  jeju: jeju.approach,
+  // RKPC approach geometry is owned by the declarative airport registry.
+  jeju: (() => {
+    const spawn = getAirportOverride('RKPC')?.spawn;
+    return {
+      threshold: { x: spawn.frame.threshold.x, z: spawn.frame.threshold.z },
+      end: spawn.frame.end,
+      gsAngleDeg: spawn.glideslopeDeg,
+      elevationFt: Math.round(spawn.frame.elevationM * 3.28084),
+    };
+  })(),
   neon: {
     // Neon Metropolis Runway 09, aligned with +X towards the setting retro sun.
     threshold: { x: -2000, z: 0 },
