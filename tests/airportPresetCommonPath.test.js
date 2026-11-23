@@ -200,3 +200,47 @@ test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => wi
   assert.equal(legacyRunway.visible, false, 'common runway replaces the legacy mesh');
   assert.equal(sim.destinationAirport, 'none', 'chosen destination must be preserved');
 }));
+
+test('Incheon preset streams RKSI and hides only duplicate runway meshes', () => withStorage(async () => {
+  const calls = [];
+  const details = { visible: true };
+  const runwayPavement = { name: 'incheon-runway-pavement', visible: true };
+  const markings = { name: 'incheon-runway-marking-pavement', visible: true };
+  const taxiway = { name: 'incheon-taxiway-pavement', visible: true };
+  const sim = {
+    lobby: { airport: 'incheon', aircraft: 'B738', preset: 'runway', pilotMode: 'human' },
+    destinationAirport: 'none',
+    currentAircraftId: 'B738',
+    sky: { timeOfDay: 12 },
+    gear: { cgGroundHeightM: CLEARANCE_M },
+    position: { x: 0, y: 0, z: 0 },
+    currentTerrain: { getHeight: () => 10.5 },
+    incheonAirport: {
+      legacyRunwayDetails: details,
+      pavement: { children: [runwayPavement, markings, taxiway] },
+      resetTraffic() {},
+    },
+    devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
+    demoDirector: { userTimeOfDayOverridden: true },
+    gameFlow: new GameFlowController(),
+    analytics: { trackFlightStart() {} },
+    beginFlightRecording() {},
+    setPreset(scenario) { calls.push(['preset', scenario]); },
+    airportStreamer: {
+      releaseGroundHold() { calls.push(['release']); },
+      ensure(code) { calls.push(['ensure', code]); },
+      setHome(code) { calls.push(['home', code]); },
+      statusFor(code) { return { state: 'ready', code }; },
+      update() { calls.push(['update']); },
+      regionFor(code) { return code === 'RKSI' ? { airport: {} } : null; },
+    },
+  };
+  await createSimulatorScenarioStart(sim).start();
+  assert.ok(calls.some(call => call[0] === 'ensure' && call[1] === 'RKSI'));
+  assert.ok(calls.some(call => call[0] === 'home' && call[1] === 'RKSI'));
+  assert.equal(details.visible, false);
+  assert.equal(runwayPavement.visible, false);
+  assert.equal(markings.visible, false);
+  assert.equal(taxiway.visible, true, 'taxiways and aprons must remain');
+  assert.equal(sim.destinationAirport, 'none');
+}));

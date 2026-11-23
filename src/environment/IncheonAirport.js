@@ -104,13 +104,17 @@ export async function loadIncheonAirport(base, options = {}) {
   group.add(texturedBuildings);
   records.forEach(r=>r.geometry.dispose());
   group.add(createPlantingInstances(trees,height));
-  group.add(createIncheonPavement(INCHEON_AIRFIELD));
+  const pavement = createIncheonPavement(INCHEON_AIRFIELD);
+  group.add(pavement);
+  const runwayDetails = new THREE.Group();
+  runwayDetails.name = 'legacy-runway-details';
+  group.add(runwayDetails);
   // Threshold bars identify the mapped endpoints; markings are illustrative.
   for(const surface of INCHEON_AIRFIELD.surfaces.filter(s=>s.kind==='runway')) {
     const a=surface.points[0],b=surface.points.at(-1),yaw=-Math.atan2(b[0]-a[0],a[1]-b[1]);
     for(const [i,p] of [a,b].entries()) {
       const bar=new THREE.Mesh(new THREE.BoxGeometry(surface.width, .025, 3),applyLogDepthOffset(new THREE.MeshBasicMaterial({color:0xffffff}), 3));
-      bar.position.set(p[0],7.04,p[1]);bar.rotation.y=yaw;group.add(bar);
+      bar.position.set(p[0],7.04,p[1]);bar.rotation.y=yaw;runwayDetails.add(bar);
       const canvas=document.createElement('canvas');canvas.width=128;canvas.height=256;
       const context=canvas.getContext('2d');context.fillStyle='#fff';context.textAlign='center';context.font='bold 85px sans-serif';
       const ref=surface.ref.split('/')[i];
@@ -121,7 +125,7 @@ export async function loadIncheonAirport(base, options = {}) {
       marking.rotateOnWorldAxis(new THREE.Vector3(0,1,0),yaw+(i?Math.PI:0));
       const direction=i?-1:1,length=Math.hypot(b[0]-a[0],b[1]-a[1]);
       marking.position.set(p[0]+direction*(b[0]-a[0])/length*160,7.05,p[1]+direction*(b[1]-a[1])/length*160);
-      group.add(marking);
+      runwayDetails.add(marking);
     }
   }
   nightLighting.illuminateWindows(group);
@@ -157,7 +161,7 @@ export async function loadIncheonAirport(base, options = {}) {
     { object: departureBridge.group, kind: 'building' },
     ...standBridgeGroups.map(bridgeGroup => ({ object: bridgeGroup, kind: 'building' })),
   ];
-  return {terrain,group,nightLighting,departureBridge,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
+  return {terrain,group,nightLighting,departureBridge,pavement,legacyRunwayDetails:runwayDetails,isOnRunway:(x,z)=>terrain.isOnRunway(x,z),isRunwaySafetyArea:(x,z)=>terrain.isRunwaySafetyArea(x,z),traffic,parked,
     towerCab:tower.cab,
     hasModeledBuilding(x,z){return colliders.some(c=>pointInRing(x,z,c.points));},
     getGazeTargets(){return gazeTargets;},

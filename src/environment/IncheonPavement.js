@@ -121,6 +121,7 @@ export function createIncheonPavement(field) {
         }
         wear.geometry.setAttribute('uv', uv);
         group.add(wear);
+        wear.name = 'incheon-runway-wear';
         const rubber = createRunwayWearMaterial();
         if (rubber) {
           const local = new THREE.Group();
@@ -136,6 +137,7 @@ export function createIncheonPavement(field) {
             local.add(mesh);
           }
           group.add(local);
+          local.name = 'incheon-runway-rubber';
         }
       }
     }
