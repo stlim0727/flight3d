@@ -139,7 +139,7 @@ export function buildControllerSource() {
         }
         return cmd;
       };
-      let apEngaged = false, gearDown = false, flapsDown = false;
+      let apEngaged = false, gearDown = false, flapsDown = false, interceptCaptured = false;
       let lastLog = -1, ticks = 0, rolloutStart = 0;
       const log = force => {
         const t = Math.floor(s.totalSimTime);
@@ -189,14 +189,15 @@ export function buildControllerSource() {
       };
       const enroute = () => {
         s.autopilot.targets.altitudeFt = terrainAltitude() / 0.3048;
-        s.autopilot.targets.iasKnots = 450;
         const distanceM = jejuDistanceM();
         if (!gearDown && distanceM < 25000) {
-          s.gear.setGearTarget(true); gearDown = true;
-          s.autopilot.targets.iasKnots = 250;
+          s.gear.setGearTarget(true);
+          gearDown = true;
         }
+        s.autopilot.targets.iasKnots = gearDown ? 250 : 450;
         if (distanceM < 22000) state.phase = 'intercept';
       };
+
       const intercept = () => {
         const p = jejuLocal(), apData = approach.APPROACH_DATA.jeju;
         const course = apData.headingDeg * D;
@@ -206,7 +207,11 @@ export function buildControllerSource() {
         if (s.autopilot.lateralMode !== 'HDG') {
           s.autopilot.engage('HDG', s.readAutopilotState());
         }
-        s.autopilot.targets.headingDeg = headingOf(aim.x - p.x, aim.z - p.z);
+        interceptCaptured ||= dist(p, aim) < 1200;
+        const targetHeading = interceptCaptured
+          ? apData.headingDeg - clamp(dev.crossTrackM * 0.05, -25, 25)
+          : headingOf(aim.x - p.x, aim.z - p.z);
+        s.autopilot.targets.headingDeg = targetHeading;
         s.autopilot.targets.altitudeFt = Math.max(ALT_M, terrainAltitude()) / 0.3048;
         s.autopilot.targets.iasKnots = 250;
         if (!gearDown) { s.gear.setGearTarget(true); gearDown = true; }
