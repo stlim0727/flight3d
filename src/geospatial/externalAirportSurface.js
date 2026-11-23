@@ -102,7 +102,10 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
       ? runwayOverride.lengthM
       : (finite(runway.lengthM) ? runway.lengthM : length);
 
-    const defaultLighting = runway.lighted ? {
+    const hasLightingOverride = Boolean(runwayOverride?.lighting);
+    const isLighted = hasLightingOverride || Boolean(runway.lighted);
+
+    const defaultLighting = isLighted ? {
       papi: [
         { endIdent: end0, glideslopeDeg: 3.0, units: 4, touchdownDistanceM: 300 },
         { endIdent: end1, glideslopeDeg: 3.0, units: 4, touchdownDistanceM: 300 },
@@ -116,6 +119,7 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
       surface: typeof runway.surface === 'string' ? runway.surface : '',
       centre: { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 },
       ends,
+      lighted: isLighted,
       lighting: runwayOverride?.lighting ?? defaultLighting,
     });
   }
@@ -367,18 +371,23 @@ function surfaceColor(surface) {
   return 0x5c5c5c;
 }
 
-function disposeGroup(group) {
-  if (!group?.isGroup) return;
-  for (const child of [...group.children]) {
-    if (child.isGroup) {
-      disposeGroup(child);
+function disposeObject(obj) {
+  if (!obj) return;
+  if (Array.isArray(obj.children)) {
+    for (const child of [...obj.children]) {
+      disposeObject(child);
+      obj.remove(child);
     }
-    child.geometry?.dispose?.();
-    const materials = Array.isArray(child.material) ? child.material : [child.material];
-    for (const material of materials) material?.dispose?.();
-    group.remove(child);
   }
-  group.clear();
+  obj.geometry?.dispose?.();
+  const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+  for (const material of materials) material?.dispose?.();
+}
+
+function disposeGroup(group) {
+  if (!group) return;
+  disposeObject(group);
+  if (typeof group.clear === 'function') group.clear();
 }
 
 function ribbonGeometry(descriptor) {
@@ -796,6 +805,7 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
   const papiSystems = [];
 
   for (const descriptor of descriptors) {
+    if (!descriptor.lighted && !descriptor.lighting) continue;
     const frame = runwayFrame(descriptor);
     if (!frame) continue;
 
@@ -832,26 +842,66 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
     }
 
     // Threshold & End lights
-    for (const [endPoint, sign] of [
-      [descriptor.ends[0]?.threshold ?? a, 1],
-      [descriptor.ends[1]?.threshold ?? b, -1],
+    for (const [end, sign] of [
+      [descriptor.ends[0], 1],
+      [descriptor.ends[1], -1],
     ]) {
-      const dirVec = new THREE.Vector3(frame.ux * sign, 0, frame.uz * sign);
-      const endAlong = thresholdAlong(frame, { threshold: endPoint });
-      const elevation = a.elevationM + (b.elevationM - a.elevationM) * (endAlong / length);
+      if (!end) continue;
+      const isDisplaced = end.displacedThresholdM > 0;
+      const dirX = frame.ux * sign;
+      const dirZ = frame.uz * sign;
 
-      for (let across = -halfWidth; across <= halfWidth; across += 4) {
-        const p = new THREE.Vector3(
-          a.x + frame.ux * endAlong + frame.px * across,
-          elevation + EXTERNAL_MESH_LIFT_M + 0.35,
-          a.z + frame.uz * endAlong + frame.pz * across
-        );
-        sources.push({
-          position: p.toArray(),
-          color: [1, 1, 1],
-          endDirection: dirVec.toArray(),
-          intensity: 2.5,
-        });
+      if (!isDisplaced) {
+        // Standard threshold: bidirectional green/red at physical/threshold
+        const endAlong = thresholdAlong(frame, end);
+        const elevation = a.elevationM + (b.elevationM - a.elevationM) * (endAlong / length);
+
+        for (let across = -halfWidth; across <= halfWidth; across += 4) {
+          const p = new THREE.Vector3(
+            a.x + frame.ux * endAlong + frame.px * across,
+            elevation + EXTERNAL_MESH_LIFT_M + 0.35,
+            a.z + frame.uz * endAlong + frame.pz * across
+          );
+          sources.push({
+            position: p.toArray(),
+            color: [1, 1, 1],
+            endDirection: [dirX, 0, dirZ],
+            intensity: 2.5,
+          });
+        }
+      } else {
+        // Displaced threshold: green lights at threshold, red end lights at physical
+        const threshAlong = thresholdAlong(frame, end);
+        const threshElev = a.elevationM + (b.elevationM - a.elevationM) * (threshAlong / length);
+        for (let across = -halfWidth; across <= halfWidth; across += 4) {
+          const p = new THREE.Vector3(
+            a.x + frame.ux * threshAlong + frame.px * across,
+            threshElev + EXTERNAL_MESH_LIFT_M + 0.35,
+            a.z + frame.uz * threshAlong + frame.pz * across
+          );
+          sources.push({
+            position: p.toArray(),
+            color: [0.02, 1, 0.12],
+            endDirection: [dirX, 1, dirZ],
+            intensity: 2.5,
+          });
+        }
+
+        const physAlong = thresholdAlong(frame, { threshold: end.physical });
+        const physElev = a.elevationM + (b.elevationM - a.elevationM) * (physAlong / length);
+        for (let across = -halfWidth; across <= halfWidth; across += 4) {
+          const p = new THREE.Vector3(
+            a.x + frame.ux * physAlong + frame.px * across,
+            physElev + EXTERNAL_MESH_LIFT_M + 0.35,
+            a.z + frame.uz * physAlong + frame.pz * across
+          );
+          sources.push({
+            position: p.toArray(),
+            color: [1, 0.05, 0.02],
+            endDirection: [dirX, 2, dirZ],
+            intensity: 2.5,
+          });
+        }
       }
     }
 
@@ -863,8 +913,13 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
       const sign = isFirst ? 1 : -1;
       const thresholdM = thresholdAlong(frame, end);
       const touchdownM = thresholdM + sign * (papiCfg.touchdownDistanceM ?? 300);
+
+      // Invert pilot's right vector on reciprocal end so 'left'/'right' is always relative to incoming approach
+      const pilotRight = right.clone().multiplyScalar(sign);
       const sideMult = papiCfg.side === 'right' ? 1 : -1;
-      const lateralM = sideMult * (halfWidth + (papiCfg.lateralOffsetM ?? 15));
+      const lateralVector = pilotRight.clone().multiplyScalar(sideMult);
+
+      const lateralDist = halfWidth + (papiCfg.lateralOffsetM ?? 15);
       const elevation = a.elevationM + (b.elevationM - a.elevationM) * (touchdownM / length);
 
       const papiGroup = new THREE.Group();
@@ -876,15 +931,15 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
       const unitSpacing = 3.8;
 
       const papiCenter = new THREE.Vector3(
-        a.x + frame.ux * touchdownM + frame.px * lateralM,
+        a.x + frame.ux * touchdownM,
         elevation + 0.4,
-        a.z + frame.uz * touchdownM + frame.pz * lateralM
-      );
+        a.z + frame.uz * touchdownM
+      ).addScaledVector(lateralVector, lateralDist);
 
       for (let u = 0; u < unitCount; u++) {
-        const uOffset = sideMult * (u * unitSpacing);
-        const unitPos = papiCenter.clone().addScaledVector(right, uOffset);
+        const unitPos = papiCenter.clone().addScaledVector(lateralVector, u * unitSpacing);
         const box = new THREE.Mesh(boxGeo, boxMat);
+        box.name = `papi-box-${descriptor.id}-${end.ident}-${u}`;
         box.position.copy(unitPos);
 
         const heading = Math.atan2(frame.ux * sign, frame.uz * sign) + Math.PI;
@@ -902,6 +957,8 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
       group.add(papiGroup);
 
       papiSystems.push({
+        endIdent: end.ident,
+        runwayId: descriptor.id,
         units,
         center: papiCenter,
         approachDir: new THREE.Vector3(-frame.ux * sign, 0, -frame.uz * sign),
@@ -1016,8 +1073,14 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
           lightColor = color;
           vIntensity = sourceIntensity;
           if (length(endDirection) > .5) {
-            lightColor = dot(cameraPosition - world.xyz, endDirection) > 0.
-              ? vec3(1., .05, .02) : vec3(.02, 1., .12);
+            float d = dot(cameraPosition - world.xyz, vec3(endDirection.x, 0., endDirection.z));
+            if (endDirection.y > 1.5) {
+              if (d <= 0.) vIntensity = 0.; else lightColor = vec3(1., .05, .02);
+            } else if (endDirection.y > 0.5) {
+              if (d > 0.) vIntensity = 0.; else lightColor = vec3(.02, 1., .12);
+            } else {
+              lightColor = d > 0. ? vec3(1., .05, .02) : vec3(.02, 1., .12);
+            }
           }
           gl_Position = projectionMatrix * mvPosition;
           gl_PointSize = clamp(2600. * sourceIntensity / max(1., -mvPosition.z), 4., 40.);

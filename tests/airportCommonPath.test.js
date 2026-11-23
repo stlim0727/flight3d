@@ -345,3 +345,115 @@ test('createExternalAirportRegion creates autonomous valid airport for un-overri
   region.dispose();
   assert.equal(region.group.children.length, 0);
 });
+
+test('PAPI lateral offset is inverted on reciprocal runway end to remain on pilot left', () => {
+  const override = getAirportOverride('RKPC');
+  const descriptors = buildExternalRunwayDescriptors(RKPC_RECORD, override);
+  const lighting = createExternalAirportLighting(descriptors);
+
+  const papi07 = lighting.papiSystems.find(p => p.endIdent === '07');
+  const papi25 = lighting.papiSystems.find(p => p.endIdent === '25');
+  assert.ok(papi07 && papi25);
+
+  // Approach vector for 07 and 25
+  const dir07 = papi07.approachDir;
+  const dir25 = papi25.approachDir;
+
+  // Pilot's left vector facing in approach direction
+  // For 07 (dir ~ [0.4, 0, 0.9]): left is [-0.9, 0, 0.4]
+  // For 25 (dir ~ [-0.4, 0, -0.9]): left is [0.9, 0, -0.4]
+  const left07 = new THREE.Vector3(-dir07.z, 0, dir07.x);
+  const left25 = new THREE.Vector3(-dir25.z, 0, dir25.x);
+
+  // Vector from runway center to PAPI
+  const rwy07Centre = descriptors[0].centre;
+  const toPapi07 = papi07.center.clone().sub(new THREE.Vector3(rwy07Centre.x, 0, rwy07Centre.z));
+  const toPapi25 = papi25.center.clone().sub(new THREE.Vector3(rwy07Centre.x, 0, rwy07Centre.z));
+
+  // Dot product of (toPapi) with (left) must be positive on BOTH ends
+  assert.ok(toPapi07.dot(left07) > 0, 'PAPI 07 must be positioned on pilot left');
+  assert.ok(toPapi25.dot(left25) > 0, 'PAPI 25 must be positioned on pilot left');
+
+  lighting.dispose();
+});
+
+test('unlighted runway creates no edge lights, threshold lights, or PAPI', () => {
+  const unlightedRecord = {
+    ...RKNY_RECORD,
+    runways: [
+      {
+        ...RKNY_RECORD.runways[0],
+        lighted: false,
+      },
+    ],
+  };
+  const descriptors = buildExternalRunwayDescriptors(unlightedRecord);
+  assert.equal(descriptors[0].lighted, false);
+  assert.equal(descriptors[0].lighting, null);
+
+  const lighting = createExternalAirportLighting(descriptors);
+  assert.equal(lighting.group.children.length, 0, 'Unlighted runway must generate no light meshes');
+  assert.equal(lighting.papiSystems.length, 0, 'Unlighted runway must generate no PAPI');
+
+  lighting.dispose();
+});
+
+test('PAPI nested lens geometries and materials are recursively disposed', () => {
+  const override = getAirportOverride('RKPC');
+  const descriptors = buildExternalRunwayDescriptors(RKPC_RECORD, override);
+  const lighting = createExternalAirportLighting(descriptors);
+
+  const papi07 = lighting.papiSystems[0];
+  const unit = papi07.units[0];
+  const lensMesh = unit.box.children.find(c => c.isMesh);
+  assert.ok(lensMesh, 'Box must have child lens mesh');
+
+  let lensGeoDisposed = false;
+  let lensMatDisposed = false;
+  lensMesh.geometry.dispose = () => { lensGeoDisposed = true; };
+  lensMesh.material.dispose = () => { lensMatDisposed = true; };
+
+  lighting.dispose();
+  assert.equal(lensGeoDisposed, true, 'Lens geometry must be disposed recursively');
+  assert.equal(lensMatDisposed, true, 'Lens material must be disposed recursively');
+});
+
+test('displaced threshold separates green threshold lights and red runway end lights', () => {
+  const override = getAirportOverride('RKPC');
+  const descriptors = buildExternalRunwayDescriptors(RKPC_RECORD, override);
+  const rwy1331 = descriptors.find(d => d.ends.some(e => e.ident === '31'));
+  assert.ok(rwy1331);
+
+  const lighting = createExternalAirportLighting([rwy1331]);
+  const haloMesh = lighting.group.children.find(c => c.name === 'airport-light-halos');
+  assert.ok(haloMesh);
+
+  const posAttr = haloMesh.geometry.attributes.position;
+  const dirAttr = haloMesh.geometry.attributes.endDirection;
+
+  let greenMode1Count = 0;
+  let redMode2Count = 0;
+  const greenThresholdZ = [];
+  const redPhysicalZ = [];
+
+  for (let i = 0; i < posAttr.count; i++) {
+    const mode = dirAttr.getY(i);
+    if (Math.abs(mode - 1) < 0.1) {
+      greenMode1Count++;
+      greenThresholdZ.push(posAttr.getZ(i));
+    } else if (Math.abs(mode - 2) < 0.1) {
+      redMode2Count++;
+      redPhysicalZ.push(posAttr.getZ(i));
+    }
+  }
+
+  assert.ok(greenMode1Count > 0, 'Must have mode 1 green threshold lights');
+  assert.ok(redMode2Count > 0, 'Must have mode 2 red runway end lights');
+
+  // The Z coordinates of green threshold and red end lights must differ significantly (displaced by ~411m)
+  const avgGreenZ = greenThresholdZ.reduce((a, b) => a + b, 0) / greenThresholdZ.length;
+  const avgRedZ = redPhysicalZ.reduce((a, b) => a + b, 0) / redPhysicalZ.length;
+  assert.ok(Math.abs(avgGreenZ - avgRedZ) > 200, 'Green threshold and red end lights must be separated by displacement');
+
+  lighting.dispose();
+});
