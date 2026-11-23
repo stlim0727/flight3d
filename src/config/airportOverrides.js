@@ -168,6 +168,83 @@ export const AIRPORT_OVERRIDES = {
       },
     },
   },
+  // Built-in scenario poses for RKSI, frozen from the retired incheonSpawn.
+  // Positions with a finite Y are surface-relative; `y` is absolute MSL.
+  RKSI: {
+    ident: 'RKSI',
+    elevationM: 7.0,
+    spawn: {
+      poses: {
+        runway: {
+          position: [-1588.1188929124337, 7.0, -3665.574191913371],
+          headingDeg: 144.68220519241027,
+          speedMps: { B738: 0, C172: 0, F16: 0 },
+        },
+        approach: {
+          position: [-2513.096606313494, 85.6116689245618, -4971.107121299431],
+          headingDeg: 144.68220519241027,
+          glideslopeDeg: 3.0,
+          speedMps: { B738: 74.5, C172: 33, F16: 90 },
+          pitchDeg: 2.291831,
+        },
+        cruise: {
+          y: 750,
+          position: [-1356.8744645621687, 750, -3339.1909595668562],
+          headingDeg: 144.68220519241027,
+          speedMps: { B738: 108, C172: 48, F16: 180 },
+        },
+        challenge: {
+          position: [-5111.126218119344, 360.24278605672663, -8032.600569958097],
+          headingDeg: 124.68220519241027,
+          vy: -2.5,
+          pitchDeg: 0.572958,
+          speedMps: { B738: 85, C172: 42, F16: 105 },
+        },
+      },
+    },
+  },
+  // Built-in scenario poses for VNLK, frozen from the dedicated Lukla branch.
+  // The sloped 06/24 runway keeps its downhill 24 takeoff and 4.28° approach.
+  VNLK: {
+    ident: 'VNLK',
+    elevationM: 2836.0,
+    spawn: {
+      poses: {
+        runway: {
+          position: [162.719765, 2858.941176, -107.574445],
+          headingDeg: 238,
+          pitchDeg: -6.71,
+          speedMps: { B738: 0, C172: 0, F16: 0 },
+          byAircraft: { F16: { position: [166.960005, 2859.529412, -110.22404] } },
+        },
+        cliff: {
+          position: [166.960005, 2859.529412, -110.22404],
+          headingDeg: 238,
+          pitchDeg: -6.71,
+          speedMps: { B738: 0, C172: 0, F16: 0 },
+          byAircraft: {
+            B738: { position: [162.719765, 2858.941176, -107.574445] },
+            C172: { position: [162.719765, 2858.941176, -107.574445] },
+          },
+        },
+        approach: {
+          y: 3070,
+          position: [-3222.5824, 3070, 2013.6922],
+          headingDeg: 58,
+          vy: -5.2,
+          pitchDeg: 1,
+          speedMps: { B738: 69.4, C172: 69.4, F16: 69.4 },
+        },
+        cruise: {
+          y: 3960,
+          position: [-1500, 3960, -800],
+          headingDeg: 54,
+          velocityHeadingDeg: 53.130102,
+          speedMps: { B738: 100, C172: 53, F16: 100 },
+        },
+      },
+    },
+  },
 };
 
 const finiteOverride = Number.isFinite;

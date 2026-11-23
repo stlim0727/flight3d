@@ -13,7 +13,6 @@ import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
 import { setSimulationWind, WindField } from '../physics/WindField.js';
 import { UrbanWindField } from '../physics/UrbanWindField.js';
 import { alignSpawnToWind } from './windSpawn.js';
-import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
 import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js';
 import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
@@ -247,11 +246,14 @@ class PresetSpawnerMethods {
       this.showToast(() => t(`regional.cruise.${type}`));
     } else if (this.activeAirport === 'incheon') {
       this.currentAirport.resetTraffic();
-      const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
+      const spawn = airportSpawnPlan('RKSI', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);
-      const pitchAttitude = type === 'approach' ? .04 : type === 'challenge' ? .01 : 0;
+      const pitchAttitude = THREE.MathUtils.degToRad(spawn.pitchDeg ?? 0);
       this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
       const airborne = type !== 'runway';
       const cruise = type === 'cruise';
@@ -308,12 +310,18 @@ class PresetSpawnerMethods {
       const label = { runway: 'jeju.runway', approach: 'jeju.approach', cruise: 'jeju.cruise', challenge: 'jeju.challenge' }[type];
       if (label) this.showToast(() => t(label));
     } else if (this.activeAirport === 'lukla') {
-      const sin58 = 0.848048;
-      const cos58 = 0.529919;
       const isF16 = this.currentAircraftId === 'F16';
       const isC172 = this.currentAircraftId === 'C172';
-      const spawnS = isF16 ? 200.0 : 195.0;
-      const spawnY = 2836.0 + spawnS * (62 / 527) + groundClearance;
+      const spawn = airportSpawnPlan('VNLK', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
+      const poseEuler = new THREE.Euler(
+        THREE.MathUtils.degToRad(spawn.pitchDeg ?? 0),
+        spawn.yaw,
+        0,
+        'YXZ',
+      );
       const luklaTrim = isF16 ? 0.3 : isC172 ? 0.8 : 1.9;
 
       if (type === 'runway') {
@@ -323,18 +331,10 @@ class PresetSpawnerMethods {
         // offset keeps the wide wing clear of the raised apron.
         // Spawned with clearance in front of the retaining wall so chase cameras
         // remain completely clear of the upper stone barrier.
-        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
-        this.linearVelocity.set(0, 0, 0);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-
-        // Pitch -6.71° nose-down along the 11.7% downhill gradient, Heading 238° (yaw -238°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(-6.71),
-          -THREE.MathUtils.degToRad(238.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.0;
         this.engines.setThrottle(0.0);
@@ -352,19 +352,10 @@ class PresetSpawnerMethods {
         // Distance to threshold 06 (s = -263.5m) is 3,536.5m
         // Elevation drop to threshold (2,805m): 265m -> slope = 4.28°
         // At 69.4 m/s (135 kts), required sink rate is -5.20 m/s (-1,025 FPM)
-        const distSW = -3800.0;
-        this.position.set(distSW * sin58, 3070.0, -distSW * cos58);
-        this.linearVelocity.set(69.4 * sin58, -5.20, -69.4 * cos58);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-
-        // Pitch 1.0° nose-up on 4.3° descent path, Heading 058° (yaw -58°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(1.0),
-          -THREE.MathUtils.degToRad(58.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.56;
         this.engines.setThrottle(0.56);
@@ -379,17 +370,10 @@ class PresetSpawnerMethods {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
-        this.linearVelocity.set(0, 0, 0);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-        // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(-6.71),
-          -THREE.MathUtils.degToRad(238.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 1.0; // TOGA 100%
         this.engines.setThrottle(1.0);
@@ -404,12 +388,10 @@ class PresetSpawnerMethods {
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
-        this.position.set(-1500, 3960, -800);
-        this.linearVelocity.set(80, 0, -60);
-        // 100 m/s TAS is ~159 KIAS, beyond what the C172 can hold level (#599).
-        if (isC172) this.linearVelocity.setLength(53);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-        this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.3);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.65;
         this.engines.setThrottle(0.65);

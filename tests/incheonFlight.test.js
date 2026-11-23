@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import { IncheonFlightSurface, INCHEON_AIRFIELD as field, incheonSpawn } from '../src/geospatial/IncheonFlightSurface.js';
+import { IncheonFlightSurface, INCHEON_AIRFIELD as field } from '../src/geospatial/IncheonFlightSurface.js';
+import { airportSpawnPlan } from '../src/config/airportSpawnPlan.js';
 import { IncheonTerrain } from '../src/geospatial/IncheonTerrain.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
 import { approachDeviation } from '../src/config/approachData.js';
@@ -55,7 +56,7 @@ test('pavement mask follows real shapes and only nearby terrain is graded',()=>{
 
 test('runway and approach spawns align with navigation for both aircraft',()=>{
   for(const id of ['B738','C172']) {
-    const ground=incheonSpawn('runway',3.5,id),air=incheonSpawn('approach',3.5,id);
+    const ground=airportSpawnPlan('RKSI','runway',{groundClearanceM:3.5,aircraftId:id}),air=airportSpawnPlan('RKSI','approach',{groundClearanceM:3.5,aircraftId:id});
     assert.ok(surface.isOnRunway(ground.x,ground.z));assert.equal(ground.y,10.5);
     const deviation=approachDeviation('incheon',{...air,altitudeFt:(air.y-3.5)/.3048});
     assert.ok(Math.abs(deviation.crossTrackM)<1e-9);
@@ -69,7 +70,7 @@ test('runway and approach spawns align with navigation for both aircraft',()=>{
 
 test('challenge spawn places aircraft on a 3 NM offset approach with high energy',()=>{
   for(const id of ['B738','C172','F16']) {
-    const air=incheonSpawn('challenge',3.5,id);
+    const air=airportSpawnPlan('RKSI','challenge',{groundClearanceM:3.5,aircraftId:id});
     const deviation=approachDeviation('incheon',{...air,altitudeFt:(air.y-3.5)/.3048});
     assert.ok(Math.abs(deviation.distanceToThresholdM-5500)<1e-6,`${id} distance`);
     assert.ok(Math.abs(deviation.crossTrackM-350)<1e-6,`${id} cross-track offset`);
@@ -117,7 +118,7 @@ test('the approach spawn is an unattended equilibrium of the live force model',(
   // at its travel leaves a sustained pitch moment and flies the preset off its path.
   for(const id of ['B738','C172']) {
     const aero=new Aerodynamics(AIRCRAFT_REGISTRY[id]),engines=new EngineModel(AIRCRAFT_REGISTRY[id]);
-    const spawn=incheonSpawn('approach',3.5,id);
+    const spawn=airportSpawnPlan('RKSI','approach',{groundClearanceM:3.5,aircraftId:id});
     const tas=Math.hypot(spawn.vx,spawn.vy,spawn.vz);
     const gammaRad=Math.asin(spawn.vy/tas);
     const flapsIndex=Math.min(5,aero.flapAngles.length-1);

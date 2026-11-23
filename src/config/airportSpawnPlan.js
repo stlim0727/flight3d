@@ -33,11 +33,36 @@ function scenicSpawn(pose, aircraftId) {
   };
 }
 
+function declaredSpawn(pose, { groundClearanceM = 3.5, aircraftId }) {
+  const specific = pose.byAircraft?.[aircraftId];
+  const poseForAircraft = specific ? { ...pose, ...specific } : pose;
+  const speed = speedFor(poseForAircraft.speedMps, aircraftId, 0);
+  const direction = headingToDirection(poseForAircraft.velocityHeadingDeg ?? poseForAircraft.headingDeg);
+  const y = Number.isFinite(poseForAircraft.y)
+    ? poseForAircraft.y
+    : poseForAircraft.position[1] + groundClearanceM;
+  const vy = Number.isFinite(poseForAircraft.vy)
+    ? poseForAircraft.vy
+    : (poseForAircraft.glideslopeDeg ? -speed * Math.tan(poseForAircraft.glideslopeDeg * DEG) : 0);
+  return {
+    x: poseForAircraft.position[0],
+    y,
+    z: poseForAircraft.position[2],
+    yaw: -poseForAircraft.headingDeg * DEG,
+    vx: direction.x * speed,
+    vy,
+    vz: direction.z * speed,
+    pitchDeg: poseForAircraft.pitchDeg ?? 0,
+  };
+}
+
 /** Common spawn plan for one airport code and flight scenario. */
 export function airportSpawnPlan(code, scenario, { groundClearanceM, aircraftId = 'B738' } = {}) {
   const spawn = getAirportOverride(code)?.spawn;
   if (!spawn) return null;
-
+  const pose = spawn.poses?.[scenario]
+    ?? (scenario === 'ditching' ? spawn.poses?.challenge : null);
+  if (pose) return declaredSpawn(pose, { groundClearanceM, aircraftId });
   if (scenario === 'cruise') return scenicSpawn(spawn.cruise, aircraftId);
   if (scenario === 'challenge' || scenario === 'ditching') {
     return scenicSpawn(spawn.challenge, aircraftId);
