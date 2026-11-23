@@ -549,3 +549,60 @@ test('apron lamps create spotlights aimed at target and adjust intensity with su
 
   lighting.dispose();
 });
+
+test('facility rotationY is applied to 3D mesh and collision detection box', () => {
+  const rotatedFacility = {
+    id: 'rotated-terminal',
+    name: 'Rotated Terminal',
+    kind: 'terminal',
+    position: [0, 36.0, 0],
+    size: [400, 20, 100], // width 400 along X, depth 100 along Z before rotation
+    rotationY: Math.PI / 2, // 90 deg rotation: now depth 400 along Z, width 100 along X
+    collision: {
+      type: 'box',
+      halfX: 200,
+      halfZ: 50,
+      maxAltitudeM: 60.0,
+    },
+  };
+
+  const facilitiesResult = createExternalAirportFacilities([rotatedFacility], 36.0);
+  const mesh = facilitiesResult.group.children.find(c => c.name === 'terminal-rotated-terminal');
+  assert.ok(mesh, 'Terminal mesh must exist');
+  assert.equal(mesh.rotation.y, Math.PI / 2, 'Mesh rotation.y must match rotationY');
+
+  // Probe at [0, 50, 150] (along Z axis, inside rotated box because half-extent along Z is 200):
+  const probeZ = [{ pos: new THREE.Vector3(0, 50, 150), radius: 0, desc: 'wing' }];
+  const hitZ = facilitiesResult.checkCollision(probeZ);
+  assert.ok(hitZ, 'Probe along rotated long axis (Z) must hit');
+  assert.equal(hitZ.part, 'wing');
+
+  // Probe at [150, 50, 0] (along X axis, outside rotated box because half-extent along X is 50):
+  const probeX = [{ pos: new THREE.Vector3(150, 50, 0), radius: 0, desc: 'wing' }];
+  const hitX = facilitiesResult.checkCollision(probeX);
+  assert.equal(hitX, false, 'Probe along rotated short axis (X) must not hit');
+
+  facilitiesResult.dispose();
+});
+
+test('facility collision detection accounts for aircraft probe radius on tower and terminal', () => {
+  const rkpcFacilities = getAirportOverride('RKPC').facilities;
+  const facilitiesResult = createExternalAirportFacilities(rkpcFacilities, 36.0);
+
+  // RKPC Tower: position [-80, 36.0, 260], radius 12.0m, maxAlt 91m
+  // Belly probe at horizontal distance 12.5m (x = -67.5, z = 260), y = 84.9m, radius 1.8m
+  // Center is outside (12.5m > 12.0m), but radius 1.8m reaches 13.8m -> must hit!
+  const towerBellyProbe = [{ pos: new THREE.Vector3(-67.5, 84.9, 260), radius: 1.8, desc: 'belly' }];
+  const towerHit = facilitiesResult.checkCollision(towerBellyProbe);
+  assert.ok(towerHit, 'Tower collision must trigger when probe boundary overlaps');
+  assert.equal(towerHit.part, 'belly');
+
+  // RKPC Terminal: position [150, 36.0, 320], halfX 230, halfZ 65, maxAlt 61m
+  // Wingtip probe at x = 150 + 231 (1m outside halfX), radius 2.0m -> must hit!
+  const termWingProbe = [{ pos: new THREE.Vector3(381, 45, 320), radius: 2.0, desc: 'wingtip' }];
+  const termHit = facilitiesResult.checkCollision(termWingProbe);
+  assert.ok(termHit, 'Terminal collision must trigger when probe radius overlaps');
+  assert.equal(termHit.part, 'wingtip');
+
+  facilitiesResult.dispose();
+});

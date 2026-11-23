@@ -796,16 +796,23 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
       cab.position.set(pos[0], baseElevation + shaftH + cabH / 2, pos[2]);
       towerGroup.add(cab);
 
+      const rotY = fac.rotationY ?? 0;
+      if (rotY !== 0) {
+        towerGroup.rotation.y = rotY;
+      }
+
       group.add(towerGroup);
       gazeTargets.push({ object: towerGroup, kind: 'tower', name: fac.name });
 
       const col = fac.collision;
       const radius = col?.radius ?? fac.radius;
       const maxAlt = col?.maxAltitudeM ?? (baseElevation + totalH + 6);
+      const minAlt = col?.minAltitudeM ?? baseElevation;
       colliders.push({
         id: fac.id,
         kind: 'tower',
-        inside: (x, z) => Math.hypot(x - pos[0], z - pos[2]) < radius,
+        inside: (x, z, r = 0) => Math.hypot(x - pos[0], z - pos[2]) <= radius + r,
+        minAltitudeM: minAlt,
         maxAltitudeM: maxAlt,
       });
     } else {
@@ -813,6 +820,7 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
       const width = size[0];
       const height = size[1];
       const depth = size[2];
+      const rotY = fac.rotationY ?? 0;
 
       const mat = new THREE.MeshStandardMaterial({
         color: fac.kind === 'terminal' ? 0x8fa3b8 : 0x7a8b9e,
@@ -823,6 +831,9 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
       const mesh = new THREE.Mesh(geo, mat);
       mesh.name = `${fac.kind}-${fac.id}`;
       mesh.position.set(pos[0], baseElevation + height / 2, pos[2]);
+      if (rotY !== 0) {
+        mesh.rotation.y = rotY;
+      }
       group.add(mesh);
 
       gazeTargets.push({ object: mesh, kind: fac.kind, name: fac.name });
@@ -831,23 +842,42 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
       const halfX = col?.halfX ?? width / 2;
       const halfZ = col?.halfZ ?? depth / 2;
       const maxAlt = col?.maxAltitudeM ?? (baseElevation + height + 3);
+      const minAlt = col?.minAltitudeM ?? baseElevation;
       colliders.push({
         id: fac.id,
         kind: fac.kind,
-        inside: (x, z) => Math.abs(x - pos[0]) < halfX && Math.abs(z - pos[2]) < halfZ,
+        inside: (x, z, r = 0) => {
+          let dx = x - pos[0];
+          let dz = z - pos[2];
+          if (rotY !== 0) {
+            const cosR = Math.cos(-rotY);
+            const sinR = Math.sin(-rotY);
+            const lx = dx * cosR - dz * sinR;
+            const lz = dx * sinR + dz * cosR;
+            dx = lx;
+            dz = lz;
+          }
+          return Math.abs(dx) <= halfX + r && Math.abs(dz) <= halfZ + r;
+        },
+        minAltitudeM: minAlt,
         maxAltitudeM: maxAlt,
       });
     }
   }
 
-  const hasModeledBuilding = (x, z) => colliders.some(c => c.inside(x, z));
+  const hasModeledBuilding = (x, z) => colliders.some(c => c.inside(x, z, 0));
   const checkCollision = (probes) => {
     if (!probes || !colliders.length) return false;
     for (const p of probes) {
       if (!p?.pos) continue;
+      const radius = p.radius || 0;
       for (const col of colliders) {
-        if (col.inside(p.pos.x, p.pos.z) && p.pos.y <= col.maxAltitudeM) {
-          return { point: p.pos.clone(), part: col.kind, id: col.id };
+        if (
+          col.inside(p.pos.x, p.pos.z, radius) &&
+          p.pos.y >= col.minAltitudeM - radius &&
+          p.pos.y <= col.maxAltitudeM + radius
+        ) {
+          return { point: p.pos.clone(), part: p.desc ?? col.kind, id: col.id };
         }
       }
     }
