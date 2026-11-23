@@ -151,7 +151,7 @@ test('diagnostics include altitude, heading, WGS84 position and rendered tile st
   assert.deepEqual(diagnostics.renderedTiles.activeTileKeys, ['12/345/678', '12/346/678']);
   assert.deepEqual(diagnostics.renderedTiles.loadedTileKeys, ['12/345/678']);
   assert.equal(diagnostics.renderedTiles.truncated, false);
-
+  assert.equal(diagnostics.renderedTiles.source, 'legacy-streamers');
   for (let i = 0; i < 45; i++) activeTiles.set(`12/400/${i}`, { imageLoaded: false });
   assert.equal(gatherFeedbackDiagnostics(sim).renderedTiles.activeTileKeys.length, 40,
     'tile keys stay bounded');
@@ -160,6 +160,42 @@ test('diagnostics include altitude, heading, WGS84 position and rendered tile st
     position: { x: 1, y: 2, z: 3 } });
   assert.equal(fictional.geoPosition, null, 'fictional airports have no WGS84 frame');
   assert.equal(fictional.renderedTiles, null, 'no streamers means no tile snapshot');
+});
+
+test('diagnostics use active OpenWorld imagery instead of hidden legacy streamers', () => {
+  const tiles = new Map([
+    ['100/200', { baseMap: {}, detailMap: {}, detailLevel: 13 }],
+    ['100/201', { baseMap: null, detailMap: null, detailLevel: 11, imageryRetryAt: 123 }],
+  ]);
+  const legacy = { activeTiles: new Map([['11/1/2', { imageLoaded: true }]]),
+    getMetrics: () => ({ activeTiles: 1, activeLOD: 'hidden' }) };
+  const hiddenStreamer = { getMetrics: () => ({ activeLOD: 'hidden', tilesLoaded: 9 }) };
+  const sim = {
+    currentTerrain: { openWorld: {
+      tileZoom: 11, farTileZoom: 8, tiles,
+      detailWanted: new Map([['100/200', 14]]),
+      pending: new Map(), pendingImagery: true, pendingDetail: false, reducedGeometry: true,
+      farTiles: new Map([['40/80', {}]]), farGroup: { visible: true },
+      imageryBudget: { detailTileLimit: 12, anisotropy: 8 },
+    }, tileStreamer: hiddenStreamer, corridorStreamer: legacy },
+    world: { anchorTerrain: { tileStreamer: hiddenStreamer, corridorStreamer: legacy }, corridorStreamer: legacy },
+    position: { x: 1, y: 2, z: 3 },
+  };
+  const rendered = gatherFeedbackDiagnostics(sim).renderedTiles;
+  assert.equal(rendered.source, 'open-world');
+  assert.equal(rendered.island, undefined, 'hidden island streamer is not reported');
+  assert.equal(rendered.corridor, undefined, 'hidden corridor streamer is not reported');
+  assert.equal(rendered.openWorld.tileZoom, 11);
+  assert.equal(rendered.openWorld.tilesTotal, 2);
+  assert.equal(rendered.openWorld.imageryLoadedCount, 1);
+  assert.equal(rendered.openWorld.detailLoadedCount, 1);
+  assert.equal(rendered.openWorld.pendingImagery, true);
+  assert.equal(rendered.openWorld.farVisible, true);
+  assert.deepEqual(rendered.openWorld.farTileKeys, ['8/40/80']);
+  assert.deepEqual(rendered.openWorld.tiles[0], { key: '11/100/200', imageryLoaded: true,
+    detailLoaded: true, detailLevel: 13, wantedDetailLevel: 14, imageryRetryAt: null });
+  assert.equal(rendered.openWorld.tiles[1].imageryRetryAt, 123);
+  assert.equal(rendered.openWorld.imageryBudget.detailTileLimit, 12);
 });
 
 test('report attaches the live sortie flight log with its metadata and touchdown records', () => {

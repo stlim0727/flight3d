@@ -545,6 +545,9 @@ export class OpenWorldTerrain {
     }
   }
 
+  get tileZoom() { return zoom; }
+  get farTileZoom() { return farZoom; }
+
   coordinate(x, z) {
     const { latitude, longitude } = localToWgs84(x, z, this.origin);
     return wgs84ToTile(latitude, longitude, zoom);

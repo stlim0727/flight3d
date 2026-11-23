@@ -86,6 +86,15 @@ const formatGeoPosition = value => value && Number.isFinite(value.latitude) && N
 const summarizeRenderedTiles = value => {
   if (!value) return null;
   const parts = [];
+  if (value.openWorld) {
+    const world = value.openWorld;
+    parts.push(`오픈월드 z${world.tileZoom ?? '—'}`);
+    parts.push(`타일 ${world.tilesTotal ?? 0}`);
+    parts.push(`이미지 ${world.imageryLoadedCount ?? 0}`);
+    if (Number.isFinite(world.detailWantedCount)) parts.push(`상세 ${world.detailWantedCount}`);
+    if (world.farVisible) parts.push(`원거리 ${world.farTiles ?? 0}`);
+    return parts.join(' · ');
+  }
   if (value.corridor) {
     parts.push(`활성 타일 ${value.corridor.activeTiles ?? 0}`);
     if (Number.isFinite(value.corridor.estimatedVramMb)) parts.push(`${value.corridor.estimatedVramMb} MB`);

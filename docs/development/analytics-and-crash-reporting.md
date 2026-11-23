@@ -201,10 +201,11 @@ average silently drops the loads this feature was added to capture.
    - A captured JPEG screenshot is attached **by default** when the canvas can be read;
      the checkbox lets the pilot remove it. The snapshot also carries `altitudeFt`,
      `headingDeg`, `geoPosition` (WGS84 latitude/longitude, real airports only) and
-     `renderedTiles` (island/corridor streamer metrics plus bounded active and
-     imagery-loaded `zoom/x/y` keys, capped at 40). Fictional arenas have no WGS84
-     frame, and regions without tile streaming report `null`; those fields never
-     invent coordinates or tile IDs.
+     `renderedTiles` snapshots the source actually on screen: `open-world` for
+     Incheon/Jeju/Lukla (base/far zoom, bounded tile keys, imagery and detail levels,
+     pending loads, far tiles and quality budget), or `legacy-streamers` only when
+     those streamers are visible. Hidden streamers are never reported as rendered.
+     Fictional arenas have no WGS84 frame; regions without tile streaming report `null`.
    - **신고 파일 저장** downloads `flight3d-report-<id>.zip`, not a JSON blob: `report.json`
      holds the metadata, diagnostics and an attachment manifest; `screenshot.jpg` is a real
      image file when included; `full-report.json` holds the optional sortie report.

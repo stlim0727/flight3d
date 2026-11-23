@@ -20,9 +20,45 @@ const streamerMetrics = streamer => {
   try { return streamer.getMetrics(); } catch { return null; }
 };
 
-/** Imagery actually rendered when the dialog opened, not just the configured zoom. */
+function gatherOpenWorldTiles(openWorld) {
+  const tileZoom = finite(openWorld.tileZoom);
+  const farZoom = finite(openWorld.farTileZoom);
+  const entries = [...(openWorld.tiles?.entries() ?? [])];
+  const tiles = entries.slice(0, MAX_ACTIVE_TILE_KEYS).map(([key, entry]) => ({
+    key: tileZoom === null ? key : `${tileZoom}/${key}`,
+    imageryLoaded: Boolean(entry?.baseMap),
+    detailLoaded: Boolean(entry?.detailMap),
+    detailLevel: finite(entry?.detailLevel) ?? tileZoom,
+    wantedDetailLevel: finite(openWorld.detailWanted?.get(key)),
+    imageryRetryAt: finite(entry?.imageryRetryAt),
+  }));
+  return {
+    tileZoom,
+    farZoom,
+    tiles,
+    tilesTotal: entries.length,
+    imageryLoadedCount: entries.filter(([, entry]) => Boolean(entry?.baseMap)).length,
+    detailLoadedCount: entries.filter(([, entry]) => Boolean(entry?.detailMap)).length,
+    detailWantedCount: openWorld.detailWanted?.size ?? 0,
+    pendingElevation: openWorld.pending?.size ?? 0,
+    pendingImagery: Boolean(openWorld.pendingImagery),
+    pendingDetail: Boolean(openWorld.pendingDetail),
+    reducedGeometry: Boolean(openWorld.reducedGeometry),
+    farTiles: openWorld.farTiles?.size ?? 0,
+    farVisible: Boolean(openWorld.farGroup?.visible),
+    farTileKeys: [...(openWorld.farTiles?.keys() ?? [])].slice(0, MAX_ACTIVE_TILE_KEYS)
+      .map(key => farZoom === null ? key : `${farZoom}/${key}`),
+    imageryBudget: { ...(openWorld.imageryBudget ?? {}) },
+    truncated: entries.length > tiles.length,
+  };
+}
+
+/** Imagery actually rendered when the dialog opened; hidden streamers are not evidence. */
 function gatherRenderedTiles(sim) {
-  const terrain = sim?.world?.anchorTerrain ?? sim?.terrain ?? null;
+  const openWorld = sim?.currentTerrain?.openWorld ?? null;
+  if (openWorld) return { source: 'open-world', openWorld: gatherOpenWorldTiles(openWorld) };
+
+  const terrain = sim?.world?.anchorTerrain ?? sim?.terrain ?? sim?.currentTerrain ?? null;
   const islandStreamer = terrain?.tileStreamer ?? null;
   const corridorStreamer = sim?.world?.corridorStreamer ?? terrain?.corridorStreamer ?? null;
   if (!islandStreamer && !corridorStreamer) return null;
@@ -34,6 +70,7 @@ function gatherRenderedTiles(sim) {
     ? [...corridorStreamer.activeTiles.entries()] : [];
   const keys = active.map(([key]) => key);
   return {
+    source: 'legacy-streamers',
     island,
     corridor: streamerMetrics(corridorStreamer),
     activeTileCount: active.length,
