@@ -214,17 +214,19 @@ export const AIRPORT_OVERRIDES = {
         ident: '06/24',
         widthM: 30.0,
         lengthM: 527,
+        // Coordinates are chosen so the common Incheon-framed projection maps
+        // them back onto the surveyed 58° / 11.76% local runway geometry.
         ends: [
           {
             ident: '06',
             physical: {
-              latitude: 27.685574417506537,
-              longitude: 86.72718622034465,
+              latitude: 27.684705043808055,
+              longitude: 86.72742950102968,
               elevationM: 2805.0,
             },
             threshold: {
-              latitude: 27.685574417506537,
-              longitude: 86.72718622034465,
+              latitude: 27.684705043808055,
+              longitude: 86.72742950102968,
               elevationM: 2805.0,
             },
             displacedThresholdM: 0,
@@ -232,13 +234,13 @@ export const AIRPORT_OVERRIDES = {
           {
             ident: '24',
             physical: {
-              latitude: 27.688093945207225,
-              longitude: 86.73171763165944,
+              latitude: 27.68896323482566,
+              longitude: 86.731474387483,
               elevationM: 2867.0,
             },
             threshold: {
-              latitude: 27.688093945207225,
-              longitude: 86.73171763165944,
+              latitude: 27.68896323482566,
+              longitude: 86.731474387483,
               elevationM: 2867.0,
             },
             displacedThresholdM: 0,

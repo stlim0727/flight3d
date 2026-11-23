@@ -165,3 +165,38 @@ test('RKSI and VNLK presets keep their validated poses', () => {
     assert.ok(Math.abs(plan.pitchDeg - pitchDeg) < 0.001, `${code}/${scenario}/${aircraftId} pitch`);
   }
 });
+
+test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => withStorage(async () => {
+  const calls = [];
+  const legacyRunway = { visible: true };
+  const sim = {
+    lobby: { airport: 'lukla', aircraft: 'B738', preset: 'runway', pilotMode: 'human' },
+    destinationAirport: 'none',
+    currentAircraftId: 'B738',
+    sky: { timeOfDay: 12 },
+    gear: { cgGroundHeightM: CLEARANCE_M },
+    position: { x: 0, y: 0, z: 0 },
+    currentTerrain: { getHeight: () => 2862 },
+    luklaAirport: { runwayGroup: legacyRunway },
+    devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
+    demoDirector: { userTimeOfDayOverridden: true },
+    gameFlow: new GameFlowController(),
+    analytics: { trackFlightStart() {} },
+    beginFlightRecording() {},
+    setPreset(scenario) { calls.push(['preset', scenario]); },
+    airportStreamer: {
+      releaseGroundHold() { calls.push(['release']); },
+      ensure(code) { calls.push(['ensure', code]); },
+      setHome(code) { calls.push(['home', code]); },
+      statusFor(code) { return { state: 'ready', code }; },
+      update() { calls.push(['update']); },
+      regionFor(code) { return code === 'VNLK' ? { airport: {} } : null; },
+    },
+  };
+  await createSimulatorScenarioStart(sim).start();
+  assert.ok(calls.some(call => call[0] === 'ensure' && call[1] === 'VNLK'),
+    'Lukla preset must load the indexed VNLK airport');
+  assert.ok(calls.some(call => call[0] === 'home' && call[1] === 'VNLK'));
+  assert.equal(legacyRunway.visible, false, 'common runway replaces the legacy mesh');
+  assert.equal(sim.destinationAirport, 'none', 'chosen destination must be preserved');
+}));
