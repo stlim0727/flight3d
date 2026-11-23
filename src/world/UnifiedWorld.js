@@ -108,6 +108,7 @@ export class UnifiedWorld {
   get loadError() { return this.anchorTerrain?.loadError; }
   get openWorld() { return this.anchorTerrain?.openWorld; }
   set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
+  get airportMesh() { return this.anchorTerrain?.airportMesh ?? null; }
   get geographicBuildingLayer() { return this.anchorTerrain?.geographicBuildingLayer; }
   set geographicBuildingLayer(value) { if (this.anchorTerrain) this.anchorTerrain.geographicBuildingLayer = value; }
   get corridorStreamer() { return this.anchorTerrain?.corridorStreamer; }
