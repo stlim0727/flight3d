@@ -127,6 +127,8 @@ export class LuklaAirport {
    */
   buildSlopedRunway() {
     const rwyGroup = new THREE.Group();
+    rwyGroup.name = 'legacy-sloped-runway';
+    this.runwayGroup = rwyGroup;
     rwyGroup.position.set(0, this.midElevation, 0);
 
     // Orientation: Heading 058° (yaw) and 6.71° incline (pitch uphill along 058°)

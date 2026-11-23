@@ -632,6 +632,10 @@ test('VNLK override preserves the sloped 06/24 runway grade', () => {
   const ends = descriptors[0].ends;
   assert.equal(ends.find(end => end.ident === '06').physical.elevationM, 2805);
   assert.equal(ends.find(end => end.ident === '24').physical.elevationM, 2867);
+  const dx = ends[1].physical.x - ends[0].physical.x;
+  const dz = ends[1].physical.z - ends[0].physical.z;
+  const heading = Math.atan2(dx, -dz) * 180 / Math.PI;
+  assert.ok(Math.abs(heading - 58) < 1, `surveyed heading must survive projection (${heading.toFixed(2)}°)`);
 
   const surface = new ExternalAirportSurface({ airport: VNLK_RECORD, overrides: override });
   assert.ok(Math.abs(surface.getHeight(0, 0) - 2836) < 3, 'runway centre keeps the surveyed grade');

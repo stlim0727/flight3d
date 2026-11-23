@@ -42,6 +42,10 @@ export function createSimulatorScenarioStart(sim) {
       async preset(request) {
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+        if (request.airport !== 'lukla'
+          || !['runway', 'cliff', 'approach'].includes(request.scenario)) {
+          if (sim.luklaAirport?.runwayGroup) sim.luklaAirport.runwayGroup.visible = true;
+        }
         if (!request.mapPlan && request.airport === 'jeju'
           && (request.scenario === 'runway' || request.scenario === 'approach')) {
           const spawn = airportSpawnPlan('RKPC', request.scenario, {
@@ -51,6 +55,15 @@ export function createSimulatorScenarioStart(sim) {
           sim.airportStreamer?.setHome?.('RKPC');
           await waitForStreamedAirport(sim, 'RKPC');
           alignMapSpawnToContact(sim, spawn);
+        }
+        if (!request.mapPlan && request.airport === 'lukla'
+          && ['runway', 'cliff', 'approach'].includes(request.scenario)) {
+          sim.airportStreamer?.setHome?.('VNLK');
+          await waitForStreamedAirport(sim, 'VNLK');
+          const commonRegion = sim.airportStreamer?.regionFor?.('VNLK');
+          const legacyRunway = sim.luklaAirport?.runwayGroup
+            ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway');
+          if (commonRegion && legacyRunway) legacyRunway.visible = false;
         }
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
