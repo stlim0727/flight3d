@@ -42,9 +42,21 @@ export function createSimulatorScenarioStart(sim) {
       async preset(request) {
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+        const setIncheonRunwayVisible = visible => {
+          const airport = sim.incheonAirport;
+          if (!airport) return;
+          if (airport.legacyRunwayDetails) airport.legacyRunwayDetails.visible = visible;
+          for (const child of airport.pavement?.children ?? []) {
+            if ((child.name ?? '').startsWith('incheon-runway')) child.visible = visible;
+          }
+        };
         if (request.airport !== 'lukla'
           || !['runway', 'cliff', 'approach'].includes(request.scenario)) {
           if (sim.luklaAirport?.runwayGroup) sim.luklaAirport.runwayGroup.visible = true;
+        }
+        if (request.airport !== 'incheon'
+          || !['runway', 'approach', 'challenge'].includes(request.scenario)) {
+          setIncheonRunwayVisible(true);
         }
         if (!request.mapPlan && request.airport === 'jeju'
           && (request.scenario === 'runway' || request.scenario === 'approach')) {
@@ -64,6 +76,12 @@ export function createSimulatorScenarioStart(sim) {
           const legacyRunway = sim.luklaAirport?.runwayGroup
             ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway');
           if (commonRegion && legacyRunway) legacyRunway.visible = false;
+        }
+        if (!request.mapPlan && request.airport === 'incheon'
+          && ['runway', 'approach', 'challenge'].includes(request.scenario)) {
+          sim.airportStreamer?.setHome?.('RKSI');
+          await waitForStreamedAirport(sim, 'RKSI');
+          if (sim.airportStreamer?.regionFor?.('RKSI')) setIncheonRunwayVisible(false);
         }
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
