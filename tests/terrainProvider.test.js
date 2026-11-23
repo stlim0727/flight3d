@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { Euler, Mesh, Object3D, Quaternion, Vector3 } from 'three';
 import { OpenWorldTerrain, buildOpenTerrainTile } from '../src/environment/OpenWorldTerrain.js';
-import { JejuFlightSurface } from '../src/geospatial/JejuFlightSurface.js';
+import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.js';
+import { JEJU_ORIGIN } from '../src/geospatial/CorridorCoordinateSystem.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
@@ -30,7 +31,7 @@ function loadedWorld(protectedAreas = []) {
 }
 
 test('analytic provider satisfies the contract', () => {
-  const provider = analyticTerrainProvider(new JejuFlightSurface());
+  const provider = analyticTerrainProvider(new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN }));
   assert.equal(assertTerrainProviderContract(provider, [[0, 0], [5000, 8000], [3741, 16591]]), true);
   assert.equal(provider.isReady(0, 0), true);
   assert.ok(Math.abs(provider.getHeight(0, 0) - 36) < 1e-9);
@@ -65,7 +66,7 @@ test('protected areas are never authoritative for the open-world provider', () =
 test('providers are interchangeable behind resolveGroundHeight', () => {
   const { world, px, pz } = loadedWorld();
   const streamed = openWorldTerrainProvider(world);
-  const analytic = analyticTerrainProvider(new JejuFlightSurface());
+  const analytic = analyticTerrainProvider(new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN }));
   let active = streamed;
   const ground = resolveGroundHeight(() => active, () => -45);
   assert.ok(Math.abs(ground(px, pz) - 40) < 0.5);

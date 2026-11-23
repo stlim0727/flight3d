@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { TERRAIN_INSETS, getInsetsForRegion } from '../src/config/terrainInsets.js';
 import { OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
-import { loadJejuAirport } from '../src/environment/JejuAirport.js';
+import { OpenWorldRegionSurface } from '../src/environment/OpenWorldRegionSurface.js';
+import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { JEJU_ORIGIN } from '../src/geospatial/CorridorCoordinateSystem.js';
 import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld } from '../src/world/UnifiedWorld.js';
@@ -21,25 +23,32 @@ test('TERRAIN_INSETS defines declarative high-resolution data for RKPC', () => {
   assert.equal(rkpc.approachDistanceM, 8000, 'RKPC approach distance must be 8000m');
 });
 
-test('UnifiedWorld forwards airportMesh from active anchorTerrain', async () => {
-  const airport = await loadJejuAirport('', { loadSatellite: false });
+test('UnifiedWorld forwards airportMesh from the common anchor terrain', () => {
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+  });
   const world = new UnifiedWorld('jeju');
   world.register('jeju', {
-    terrain: airport.terrain,
-    airport,
-    group: airport.group,
-    mesh: airport.terrain.mesh,
+    terrain: surface,
+    mesh: surface.mesh,
     extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
   });
 
   assert.ok(world.airportMesh, 'UnifiedWorld must forward airportMesh from anchor terrain');
-  assert.equal(world.airportMesh, airport.terrain.airportMesh, 'Must point to active airportMesh');
+  assert.equal(world.airportMesh, surface.airportMesh, 'Must point to the common precinct mesh');
+  surface.dispose();
 });
 
 test('OpenWorldTerrain creates localMesh for RKPC airport precinct sharing common tile material', async () => {
-  const airport = await loadJejuAirport('', { loadSatellite: false });
-  const airportMesh = airport.terrain.airportMesh;
-  assert.ok(airportMesh?.geometry, 'JejuAirport airportMesh must have geometry');
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+  });
+  const airportMesh = surface.airportMesh;
+  assert.ok(airportMesh?.geometry, 'Common anchor must expose precinct geometry');
 
   const rkpcInsets = getInsetsForRegion('jeju');
   const dummyElevationCache = {
@@ -278,32 +287,4 @@ test('loadImageryDetail retains parent tile baseMap when detail sub-tiles fail o
   openWorld.dispose();
 });
 
-test('JejuAirport keeps airportMesh visible until replacement localMesh is rendered with imagery', async () => {
-  const airport = await loadJejuAirport('', { loadSatellite: false });
-  const islandMesh = airport.terrain.islandMesh;
-  const airportMesh = airport.terrain.airportMesh;
 
-  assert.ok(islandMesh && airportMesh);
-
-  // Case 1: DEM tiles loaded, localImagery configured, but localMesh not yet visible (imagery loading)
-  airport.terrain.openWorld = {
-    tiles: new Map([['1743/821', {}]]),
-    localImagery: {},
-    hasVisibleLocalMesh: () => false,
-  };
-  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
-  assert.equal(islandMesh.visible, false, 'Island mesh must be hidden when DEM tiles are active');
-  assert.equal(airportMesh.visible, true, 'Airport precinct fallback must remain visible while replacement imagery is pending');
-
-  // Case 2: Replacement localMesh imagery succeeds and becomes visible
-  airport.terrain.openWorld.hasVisibleLocalMesh = () => true;
-  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
-  assert.equal(airportMesh.visible, false, 'Airport precinct fallback hides once replacement localMesh is visible');
-
-  // Case 3: OpenWorld unloaded (cold cache / offline fallback)
-  airport.terrain.openWorld.tiles.clear();
-  airport.terrain.openWorld.hasVisibleLocalMesh = () => false;
-  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
-  assert.equal(islandMesh.visible, true, 'Island mesh must reappear as fallback');
-  assert.equal(airportMesh.visible, true, 'Airport precinct mesh must reappear as fallback');
-});

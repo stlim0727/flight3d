@@ -12,7 +12,9 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { TERRAIN_INSETS, getInsetsForRegion } from '../src/config/terrainInsets.js';
 import { OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
-import { loadJejuAirport } from '../src/environment/JejuAirport.js';
+import { OpenWorldRegionSurface } from '../src/environment/OpenWorldRegionSurface.js';
+import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { JEJU_ORIGIN } from '../src/geospatial/CorridorCoordinateSystem.js';
 import { wgs84ToTile, tileToWgs84, wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 
@@ -29,9 +31,12 @@ console.log(`  • Detail Range: Zoom ${rkpcInset.minDetailLevel} ~ ${rkpcInset.
 console.log(`  • Approach Trigger Distance: ${rkpcInset.approachDistanceM} meters\n`);
 
 // 2. Load Jeju Airport Environment
-console.log('🛫 2. Loading Jeju Airport & Flight Surface:');
-const airport = await loadJejuAirport('', { loadSatellite: false });
-const flightSurface = airport.terrain;
+console.log('🛫 2. Loading common Jeju anchor surface:');
+const config = REGION_SURFACES.jeju;
+const flightSurface = new OpenWorldRegionSurface({
+  ...config,
+  fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+});
 const airportMesh = flightSurface.airportMesh;
 assert.ok(airportMesh?.geometry, 'Airport precinct geometry must exist');
 

@@ -92,6 +92,12 @@ export class ExternalAirportStreamer {
     return this._home;
   }
 
+  /** Loaded common region for a code, or null when not streamed. */
+  regionFor(code) {
+    const normalized = typeof code === 'string' ? code.trim().toUpperCase() : null;
+    return this._loaded?.code === normalized ? this._loaded.region : null;
+  }
+
   statusFor(code) {
     if (this._disposed || !isExternalDestination(code)) return null;
     return this._code === code.trim().toUpperCase() ? this.status : null;

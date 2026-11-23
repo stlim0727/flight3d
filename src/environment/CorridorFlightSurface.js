@@ -23,7 +23,6 @@ import {
   MEAN_SEA_LEVEL_M,
   wgs84ToIncheonLocal,
   wgs84ToIncheonSceneryLocal,
-  wgs84ToJejuLocal,
 } from '../geospatial/CorridorCoordinateSystem.js';
 import { localToWgs84, wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
@@ -37,12 +36,10 @@ export class CorridorFlightSurface {
    * @param {Object} [options]
    * @param {Object} [options.activeOrigin] - Active reference origin (default: JEJU_ORIGIN)
    * @param {Object} [options.incheonSurface] - IncheonFlightSurface instance
-   * @param {Object} [options.jejuSurface] - JejuFlightSurface instance
    */
   constructor(options = {}) {
     this.activeOrigin = options.activeOrigin || JEJU_ORIGIN;
     this.incheonSurface = options.incheonSurface || null;
-    this.jejuSurface = options.jejuSurface || null;
     this.isLoaded = true;
   }
 
@@ -92,10 +89,6 @@ export class CorridorFlightSurface {
   getHeightAtWgs84(latitude, longitude) {
     // 1. Jeju Island Region (lat 33.15 ~ 33.58, lon 126.15 ~ 126.98)
     if (latitude >= 33.15 && latitude <= 33.58 && longitude >= 126.15 && longitude <= 126.98) {
-      if (this.jejuSurface && typeof this.jejuSurface.getHeight === 'function') {
-        const [jx, jz] = wgs84ToJejuLocal(latitude, longitude);
-        return this.jejuSurface.getHeight(jx, jz);
-      }
       // Analytical fallback for Jeju: Hallasan volcanic cone + runway 07
       const dLat = latitude - JEJU_ORIGIN.latitude;
       const dLon = longitude - JEJU_ORIGIN.longitude;
@@ -207,11 +200,6 @@ export class CorridorFlightSurface {
       return true;
     }
 
-    // 2. Jeju Airport
-    if (this.jejuSurface && typeof this.jejuSurface.isOnRunway === 'function') {
-      const [jx, jz] = wgs84ToJejuLocal(latitude, longitude);
-      if (Math.hypot(jx, jz) < 5000 && this.jejuSurface.isOnRunway(jx, jz)) return true;
-    }
 
     // 3. Incheon Airport
     if (this.incheonSurface && typeof this.incheonSurface.isOnRunway === 'function') {
@@ -230,11 +218,6 @@ export class CorridorFlightSurface {
       return true;
     }
 
-    // 2. Jeju Airport
-    if (this.jejuSurface && typeof this.jejuSurface.isRunwaySafetyArea === 'function') {
-      const [jx, jz] = wgs84ToJejuLocal(latitude, longitude);
-      if (Math.hypot(jx, jz) < 5000 && this.jejuSurface.isRunwaySafetyArea(jx, jz)) return true;
-    }
 
     // 3. Incheon Airport
     if (this.incheonSurface && typeof this.incheonSurface.isRunwaySafetyArea === 'function') {

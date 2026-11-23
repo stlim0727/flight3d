@@ -347,9 +347,12 @@ test('building tiles crossing the Incheon scenery edge wait for their DEM parent
 });
 
 test('refreshes failed imagery and water without rebuilding the terrain tile', async () => {
-  let imageAttempts = 0, waterAttempts = 0;
+  let imageAttempts = 0, waterAttempts = 0, imageryOffline = true;
   const image = { width: 256, height: 256 };
-  const imageryCache = { getTileImage: async () => ++imageAttempts === 1 ? null : image, dispose() {} };
+  const imageryCache = {
+    getTileImage: async () => { imageAttempts += 1; return imageryOffline ? null : image; },
+    dispose() {},
+  };
   const world = new OpenWorldTerrain({ origin, imageryCache });
   const mesh = new Mesh();
   mesh.geometry.setIndex([0, 1, 2]);
@@ -365,17 +368,41 @@ test('refreshes failed imagery and water without rebuilding the terrain tile', a
   assert.equal(entry.baseMap, null);
   assert.equal(entry.water, undefined);
   world.updateTileResources();
-  assert.equal(imageAttempts, 1);
+  assert.equal(imageAttempts, 2, 'z11 and its z10 parent are both attempted before failing');
   assert.equal(waterAttempts, 1);
 
+  imageryOffline = false;
   entry.imageryRetryAt = entry.waterRetryAt = 0;
   world.updateTileResources();
   await Promise.all([world.pendingImagery, world.pendingWater]);
   assert.equal(world.tiles.get(key).mesh, mesh);
   assert.equal(mesh.material.map.image, image);
   assert.equal(entry.water, mask);
-  assert.equal(imageAttempts, 2);
+  assert.equal(imageAttempts, 3);
   assert.equal(waterAttempts, 2);
+  world.dispose();
+});
+
+test('falls back to the z10 parent quadrant when a z11 image is unavailable', async () => {
+  const parentImage = { width: 256, height: 256 };
+  const attempts = [];
+  const imageryCache = {
+    getTileImage: async (z, tx, ty) => {
+      attempts.push([z, tx, ty]);
+      return z === 11 ? null : parentImage;
+    },
+    dispose() {},
+  };
+  const world = new OpenWorldTerrain({ origin, imageryCache });
+  const key = `${x}/${y}`;
+  const entry = { mesh: new Mesh(), baseMap: null, detail: { base: { value: null } } };
+  world.tiles.set(key, entry);
+  await world.loadBaseImagery({ x, y, key }, entry);
+  assert.deepEqual(attempts, [[11, x, y], [10, Math.floor(x / 2), Math.floor(y / 2)]]);
+  assert.equal(entry.baseFromParent, true);
+  assert.deepEqual(entry.baseMap.repeat.toArray(), [0.5, 0.5]);
+  assert.deepEqual(entry.baseMap.offset.toArray(), [(x % 2) * 0.5, y % 2 === 0 ? 0.5 : 0]);
+  assert.equal(entry.mesh.material.map, entry.baseMap);
   world.dispose();
 });
 

@@ -144,8 +144,8 @@ export const AIRPORT_OVERRIDES = {
         { x: 250, y: 36.0, z: 240, height: 20, target: [250, 39.0, 180] },
       ],
     },
-    // Scenario poses in the Jeju region frame (same numbers the legacy
-    // JejuFlightSurface used, now owned by shared declarative airport data).
+    // Scenario poses in the Jeju region frame, now owned by shared
+    // declarative airport data and consumed by the common spawn planner.
     spawn: {
       runwayId: '07/25',
       endId: '07',
