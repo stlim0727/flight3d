@@ -288,3 +288,17 @@ test('loadImageryDetail retains parent tile baseMap when detail sub-tiles fail o
 });
 
 
+test('Chuja strip is exposed for streamed DEM flattening', () => {
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+  });
+  const strip = config.strips[0];
+  const nearest = surface.nearest(strip.center[0], strip.center[1]);
+  assert.ok(nearest, 'auxiliary strip must be registered as a runway descriptor');
+  assert.equal(nearest.hit.distance, 0);
+  assert.equal(nearest.hit.elevationM, 12, 'DEM flattening must use the strip elevation');
+  surface.dispose();
+});
+

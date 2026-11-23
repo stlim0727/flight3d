@@ -346,10 +346,12 @@ export function applyAirportOverrides(airport) {
   const code = airport.ident ?? airport.icao ?? airport.code;
   const overrides = getAirportOverride(code);
   if (!overrides) return airport;
+  const visibleRunways = airport.runways.filter(runway =>
+    !overrides.hideRunways?.some(id => String(id) === String(runway?.id)));
   return {
     ...airport,
     elevationM: finiteOverride(overrides.elevationM) ? overrides.elevationM : airport.elevationM,
-    runways: airport.runways.map(runway => {
+    runways: visibleRunways.map(runway => {
       const endIdents = (runway.ends ?? []).map(end => String(end?.ident));
       const runwayOverride = overrides.runways?.find(entry =>
         String(entry.ident ?? '').split('/').some(ident => endIdents.includes(ident)));

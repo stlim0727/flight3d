@@ -720,3 +720,9 @@ test('rotated facility collider uses the same orientation as its mesh', () => {
   assert.ok(hit, 'collision must follow the rendered rotation');
   result.dispose();
 });
+
+test('hidden RKSI runway is removed from normalized map records', async () => {
+  const { applyAirportOverrides } = await import('../src/config/airportOverrides.js');
+  const record = { ident: 'RKSI', runways: [{ id: '346105', ends: [] }, { id: '237288', ends: [] }] };
+  assert.deepEqual(applyAirportOverrides(record).runways.map(runway => runway.id), ['237288']);
+});

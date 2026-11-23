@@ -256,3 +256,9 @@ test('Incheon preset streams RKSI and hides only duplicate runway meshes', () =>
   assert.equal(taxiway.visible, true, 'taxiways and aprons must remain');
   assert.equal(sim.destinationAirport, 'none');
 }));
+
+test('Jeju approach data keeps both heading and glideslope', async () => {
+  const { APPROACH_DATA } = await import('../src/config/approachData.js');
+  assert.equal(APPROACH_DATA.jeju.headingDeg, 67);
+  assert.equal(APPROACH_DATA.jeju.gsAngleDeg, 3);
+});
