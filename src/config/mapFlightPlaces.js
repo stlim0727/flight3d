@@ -2,6 +2,7 @@
 // Airport rows come from the committed OurAirports index, not hand-authored codes.
 import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
 import { registerExternalDestinations } from './externalDestinations.js';
+import { applyAirportOverrides } from './airportOverrides.js';
 import { REGIONAL_CRUISES } from './regionalCruises.js';
 import { haversineDistanceM, JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
@@ -123,7 +124,7 @@ export function indexedAirportPlace(airport) {
     country: airport.country,
     type: airport.type,
     tileId: airport.tileId,
-    runways: airport.runways ?? [],
+    runways: applyAirportOverrides(airport)?.runways ?? [],
   });
 }
 

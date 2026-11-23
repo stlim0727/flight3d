@@ -82,10 +82,15 @@ export class OpenWorldRegionSurface {
   }
 
   getHeight(x, z) {
-    if (this.fallback?.isOnRunway?.(x, z)) return this.fallback.getHeight(x, z);
     const streamed = this.openWorld?.sampleRaw?.(x, z) ?? this.openWorld?.sample?.(x, z)?.height;
-    if (Number.isFinite(streamed)) return streamed;
-    return this.fallback?.getHeight(x, z) ?? 0;
+    const natural = Number.isFinite(streamed) ? streamed : (this.fallback?.getHeight(x, z) ?? 0);
+    const nearest = this.nearest(x, z);
+    if (nearest && nearest.hit.distance < 240) {
+      const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 40, 240);
+      return THREE.MathUtils.lerp(nearest.hit.elevationM, natural, blend);
+    }
+    if (this.fallback?.isOnRunway?.(x, z)) return this.fallback.getHeight(x, z);
+    return natural;
   }
 
   getNaturalHeight(x, z) {

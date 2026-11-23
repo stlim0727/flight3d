@@ -299,6 +299,15 @@ test('Chuja strip is exposed for streamed DEM flattening', () => {
   assert.ok(nearest, 'auxiliary strip must be registered as a runway descriptor');
   assert.equal(nearest.hit.distance, 0);
   assert.equal(nearest.hit.elevationM, 12, 'DEM flattening must use the strip elevation');
+  surface.openWorld = { sampleRaw: () => 40 };
+  const angle = strip.headingDeg * Math.PI / 180;
+  const sideX = strip.center[0] + Math.cos(angle) * 100;
+  const sideZ = strip.center[1] + Math.sin(angle) * 100;
+  const nearestSide = surface.nearest(sideX, sideZ);
+  const t = Math.min(1, Math.max(0, (nearestSide.hit.distance - 40) / 200));
+  const expected = 12 + (40 - 12) * t * t * (3 - 2 * t);
+  assert.ok(Math.abs(surface.getHeight(sideX, sideZ) - expected) < 1e-6,
+    'contact beside the strip must follow the same grading as rendered DEM');
   surface.dispose();
 });
 
