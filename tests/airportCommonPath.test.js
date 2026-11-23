@@ -673,3 +673,50 @@ test('RKSI override reproduces the surveyed 15R/33L runway geometry', async () =
   const { isExternalDestination } = await import('../src/config/externalDestinations.js');
   assert.equal(isExternalDestination('RKSI'), true);
 });
+
+test('RKSI hides the unmapped 16R/34L runway from the common region', () => {
+  const record = {
+    ident: 'RKSI',
+    latitude: 37.469101,
+    longitude: 126.450996,
+    elevationM: 7.01,
+    runways: [
+      { id: '346105', lengthM: 3750, widthM: 60, ends: [
+        { ident: '16R', physical: { latitude: 37.48, longitude: 126.44, elevationM: 7.01 },
+          threshold: { latitude: 37.48, longitude: 126.44, elevationM: 7.01 } },
+        { ident: '34L', physical: { latitude: 37.45, longitude: 126.46, elevationM: 7.01 },
+          threshold: { latitude: 37.45, longitude: 126.46, elevationM: 7.01 } },
+      ] },
+      { id: '237288', lengthM: 3750, widthM: 60, ends: [
+        { ident: '15R', physical: { latitude: 37.4818, longitude: 126.435997, elevationM: 7.01 },
+          threshold: { latitude: 37.4818, longitude: 126.435997, elevationM: 7.01 } },
+        { ident: '33L', physical: { latitude: 37.4545, longitude: 126.461, elevationM: 7.01 },
+          threshold: { latitude: 37.4545, longitude: 126.461, elevationM: 7.01 } },
+      ] },
+    ],
+  };
+  const descriptors = buildExternalRunwayDescriptors(record, getAirportOverride('RKSI'));
+  assert.deepEqual(descriptors.map(descriptor => descriptor.id), ['237288']);
+});
+
+test('VNLK common region does not duplicate dedicated facilities', () => {
+  assert.equal(getAirportOverride('VNLK').facilities, undefined);
+});
+
+test('rotated facility collider uses the same orientation as its mesh', () => {
+  const descriptor = {
+    id: 'rotated-wall',
+    kind: 'wall',
+    position: [0, 0, 0],
+    size: [40, 10, 20],
+    rotationY: Math.PI / 4,
+    collision: { type: 'box', halfX: 20, halfZ: 10, maxAltitudeM: 20 },
+  };
+  const result = createExternalAirportFacilities([descriptor], 0);
+  const mesh = result.group.children.find(child => child.isMesh);
+  const point = new THREE.Vector3(15, 0, 0).applyEuler(mesh.rotation);
+  assert.equal(result.hasModeledBuilding(point.x, point.z), true);
+  const hit = result.checkCollision([{ pos: new THREE.Vector3(point.x, 5, point.z), radius: 0, desc: 'belly' }]);
+  assert.ok(hit, 'collision must follow the rendered rotation');
+  result.dispose();
+});

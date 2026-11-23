@@ -192,6 +192,12 @@ test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => wi
       update() { calls.push(['update']); },
       regionFor(code) { return code === 'VNLK' ? { airport: {} } : null; },
     },
+    syncLegacyRunwayHandoff() {
+      for (const [code, objects] of Object.entries(this._handedOffRunways ?? {})) {
+        const mounted = Boolean(this.airportStreamer?.regionFor?.(code));
+        for (const object of objects) if (object) object.visible = !mounted;
+      }
+    },
   };
   await createSimulatorScenarioStart(sim).start();
   assert.ok(calls.some(call => call[0] === 'ensure' && call[1] === 'VNLK'),
@@ -233,6 +239,12 @@ test('Incheon preset streams RKSI and hides only duplicate runway meshes', () =>
       statusFor(code) { return { state: 'ready', code }; },
       update() { calls.push(['update']); },
       regionFor(code) { return code === 'RKSI' ? { airport: {} } : null; },
+    },
+    syncLegacyRunwayHandoff() {
+      for (const [code, objects] of Object.entries(this._handedOffRunways ?? {})) {
+        const mounted = Boolean(this.airportStreamer?.regionFor?.(code));
+        for (const object of objects) if (object) object.visible = !mounted;
+      }
     },
   };
   await createSimulatorScenarioStart(sim).start();

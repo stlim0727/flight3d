@@ -7,7 +7,7 @@ import { TileCacheManager } from './TileCacheManager.js';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospatial/TileCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
-import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
+import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { getInsetsForRegion } from '../config/terrainInsets.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 import { EARTH_RADIUS_M } from './AerialPerspective.js';
@@ -213,6 +213,20 @@ function imageryTexture(image, anisotropy = defaultAnisotropy) {
 }
 
 function parentImageryTexture(image, x, y, anisotropy) {
+  const sourceWidth = image?.naturalWidth ?? image?.width;
+  const sourceHeight = image?.naturalHeight ?? image?.height;
+  if (typeof document !== 'undefined' && Number.isFinite(sourceWidth) && Number.isFinite(sourceHeight)
+    && sourceWidth >= 2 && sourceHeight >= 2) {
+    // Crop in pixel space so the base texture keeps identity UVs; the detail
+    // atlas shares vMapUv and must not inherit the parent quadrant transform.
+    const size = Math.min(sourceWidth, sourceHeight) / 2;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    canvas.getContext('2d').drawImage(image, (x % 2) * size, (y % 2) * size, size, size, 0, 0, size, size);
+    return imageryTexture(canvas, anisotropy);
+  }
+  // Node/texture-only fallback where canvas drawing is unavailable.
   const texture = imageryTexture(image, anisotropy);
   texture.repeat.set(0.5, 0.5);
   texture.offset.set((x % 2) * 0.5, (y % 2 === 0) ? 0.5 : 0);
@@ -1269,14 +1283,11 @@ export class OpenWorldTerrain {
   }
 }
 
-const chuja = wgs84ToLocal(CHUJA_EMERGENCY_STRIP.center.latitude, CHUJA_EMERGENCY_STRIP.center.longitude, JEJU_ORIGIN);
+
 const frames = {
   lukla: { origin: luklaGrid.origin },
   incheon: { origin: INCHEON_PATCH.origin, protectedAreas: [[-25000, -25000, 25000, 25000]] },
-  jeju: { origin: JEJU_ORIGIN, protectedAreas: [
-    [-3200, -1500, 3200, 1500],
-    [chuja[0] - 2500, chuja[1] - 2500, chuja[0] + 2500, chuja[1] + 2500],
-  ], insets: getInsetsForRegion('jeju') },
+  jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
 };
 
 function setCorridorStreamersVisible(surface, visible) {

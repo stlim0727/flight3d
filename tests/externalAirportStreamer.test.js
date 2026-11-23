@@ -340,3 +340,14 @@ test('releaseGroundHold clears the previous runway before a new map start', asyn
   assert.equal(await h.streamer.ensure('RKPK'), true);
   assert.equal(h.streamer.statusFor('RKPK').state, 'ready');
 });
+
+test('destination hold overrides frame-loop destination until released', () => {
+  const h = harness();
+  h.streamer.setHome('RKSS');
+  h.streamer.holdDestination('RKSS');
+  h.streamer.update({ x: 0, z: 0, destinationCode: 'RKPC' });
+  assert.equal(h.streamer.status.code, 'RKSS', 'spawn load must not be cancelled by the frame loop');
+  h.streamer.releaseDestinationHold();
+  h.streamer.update({ x: 0, z: 0, destinationCode: 'RKPC' });
+  assert.equal(h.streamer.status.code, 'RKPC', 'chosen destination applies after spawn');
+});

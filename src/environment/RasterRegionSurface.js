@@ -102,7 +102,7 @@ export class RasterRegionSurface {
     this.loadError = null;
     try {
       if (typeof window === 'undefined' || !fetchImpl || !this.demUrl) return;
-      const baseUrl = globalThis.importMetaEnv?.BASE_URL ?? '/';
+      const baseUrl = import.meta.env?.BASE_URL ?? '/';
       const response = await fetchImpl(`${baseUrl}${this.demUrl}`);
       if (!response.ok) throw new Error(`DEM request failed (HTTP ${response.status})`);
       const data = new Float32Array(await response.arrayBuffer());
