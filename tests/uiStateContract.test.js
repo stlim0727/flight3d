@@ -432,6 +432,8 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
     const results = elements.get('lobby-map-results');
     const bookmarks = elements.get('lobby-map-bookmarks');
 
+    assert.equal(results.children.length, 0, 'empty search query must not display false-empty search messages');
+
     search.value = 'jfk';
     search.listeners.input[0]();
     assert.equal(status.textContent, t('lobby.map.search.loading'));
