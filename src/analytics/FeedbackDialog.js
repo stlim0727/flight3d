@@ -79,6 +79,22 @@ const formatClock = seconds => {
 };
 const formatNumber = (value, digits = 0) => Number.isFinite(value) ? value.toFixed(digits) : null;
 const formatBytes = bytes => bytes >= 1024 ? `${Math.round(bytes / 1024)} KB` : `${bytes} B`;
+const formatHeading = value => Number.isFinite(value) ? `${Math.round((value + 360) % 360)}°` : null;
+const formatGeoPosition = value => value && Number.isFinite(value.latitude) && Number.isFinite(value.longitude)
+  ? `${value.latitude.toFixed(5)}, ${value.longitude.toFixed(5)}` : null;
+const summarizeRenderedTiles = value => {
+  if (!value) return null;
+  const parts = [];
+  if (value.corridor) {
+    parts.push(`활성 타일 ${value.corridor.activeTiles ?? 0}`);
+    if (Number.isFinite(value.corridor.estimatedVramMb)) parts.push(`${value.corridor.estimatedVramMb} MB`);
+  }
+  if (value.island) {
+    parts.push(`섬 LOD ${value.island.activeLOD ?? '—'}`);
+    if (Number.isFinite(value.island.zoom)) parts.push(`z${value.island.zoom}`);
+  }
+  return parts.length ? parts.join(' · ') : null;
+};
 
 /**
  * Mount and open the in-game anomaly report dialog.
@@ -102,7 +118,7 @@ export function openFeedbackDialog(sim = null, options = {}) {
     diagnosticsSnapshot = gatherUserFeedbackContext(currentSim);
     fullReportSnapshot = gatherUserFeedbackFullReport(currentSim);
     screenshotSnapshot = captureFeedbackScreenshot(currentSim);
-    resetFormState(feedbackOverlay);
+    resetFormState(feedbackOverlay, screenshotSnapshot);
     renderContext(feedbackOverlay, diagnosticsSnapshot);
     renderFlightLogSummary(feedbackOverlay, diagnosticsSnapshot);
     renderAttachmentOptions(feedbackOverlay, fullReportSnapshot, screenshotSnapshot);
@@ -134,12 +150,12 @@ function closeFeedbackDialog() {
   handler?.();
 }
 
-function resetFormState(overlay) {
+function resetFormState(overlay, screenshot) {
   overlay.querySelector('[data-feedback-category]').value = 'bug';
   overlay.querySelector('[data-feedback-severity]').value = 'major';
   overlay.querySelector('[data-feedback-include-diag]').checked = true;
   overlay.querySelector('[data-feedback-include-full-report]').checked = false;
-  overlay.querySelector('[data-feedback-include-screenshot]').checked = false;
+  overlay.querySelector('[data-feedback-include-screenshot]').checked = Boolean(screenshot);
   overlay.querySelector('[data-feedback-screenshot-preview]').hidden = true;
   overlay.querySelector('[data-feedback-screenshot-preview]').removeAttribute('src');
   overlay.querySelector('[data-feedback-preview-toggle]').setAttribute('aria-expanded', 'false');
@@ -204,6 +220,9 @@ function renderContext(overlay, snapshot) {
   add('현재 G', formatNumber(snapshot.gForce, 2));
   add('고도', Number.isFinite(telemetry.altitudeFt) ? `${Math.round(telemetry.altitudeFt).toLocaleString()} ft` : null);
   add('IAS', Number.isFinite(telemetry.iasKnots) ? `${Math.round(telemetry.iasKnots)} kt` : null);
+  add('방위', formatHeading(snapshot.headingDeg ?? telemetry.headingDeg));
+  add('좌표', formatGeoPosition(snapshot.geoPosition));
+  add('렌더 타일', summarizeRenderedTiles(snapshot.renderedTiles));
   add('최대 G', Number.isFinite(snapshot.peakG) ? `${formatNumber(snapshot.peakG, 1)} @ ${formatClock(snapshot.peakGTimeSec)}` : null);
   if (snapshot.isCrashed) add('상태', '충돌·파손');
   else if (snapshot.gearFailure) add('기어', '고장');
@@ -248,7 +267,7 @@ function createFeedbackOverlay(getSim) {
         <button type="button" class="feedback-close-btn" data-feedback-close aria-label="닫기">×</button>
       </div>
       <p class="feedback-desc">
-        비행 중 이상 동작을 발견한 즉시 기록하세요. 열린 순간의 기체 상태와 비행 로그가 자동으로 첨부됩니다.
+        비행 중 이상 동작을 발견한 즉시 기록하세요. 열린 순간의 화면 스크린샷, 고도·방위·좌표·렌더 타일 정보와 비행 로그가 첨부됩니다.
       </p>
       <div class="feedback-context" data-feedback-context aria-label="현재 비행 상황"></div>
       <form class="feedback-form" data-feedback-form>
@@ -326,7 +345,7 @@ function createFeedbackOverlay(getSim) {
         <p class="feedback-log-summary" data-feedback-full-report-summary></p>
         <label class="feedback-diag-row">
           <input type="checkbox" data-feedback-include-screenshot />
-          <span>현재 화면 스크린샷 함께 첨부</span>
+          <span>현재 화면 스크린샷 첨부 (기본 선택)</span>
         </label>
         <p class="feedback-log-summary" data-feedback-screenshot-summary></p>
         <img class="feedback-screenshot-preview" data-feedback-screenshot-preview alt="제보에 첨부할 현재 화면 스크린샷 미리보기" hidden />

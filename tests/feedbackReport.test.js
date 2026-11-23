@@ -120,6 +120,48 @@ test('snapshot includes held sortie peak, touchdown G, context samples, dynamics
   assert.equal(live.peakG, null, 'new flight must not inherit previous peak');
 });
 
+test('diagnostics include altitude, heading, WGS84 position and rendered tile state', () => {
+  const activeTiles = new Map([
+    ['12/345/678', { imageLoaded: true }],
+    ['12/346/678', { imageLoaded: false }],
+  ]);
+  const corridor = { activeTiles, getMetrics: () => ({ activeTiles: activeTiles.size,
+    tilesLoaded: 2, estimatedVramMb: 0.52 }) };
+  const sim = {
+    activeAirport: 'jeju',
+    position: { x: 120, y: 900, z: -50 },
+    telemetry: { altitudeFt: 2952.8, headingDeg: -30 },
+    flightRecorder: { active: true, elapsed: 3, samples: [], peaks: {} },
+    world: { corridorStreamer: corridor, anchorTerrain: {
+      tileStreamer: { zoom: 11, appliedZoom: 12,
+        getMetrics: () => ({ activeLOD: 'stitched', tilesLoaded: 4 }) },
+      corridorStreamer: corridor,
+    } },
+  };
+  const diagnostics = gatherFeedbackDiagnostics(sim);
+  assert.equal(diagnostics.diagnosticsVersion, 3);
+  assert.equal(diagnostics.altitudeFt, 2952.8);
+  assert.equal(diagnostics.headingDeg, -30);
+  assert.ok(Number.isFinite(diagnostics.geoPosition?.latitude), 'real airport resolves WGS84 latitude');
+  assert.ok(Number.isFinite(diagnostics.geoPosition?.longitude));
+  assert.equal(diagnostics.geoPosition.anchor, 'jeju');
+  assert.equal(diagnostics.renderedTiles.island.zoom, 12);
+  assert.equal(diagnostics.renderedTiles.island.activeLOD, 'stitched');
+  assert.equal(diagnostics.renderedTiles.corridor.activeTiles, 2);
+  assert.deepEqual(diagnostics.renderedTiles.activeTileKeys, ['12/345/678', '12/346/678']);
+  assert.deepEqual(diagnostics.renderedTiles.loadedTileKeys, ['12/345/678']);
+  assert.equal(diagnostics.renderedTiles.truncated, false);
+
+  for (let i = 0; i < 45; i++) activeTiles.set(`12/400/${i}`, { imageLoaded: false });
+  assert.equal(gatherFeedbackDiagnostics(sim).renderedTiles.activeTileKeys.length, 40,
+    'tile keys stay bounded');
+
+  const fictional = gatherFeedbackDiagnostics({ activeAirport: 'coastal',
+    position: { x: 1, y: 2, z: 3 } });
+  assert.equal(fictional.geoPosition, null, 'fictional airports have no WGS84 frame');
+  assert.equal(fictional.renderedTiles, null, 'no streamers means no tile snapshot');
+});
+
 test('report attaches the live sortie flight log with its metadata and touchdown records', () => {
   const samples = Array.from({ length: 25 }, (_, i) => ({ timeSec: i / 5, x: i, z: -i, altitudeFt: 1000 + i,
     iasKnots: 90, gForce: i === 12 ? 4.5 : 1, pitchDeg: 2, rollDeg: 0, headingDeg: 180 }));

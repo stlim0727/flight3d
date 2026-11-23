@@ -1,4 +1,5 @@
 import { createSortie } from '../replay/ReplayStore.js';
+import { worldPositionToWgs84 } from '../geospatial/airportGeodesy.js';
 
 const finite = value => Number.isFinite(value) ? value : null;
 const vector = value => value ? ['x', 'y', 'z'].map(axis => finite(value[axis])) : null;
@@ -13,6 +14,36 @@ const LOG_UNITS = { time: 's', x: 'm', z: 'm', altitude: 'ft MSL', airspeed: 'kt
   gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down',
   impactSpeed: 'kt (world velocity magnitude at collision)' };
 const LOG_COORDINATES = 'Three.js world: +Y up; x/z horizontal; altitudeFt = world Y / 0.3048';
+const MAX_ACTIVE_TILE_KEYS = 40;
+const streamerMetrics = streamer => {
+  if (!streamer || typeof streamer.getMetrics !== 'function') return null;
+  try { return streamer.getMetrics(); } catch { return null; }
+};
+
+/** Imagery actually rendered when the dialog opened, not just the configured zoom. */
+function gatherRenderedTiles(sim) {
+  const terrain = sim?.world?.anchorTerrain ?? sim?.terrain ?? null;
+  const islandStreamer = terrain?.tileStreamer ?? null;
+  const corridorStreamer = sim?.world?.corridorStreamer ?? terrain?.corridorStreamer ?? null;
+  if (!islandStreamer && !corridorStreamer) return null;
+  const island = streamerMetrics(islandStreamer);
+  if (island) {
+    island.zoom = finite(islandStreamer.appliedZoom) ?? finite(islandStreamer.zoom) ?? null;
+  }
+  const active = corridorStreamer?.activeTiles instanceof Map
+    ? [...corridorStreamer.activeTiles.entries()] : [];
+  const keys = active.map(([key]) => key);
+  return {
+    island,
+    corridor: streamerMetrics(corridorStreamer),
+    activeTileCount: active.length,
+    activeTileKeys: keys.slice(0, MAX_ACTIVE_TILE_KEYS),
+    loadedTileKeys: active.filter(([, entry]) => entry?.imageLoaded)
+      .map(([key]) => key).slice(0, MAX_ACTIVE_TILE_KEYS),
+    truncated: keys.length > MAX_ACTIVE_TILE_KEYS,
+  };
+}
+
 const touchdown = value => ({ timeSec: finite(value?.timeSec), sinkRateFpm: finite(value?.sinkRateFpm),
   contactG: finite(value?.contactG) });
 
@@ -111,7 +142,23 @@ export function gatherFeedbackDiagnostics(sim) {
   const peakIndex = samples.findIndex(value => value.timeSec >= peak?.timeSec);
   const pick = keys => Object.fromEntries(keys.map(key => [key, finite(telemetry[key])]));
   const diagnostics = {
-    diagnosticsVersion: 2,
+    altitudeFt: finite(telemetry.altitudeFt),
+    headingDeg: finite(telemetry.headingDeg),
+    geoPosition: (() => {
+      const anchor = held?.metadata?.airport ?? sim.activeAirport ?? null;
+      const x = finite(sim.position?.x);
+      const z = finite(sim.position?.z);
+      if (!anchor || x === null || z === null) return null;
+      try {
+        const position = worldPositionToWgs84(anchor, x, z);
+        return position ? { latitude: finite(position.latitude), longitude: finite(position.longitude), anchor } : null;
+      } catch {
+        return null;
+      }
+    })(),
+    renderedTiles: gatherRenderedTiles(sim),
+    diagnosticsVersion: 3,
+
     flightLog: buildFlightLog(sim),
     aircraft: held?.metadata?.aircraft ?? sim.currentAircraftId ?? null,
     airport: held?.metadata?.airport ?? sim.activeAirport ?? null,

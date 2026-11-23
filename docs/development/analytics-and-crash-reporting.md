@@ -198,14 +198,22 @@ average silently drops the loads this feature was added to capture.
      duration, build and browser/viewport data. A completed debrief's sortie metadata,
      peak and trace take precedence over a different live aircraft. G is simulated CG
      body-normal specific force, not a certified crash or occupant measurement.
+   - A captured JPEG screenshot is attached **by default** when the canvas can be read;
+     the checkbox lets the pilot remove it. The snapshot also carries `altitudeFt`,
+     `headingDeg`, `geoPosition` (WGS84 latitude/longitude, real airports only) and
+     `renderedTiles` (island/corridor streamer metrics plus bounded active and
+     imagery-loaded `zoom/x/y` keys, capped at 40). Fictional arenas have no WGS84
+     frame, and regions without tile streaming report `null`; those fields never
+     invent coordinates or tile IDs.
    - Unchecking diagnostics removes simulator/browser details from both delivery and
      JSON export. The SDK no longer silently adds them back. Export contains no API token.
    - `flightDurationSec` reads `FlightRecorder.elapsed`, not the nonexistent `elapsedSeconds`.
 
 Verification: `node --test tests/analytics.test.js tests/feedbackReport.test.js`.
 `CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-feedback-delivery.mjs`
-checks the 390px simulator dialog, blocked requests, retained text/G snapshot, JSON save,
-and delayed acknowledgement/retry. Add `--live` to submit one clearly labelled synthetic
+checks the 390px simulator dialog, default screenshot attachment, blocked requests,
+retained text/G snapshot, JSON save and delayed acknowledgement/retry.
+Add `--live` to submit one clearly labelled synthetic
 verification report; confirm its exact UUID in PostHog afterward. The script always runs
 hardware-GPU preflight. Chrome mobile emulation is not evidence of native Brave Shields.
 

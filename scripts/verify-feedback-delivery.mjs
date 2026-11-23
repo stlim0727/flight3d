@@ -43,6 +43,8 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
       };
       sim.openFeedbackDialog();
     });
+    assert.equal(await evaluate('document.querySelector("[data-feedback-include-screenshot]").checked'), true,
+      'screenshot is attached by default when the canvas can be captured');
     const cardScroll = () => evaluate("document.querySelector('.feedback-card').scrollTop");
     const touch = (type, y, x = 20) => send('Input.dispatchTouchEvent', {
       type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
@@ -90,6 +92,11 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
     assert.equal(failed.request.touchdowns[0].contactG, 2.9);
     assert.equal(failed.request.flightDurationSec, 120);
     assert.ok(!failed.request.api_key, 'properties contain no API credential');
+    assert.ok(failed.request.screenshot?.startsWith('data:image/jpeg;base64,'), 'default screenshot in report');
+    assert.ok(Number.isFinite(failed.request.altitudeFt), 'altitude in report');
+    assert.ok(Number.isFinite(failed.request.headingDeg), 'heading in report');
+    assert.ok('geoPosition' in failed.request && 'renderedTiles' in failed.request,
+      'geo and tile diagnostics present even when unavailable');
     await screenshot(`${artifacts}/blocked-mobile.png`);
     await evaluate(() => {
       document.querySelector('[data-feedback-close]').click();
@@ -106,6 +113,8 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
     }
     assert.equal(downloaded?.reportId, failed.id, 'actual report JSON downloaded');
     assert.equal(downloaded.properties.peakG, 50.25);
+    assert.ok(downloaded.properties.screenshot?.startsWith('data:image/jpeg;base64,'),
+      'downloaded report keeps the screenshot');
     assert.equal(downloaded.api_key, undefined);
     await evaluate(() => {
       window.feedbackMode = 'waiting';
