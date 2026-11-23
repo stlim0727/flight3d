@@ -1,12 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import { playbackDurations } from '../scripts/record-flight-video.mjs';
 import {
   approachPhase,
   decelerationThrottle,
-  playbackDurations,
   rolloutReason,
   nextRolloutPitch,
-} from '../scripts/record-flight-video.mjs';
+} from '../scripts/lib/recordedSortieController.js';
 
 describe('recorded sortie guards', () => {
   it('does not start final approach while still laterally far from the runway', () => {
