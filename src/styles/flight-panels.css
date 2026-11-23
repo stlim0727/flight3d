@@ -549,6 +549,13 @@ body:not([data-flow="flight"]) #pilotage-map,
 }
 .map-landmark[aria-pressed="true"]::after { background: #943e28; box-shadow: 0 0 0 2px #943e28; }
 .map-landmark:focus-visible { outline: 2px solid #324e50; }
+.map-landmark::before {
+  content: attr(data-caption); position: absolute; left: 20px; top: 50%; transform: translateY(-50%);
+  max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font: 600 12px/1.25 system-ui, sans-serif; color: #263d40;
+  text-shadow: 0 0 3px #fff9e9, 0 0 2px #fff9e9; pointer-events: none;
+}
+.map-landmark[data-left="true"]::before { left: auto; right: 20px; }
 .map-inspector {
   position: absolute; left: .5rem; bottom: 2rem; max-width: calc(100% - 1rem);
   display: flex; align-items: center; flex-wrap: wrap; gap: .35rem; padding: .35rem .5rem;

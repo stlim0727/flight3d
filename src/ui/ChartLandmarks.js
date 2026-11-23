@@ -49,6 +49,7 @@ export class ChartLandmarks {
     this.bridges = bridges;
     const visible = new Set();
     const placed = [];
+    const labels = [];
     const candidates = [this.checkpoint, this.inspected, ...bridges, ...catalog, ...this.streamed];
     for (const place of candidates) {
       if (!place || visible.has(place.id)) continue;
@@ -69,6 +70,14 @@ export class ChartLandmarks {
       button.place = place;
       const name = landmarkName(place, getLanguage());
       button.title = name;
+      const leftward = x > width / 2;
+      const labelWidth = Math.min(96, name.length * 12 + 6);
+      const left = leftward ? x - 8 - labelWidth : x + 8;
+      const right = left + labelWidth;
+      const fits = !labels.some(p => Math.abs(y - p.y) < 17 && left < p.right && right > p.left);
+      button.setAttribute('data-caption', fits ? name : '');
+      button.setAttribute('data-left', String(leftward));
+      if (fits) labels.push({ left, right, y });
       button.setAttribute('aria-label', name);
       button.setAttribute('aria-pressed', String(place.id === this.checkpoint?.id));
       button.style.left = x + 'px';
