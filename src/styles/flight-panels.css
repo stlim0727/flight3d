@@ -535,6 +535,69 @@ body:not([data-flow="flight"]) #pilotage-map,
 }
 .map-paper .map-credit { right: .45rem; bottom: .5rem; font-size: 10px; }
 
+/* Unfold and fold the sheet like a pocket chart folded in thirds and then in
+   half: two vertical panels open one after the other, then the horizontal
+   fold, matching the three snaps of the 0.6 s unfold rustle. Folding runs the
+   same steps backwards in the 0.45 s fold rustle (MAP_FOLD_MS) before the
+   sheet closes. Each keyframe segment eases on its own, so every panel snaps
+   open and settles. `--paper-base` keeps the layout's own placement. */
+#pilotage-map .map-paper {
+  --paper-base: translate(0, 0);
+  transform-origin: 50% 100%;
+}
+#pilotage-map[open] .map-paper {
+  animation: map-unfold 600ms cubic-bezier(.25, .8, .3, 1) backwards;
+}
+#pilotage-map[open].is-folding .map-paper {
+  animation: map-fold 450ms cubic-bezier(.55, 0, .75, .45) forwards;
+}
+/* Faint creases stay on the opened sheet; the panel shading over them fades
+   as the sheet flattens and gathers again as it folds. */
+#pilotage-map .map-paper::before,
+#pilotage-map .map-paper::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+#pilotage-map .map-paper::before {
+  background:
+    linear-gradient(180deg, #0000 calc(50% - 1px), #5b432614 calc(50% - 1px) 50%, #fffaeb24 50% calc(50% + 1px), #0000 0),
+    linear-gradient(90deg, #0000 calc(33.33% - 1px), #5b432614 calc(33.33% - 1px) 33.33%, #fffaeb24 33.33% calc(33.33% + 1px), #0000 0),
+    linear-gradient(90deg, #0000 calc(66.67% - 1px), #5b432614 calc(66.67% - 1px) 66.67%, #fffaeb24 66.67% calc(66.67% + 1px), #0000 0);
+}
+#pilotage-map .map-paper::after {
+  opacity: 0;
+  background:
+    linear-gradient(180deg, #3d2a1426 0 50%, #fff8e614 50%),
+    linear-gradient(90deg, #3d2a1433 0 33.33%, #fff8e61f 33.33% 66.67%, #3d2a1433 66.67%);
+}
+#pilotage-map[open] .map-paper::after { animation: map-crease-settle 600ms ease-out backwards; }
+#pilotage-map[open].is-folding .map-paper::after { animation: map-crease-gather 450ms ease-in forwards; }
+@keyframes map-unfold {
+  0% { opacity: 0; transform: var(--paper-base) perspective(1200px) rotateX(62deg) scale(.3, .5); }
+  12% { opacity: 1; }
+  40% { transform: var(--paper-base) perspective(1200px) rotateX(38deg) scale(.66, .5); }
+  70% { transform: var(--paper-base) perspective(1200px) rotateX(16deg) scale(1, .52); }
+  100% { opacity: 1; transform: var(--paper-base) perspective(1200px) rotateX(0deg) scale(1, 1); }
+}
+@keyframes map-fold {
+  0% { opacity: 1; transform: var(--paper-base) perspective(1200px) rotateX(0deg) scale(1, 1); }
+  35% { transform: var(--paper-base) perspective(1200px) rotateX(16deg) scale(1, .52); }
+  70% { transform: var(--paper-base) perspective(1200px) rotateX(38deg) scale(.66, .5); }
+  88% { opacity: 1; }
+  100% { opacity: 0; transform: var(--paper-base) perspective(1200px) rotateX(62deg) scale(.3, .5); }
+}
+@keyframes map-crease-settle { from { opacity: 1; } to { opacity: 0; } }
+@keyframes map-crease-gather { from { opacity: 0; } to { opacity: 1; } }
+@keyframes map-backdrop-in { from { background-color: transparent; backdrop-filter: blur(0); } }
+@keyframes map-backdrop-out { to { background-color: transparent; backdrop-filter: blur(0); } }
+@media (prefers-reduced-motion: reduce) {
+  #pilotage-map,
+  #pilotage-map .map-paper,
+  #pilotage-map .map-paper::after { animation: none !important; }
+}
+
 body[data-pilotage-layout="cockpit"] #pilotage-map {
   right: 50%;
   transform: translateX(50%);
@@ -553,10 +616,16 @@ body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; hei
     z-index: 999;
     background: rgb(17 25 32 / 23%);
     backdrop-filter: blur(7px);
+    animation: map-backdrop-in 600ms ease-out backwards;
+  }
+  body[data-flow="flight"] #pilotage-map[open].is-folding {
+    animation: map-backdrop-out 450ms ease-in forwards;
   }
   body[data-flow="flight"] #pilotage-map[open] .map-paper {
+    --paper-base: translate(-50%, -50%);
     inset: 50% auto auto 50%;
     transform: translate(-50%, -50%);
+    transform-origin: 50% 50%;
     width: var(--chart-width);
     height: var(--chart-height);
     border-color: #97896d;
@@ -589,6 +658,7 @@ body[data-pilotage-layout="external"] #pilotage-map .map-paper {
   inset: max(3rem, env(safe-area-inset-top)) 0 2.7rem;
   width: auto;
   height: auto;
+  transform-origin: 50% 50%;
 }
 @media (orientation: portrait) {
   body[data-pilotage-layout="external"] #canvas-container { width: 100%; height: 57%; }
