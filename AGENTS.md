@@ -33,6 +33,7 @@ Workflow rules that apply to every agent:
 3. Open a pull request when the work is ready: commit to a focused branch, push, and open a PR — unless the user explicitly requests local-only work.
 4. Multiple agents may work in this repository at the same time. Inspect git status before editing, never assume exclusive access, and leave other agents' and the user's edits untouched.
 5. Avoid running the full test suite (`npm test`) locally when it is long and almost identical to the remote CI test suite. Run focused unit tests (`node --test tests/<name>.test.js`) and fast syntax checks (`npm run check`) locally, then boldly push to let CI test verify it.
+6. After opening or updating a PR, follow the global `~/.agents/PR_FOLLOWTHROUGH.md` loop in the same task: one `npm run pr:arc` call (add `--wait` for in-flight checks) for status, validate and fix actionable feedback, rebase conflicts without clobbering other commits, reproduce CI failures before editing, recheck once, resolve only fixed threads, then `npm run pr:mac` to wait for CI and merge. Never poll `gh pr checks` across turns or merge with failing/pending checks.
 
 - Read the relevant row in [the task map](docs/development/agent-task-map.md).
 - Follow [working rules](docs/development/agent-working-rules.md). Load only
