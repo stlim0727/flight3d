@@ -606,3 +606,34 @@ test('facility collision detection accounts for aircraft probe radius on tower a
 
   facilitiesResult.dispose();
 });
+
+const VNLK_RECORD = {
+  ident: 'VNLK',
+  latitude: 27.686768,
+  longitude: 86.729479,
+  elevationM: 2859.02,
+  runways: [{
+    id: '307899',
+    lengthM: 527,
+    widthM: 29.9,
+    ends: [
+      { ident: '06', physical: { latitude: 27.685678, longitude: 86.727219, elevationM: 2784.04 },
+        threshold: { latitude: 27.685678, longitude: 86.727219, elevationM: 2784.04 } },
+      { ident: '24', physical: { latitude: 27.688025, longitude: 86.731718, elevationM: 2845 },
+        threshold: { latitude: 27.688025, longitude: 86.731718, elevationM: 2845 } },
+    ],
+  }],
+};
+
+test('VNLK override preserves the sloped 06/24 runway grade', () => {
+  const override = getAirportOverride('VNLK');
+  const descriptors = buildExternalRunwayDescriptors(VNLK_RECORD, override);
+  assert.equal(descriptors.length, 1);
+  const ends = descriptors[0].ends;
+  assert.equal(ends.find(end => end.ident === '06').physical.elevationM, 2805);
+  assert.equal(ends.find(end => end.ident === '24').physical.elevationM, 2867);
+
+  const surface = new ExternalAirportSurface({ airport: VNLK_RECORD, overrides: override });
+  assert.ok(Math.abs(surface.getHeight(0, 0) - 2836) < 3, 'runway centre keeps the surveyed grade');
+  assert.ok(surface.isOnRunway(0, 0), 'common surface owns the runway footprint');
+});

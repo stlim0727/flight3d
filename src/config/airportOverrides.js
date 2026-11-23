@@ -208,6 +208,76 @@ export const AIRPORT_OVERRIDES = {
   VNLK: {
     ident: 'VNLK',
     elevationM: 2836.0,
+    // Per-end elevations are kept so the common surface owns the 11.76% grade.
+    runways: [
+      {
+        ident: '06/24',
+        widthM: 30.0,
+        lengthM: 527,
+        ends: [
+          {
+            ident: '06',
+            physical: {
+              latitude: 27.685574417506537,
+              longitude: 86.72718622034465,
+              elevationM: 2805.0,
+            },
+            threshold: {
+              latitude: 27.685574417506537,
+              longitude: 86.72718622034465,
+              elevationM: 2805.0,
+            },
+            displacedThresholdM: 0,
+          },
+          {
+            ident: '24',
+            physical: {
+              latitude: 27.688093945207225,
+              longitude: 86.73171763165944,
+              elevationM: 2867.0,
+            },
+            threshold: {
+              latitude: 27.688093945207225,
+              longitude: 86.73171763165944,
+              elevationM: 2867.0,
+            },
+            displacedThresholdM: 0,
+          },
+        ],
+      },
+    ],
+    facilities: [
+      {
+        id: 'terminal',
+        name: 'Lukla Terminal',
+        kind: 'terminal',
+        position: [76.3, 2844.0, 8.9],
+        size: [44, 24, 24],
+        rotationY: 32 * Math.PI / 180,
+        collision: { type: 'box', halfX: 22, halfZ: 12, maxAltitudeM: 2870 },
+      },
+      {
+        id: 'tower',
+        name: 'Lukla Control Tower',
+        kind: 'tower',
+        position: [83.1, 2855.0, 4.7],
+        height: 16,
+        radius: 4.5,
+        cabHeight: 6,
+        cabRadius: 4.5,
+        shaftRadius: 3.5,
+        collision: { type: 'cylinder', radius: 4.5, maxAltitudeM: 2877 },
+      },
+      {
+        id: 'rw24-wall',
+        name: 'Runway 24 Retaining Wall',
+        kind: 'wall',
+        position: [224.6, 2867.0, -140.4],
+        size: [45, 6, 3.5],
+        rotationY: 58 * Math.PI / 180,
+        collision: { type: 'box', halfX: 22.5, halfZ: 1.75, maxAltitudeM: 2873 },
+      },
+    ],
     spawn: {
       poses: {
         runway: {
