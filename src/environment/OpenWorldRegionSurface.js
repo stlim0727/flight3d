@@ -43,17 +43,54 @@ export class OpenWorldRegionSurface {
       this.mesh.add(mesh);
       return mesh;
     });
+    this.runways = strips.map((strip, index) => {
+      const angle = strip.headingDeg * DEG;
+      const dx = Math.sin(angle) * strip.lengthM / 2;
+      const dz = -Math.cos(angle) * strip.lengthM / 2;
+      return {
+        id: strip.id ?? `strip-${index}`,
+        widthM: strip.widthM,
+        ends: [
+          { physical: { x: strip.center[0] - dx, z: strip.center[1] - dz, elevationM: strip.elevationM } },
+          { physical: { x: strip.center[0] + dx, z: strip.center[1] + dz, elevationM: strip.elevationM } },
+        ],
+      };
+    });
     this.stripMaterial = stripMaterial;
   }
 
   // OpenWorldTerrain derives its precinct localImagery from this geometry.
   get airportGeometry() { return this.geometry; }
 
+  // OpenWorldTerrain uses this to flatten streamed DEM under auxiliary strips.
+  nearest(x, z) {
+    let best = null;
+    for (const runway of this.runways) {
+      const a = runway.ends[0].physical;
+      const b = runway.ends[1].physical;
+      const dx = b.x - a.x;
+      const dz = b.z - a.z;
+      const lengthSquared = dx * dx + dz * dz;
+      if (lengthSquared <= 0) continue;
+      const t = THREE.MathUtils.clamp(((x - a.x) * dx + (z - a.z) * dz) / lengthSquared, 0, 1);
+      const distance = Math.hypot(x - (a.x + t * dx), z - (a.z + t * dz));
+      if (!best || distance < best.hit.distance) {
+        best = { runway, hit: { distance, elevationM: a.elevationM + (b.elevationM - a.elevationM) * t } };
+      }
+    }
+    return best;
+  }
+
   getHeight(x, z) {
-    if (this.fallback?.isOnRunway?.(x, z)) return this.fallback.getHeight(x, z);
     const streamed = this.openWorld?.sampleRaw?.(x, z) ?? this.openWorld?.sample?.(x, z)?.height;
-    if (Number.isFinite(streamed)) return streamed;
-    return this.fallback?.getHeight(x, z) ?? 0;
+    const natural = Number.isFinite(streamed) ? streamed : (this.fallback?.getHeight(x, z) ?? 0);
+    const nearest = this.nearest(x, z);
+    if (nearest && nearest.hit.distance < 240) {
+      const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 40, 240);
+      return THREE.MathUtils.lerp(nearest.hit.elevationM, natural, blend);
+    }
+    if (this.fallback?.isOnRunway?.(x, z)) return this.fallback.getHeight(x, z);
+    return natural;
   }
 
   getNaturalHeight(x, z) {

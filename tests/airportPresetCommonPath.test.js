@@ -256,3 +256,20 @@ test('Incheon preset streams RKSI and hides only duplicate runway meshes', () =>
   assert.equal(taxiway.visible, true, 'taxiways and aprons must remain');
   assert.equal(sim.destinationAirport, 'none');
 }));
+
+test('Jeju approach data keeps both heading and glideslope', async () => {
+  const { APPROACH_DATA } = await import('../src/config/approachData.js');
+  assert.equal(APPROACH_DATA.jeju.headingDeg, 67);
+  assert.equal(APPROACH_DATA.jeju.gsAngleDeg, 3);
+});
+
+test('map catalog excludes hidden RKSI runways', async () => {
+  const { indexedAirportPlace } = await import('../src/config/mapFlightPlaces.js');
+  const place = indexedAirportPlace({
+    ident: 'RKSI',
+    latitude: 37.469101,
+    longitude: 126.450996,
+    runways: [{ id: '346105', ends: [] }, { id: '237288', ends: [] }],
+  });
+  assert.deepEqual(place.runways.map(runway => runway.id), ['237288']);
+});

@@ -127,9 +127,10 @@ function resolveLobbyMapPlan(sim) {
   const [runwayId, endId] = (choice.runwayKey ?? '').split(':');
   const baseOffset = airport ? projectToLocal(airport.latitude, airport.longitude) : [0, 0];
   const anchorBase = BASE_OFFSETS[sim.activeAirport] ?? [0, 0];
-  return resolveMapFlightPlan({
+  const normalized = applyAirportOverrides(airport);
+  const plan = resolveMapFlightPlan({
     state: choice.state,
-    airport: applyAirportOverrides(airport),
+    airport: normalized,
     runwayId,
     endId,
     point,
@@ -137,6 +138,19 @@ function resolveLobbyMapPlan(sim) {
     anchorBase,
     aircraftId: sim.lobby.aircraft ?? sim.currentAircraftId,
   });
+  // A saved selection may name a runway hidden by declarative overrides; use
+  // the first visible runway rather than silently dropping the map spawn.
+  if (!plan && normalized && choice.state !== 'cruise' && (runwayId || endId)) {
+    return resolveMapFlightPlan({
+      state: choice.state,
+      airport: normalized,
+      point,
+      baseOffset,
+      anchorBase,
+      aircraftId: sim.lobby.aircraft ?? sim.currentAircraftId,
+    });
+  }
+  return plan;
 }
 
 async function waitForStreamedAirport(sim, code) {
