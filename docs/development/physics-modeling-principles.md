@@ -38,3 +38,20 @@ When adding or reviewing a physics feature, ask: would removing every
 behavior-switch `if` from the force model change the aircraft's motion? If yes,
 the switch is conditional acting and should be replaced with state-variable
 modeling, or justified as one of the two allowed checks above.
+
+## Airport and environmental surfaces
+
+1. **Continuous contact height.** Terrain contact height (`getHeight(x, z)`) must
+   blend continuously between runway/taxiway pavement, building footprints, and
+   external terrain DEM. Structural footprints (towers, passenger terminals) must
+   maintain their base floor elevation without sinking under external terrain.
+2. **Visual-physical lighting and geometry consistency.**
+   - Reciprocal runway ends reverse approach heading relative to the runway
+     axis. Lateral offsets for approach aids (PAPI, ALS) must scale by the end's
+     relative direction sign (`pilotRight = right * sign`) to keep the pilot-relative
+     side (`left` / `right`) consistent on both ends.
+   - Displaced thresholds separate approach landing limits from pavement rollout:
+     green threshold lights sit at `end.threshold`, while red runway end lights
+     remain at `end.physical`.
+   - Apron light poles must pair visual emissive fixtures with actual `SpotLight`
+     illumination and night-level modulation so parked aircraft and tarmac receive light.

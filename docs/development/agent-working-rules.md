@@ -61,3 +61,9 @@ Adapted from Keepory's CLAUDE.md and docs/development/agent-working-rules.md.
 - Before browser verification, follow [hardware GPU setup](browser-gpu.md).
   Pass its browser/device/renderer/drawing requirements to delegated agents;
   do not infer GPU absence from sandbox visibility or use silent software fallback.
+- For environment structures, buildings, and airport facilities, maintain the **Triple Representation** invariant:
+  1. Visual 3D Mesh (`mesh.position`, `mesh.rotation.y`, dimensions)
+  2. Ground Contact/Terrain Height (`getHeight()` footprint, OBB rotation, base plateau elevation)
+  3. Collision Detection (`checkBuildingCollision()` boundaries, OBB/cylinder, `rotationY`, altitude)
+  Updating one representation (such as adding rotation or flattening terrain) without updating the others causes visual-physical detachment or phantom collisions.
+- When implementing or modifying collision detection handlers (`checkBuildingCollision`), aircraft probes are bounding spheres with non-zero radii (`probe.radius`). Always inflate boundary checks horizontally (`radius + probe.radius`, `halfX + probe.radius`, `halfZ + probe.radius`) and vertically (`minAlt - probe.radius` to `maxAlt + probe.radius`) to properly detect grazing surface collisions.
