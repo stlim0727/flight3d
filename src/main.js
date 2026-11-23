@@ -18,7 +18,6 @@ import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
-import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
 import { PilotPhysiology } from './physics/PilotPhysiology.js';
@@ -27,8 +26,7 @@ import { advancePhysicsFrame, clampFrameDelta } from './core/physicsTiming.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { WaterDitching } from './physics/WaterDitching.js';
-import { AutopilotController } from './physics/Autopilot.js';
-import { solveTrim } from './physics/TrimSolver.js';
+import { createSimulatorAutopilot } from './physics/Autopilot.js';
 import { LoadingPanel } from './ui/LoadingPanel.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
@@ -478,19 +476,9 @@ class FlightSimulator {
       }
     };
 
-    // Autopilot (pure control laws in src/physics/Autopilot.js). The trim
-    // solver runs only on mode/target capture, so its allocation is off the
-    // 120 Hz path.
-    this.autopilot = new AutopilotController({
-      trimSolver: (telemetry, flightPathAngleDeg) => solveTrim(this.aero, this.engines, {
-        iasKnots: telemetry.iasKnots,
-        altitudeMeters: Atmosphere.feetToMeters(telemetry.altitudeFt),
-        flightPathAngleDeg,
-        flapsIndex: this.aero.flapsIndex,
-        gearState: this.telemetry.gearState,
-        spoilers: this.aero.spoilers,
-      }),
-    });
+    // Autopilot owns its trim snapshot and Flight3d's airport/corridor guidance.
+    // The trim solver runs only on mode/target capture, off the 120 Hz path.
+    this.autopilot = createSimulatorAutopilot(this);
     // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
     this._apEuler = new THREE.Euler();
     this._apForward = new THREE.Vector3();
