@@ -30,6 +30,7 @@ export default {
   "demo.f16.gimpo.complete": "Gimpo sortie complete · manual control",
   "demo.f16.gimpo.complete.desc": "Stopped on the streamed Gimpo runway. Choose a preset or camera view to continue.",
   "demo.f16.gimpo.handoff": "Gimpo sortie complete · enjoy your flight",
+  "demo.f16.gimpo.rollout.timeout": "Gimpo sortie stopped · the aircraft did not stop on the runway",
   "demo.sihwa.name": "Sihwa coastal tour",
   "demo.sihwa.briefing": "Start airborne near Sihwa seawall, visit the tidal power station, Dal Observatory and Bangameori Beach, then return for an airborne manual handoff. Speed and turn radius suit each aircraft.",
   "demo.sihwa.complete": "Sihwa tour complete · manual control",

@@ -103,15 +103,19 @@ export class F16GimpoScenario {
   }
 
   terrainAltitude() {
-    const here = corridor.incheonSceneryLocalToWgs84(this.sim.position.x, this.sim.position.z);
-    const along = corridor.projectPointOnRoute(here.latitude, here.longitude).distanceAlongRouteM;
-    const total = corridor.getCorridorDistanceM();
+    // The corridor helper follows Incheon → Jeju, not this north-east sortie.
+    // Sample ahead along the actual bearing to the Gimpo threshold instead.
+    const targetX = this.approach.threshold.x + this.offset[0];
+    const targetZ = this.approach.threshold.z + this.offset[1];
+    const dx = targetX - this.sim.position.x, dz = targetZ - this.sim.position.z;
+    const remaining = Math.hypot(dx, dz) || 1;
+    const ux = dx / remaining, uz = dz / remaining;
     let cmd = ALT_M;
     const surface = this.sim.currentTerrain;
     for (const ahead of [0, 500, 1500, 3000, 6000, 12000, 20000]) {
-      const r = corridor.interpolateRoute(clamp((along + ahead) / total, 0, 1));
-      const [x, z] = corridor.wgs84ToIncheonSceneryLocal(r.latitude, r.longitude);
-      const ground = surface?.getHeight?.(x, z) ?? 0;
+      const distance = Math.min(ahead, remaining);
+      const ground = surface?.getHeight?.(this.sim.position.x + ux * distance,
+        this.sim.position.z + uz * distance) ?? 0;
       if (Number.isFinite(ground)) cmd = Math.max(cmd, ground + CLEARANCE_M);
     }
     return cmd;
@@ -315,13 +319,18 @@ export class F16GimpoScenario {
       case STAGES.ROLLOUT: {
         if (tel.groundSpeedKnots > 30) this.steerRunway();
         else sim.controls.setVirtualInput('aileron', 0);
-        this.rolloutPitchDeg = nextRolloutPitch(this.rolloutPitchDeg, 0.05);
+        this.rolloutPitchDeg = nextRolloutPitch(this.rolloutPitchDeg, dt);
         flyVerticalPath(sim, 0, 0, tel, 0, this.rolloutPitchDeg);
         sim.controls.setVirtualInput('throttle', 0);
         sim.controls.setVirtualInput('brakes', 1);
         sim.aero.spoilers = 1;
-        if (tel.groundSpeedKnots < 8 || sim.totalSimTime - this.rolloutStart > 40) {
+        const onRunway = sim.currentAirport?.isOnRunway?.(sim.position.x, sim.position.z) ?? true;
+        if (tel.onGround && onRunway && tel.groundSpeedKnots < 8) {
           this.director.setStage(STAGES.COMPLETED);
+        } else if (sim.totalSimTime - this.rolloutStart > 40) {
+          this.result.status = 'failed';
+          this.result.reason = 'rollout-timeout';
+          this.director.stop(() => t('demo.f16.gimpo.rollout.timeout'), true);
         }
         break;
       }
@@ -338,6 +347,10 @@ export class F16GimpoScenario {
   }
 
   stop() {
+    // CLIMB engaged HDG/ALT/SPD; a handoff must not leave the integrator
+    // applying those commands after the director releases the controls.
+    this.sim.autopilot?.disengage?.();
+    this.sim.controls?.clearVirtualInputs?.();
     if (['running', 'pending'].includes(this.result.status)) this.result.status = 'cancelled';
   }
 }

@@ -30,6 +30,7 @@ export default {
   "demo.f16.gimpo.complete": "김포 비행 완료 · 수동 조종으로 인계합니다",
   "demo.f16.gimpo.complete.desc": "스트리밍 김포 활주로에 정지했습니다. 프리셋이나 카메라를 선택해 계속하세요.",
   "demo.f16.gimpo.handoff": "김포 비행 완료 · 자유 비행을 즐기세요",
+  "demo.f16.gimpo.rollout.timeout": "김포 비행 중단 · 활주로에서 정지하지 못했습니다",
   "demo.sihwa.name": "시화 해안 둘러보기",
   "demo.sihwa.briefing": "시화방조제 인근 상공에서 시작해 조력발전소·달전망대·방아머리해변을 둘러보고 수동 조종으로 인계합니다. 기종별 속도와 선회 반경을 적용합니다.",
   "demo.sihwa.complete": "시화 해안 관광 완료 · 수동 조종으로 인계합니다",

@@ -33,6 +33,7 @@ function createSim(region = runwayRegion()) {
       gearState: 1, touchdown: false },
     totalSimTime: 0, isCrashed: false, crashResult: null,
     currentTerrain: { getHeight: () => 10 },
+    currentAirport: { isOnRunway: () => true },
     cameraSystem: { mode: 0, setMode(mode) { this.mode = mode; } },
     controls: {
       setVirtualInput(k, v) { assert.ok(Number.isFinite(v), `${k} is finite`); inputs[k] = v; },
@@ -134,5 +135,60 @@ describe('F-16 Incheon → Gimpo demo', () => {
     assert.equal(director.currentStage, F16GimpoScenario.STAGES.COMPLETED);
     assert.equal(scenario.result.status, 'completed');
     assert.equal(stopCalls(), 1);
+  });
+});
+
+describe('F-16 Gimpo demo review fixes', () => {
+  it('samples terrain along the Gimpo bearing, not the Jeju corridor', () => {
+    const { sim, scenario } = createHarness(F16GimpoScenario.STAGES.ENROUTE);
+    sim.position.set(OFFSET[0], 10, OFFSET[1] + THRESHOLD.z);
+    sim.currentTerrain.getHeight = x => (x >= OFFSET[0] + 50 ? 500 : 0);
+    assert.equal(scenario.terrainAltitude(), 560);
+  });
+
+  it('uses the supplied dt for rollout pitch decay', () => {
+    const { sim, scenario } = createHarness(F16GimpoScenario.STAGES.ROLLOUT);
+    sim.telemetry.groundSpeedKnots = 100;
+    sim.totalSimTime = 5;
+    scenario.rolloutPitchDeg = 10;
+    scenario.update(0.1);
+    assert.ok(Math.abs(scenario.rolloutPitchDeg - 9.7) < 1e-9, `pitch ${scenario.rolloutPitchDeg}`);
+  });
+
+  it('reports a rollout timeout instead of a completed landing', () => {
+    const { sim, director, scenario, stopCalls } = createHarness(F16GimpoScenario.STAGES.ROLLOUT);
+    sim.telemetry.onGround = true;
+    sim.telemetry.groundSpeedKnots = 30;
+    sim.totalSimTime = 50;
+    scenario.update(0.05);
+    assert.equal(director.currentStage, F16GimpoScenario.STAGES.ROLLOUT);
+    assert.equal(scenario.result.status, 'failed');
+    assert.equal(scenario.result.reason, 'rollout-timeout');
+    assert.equal(stopCalls(), 1);
+  });
+
+  it('only completes when stopped on the runway', () => {
+    const { sim, director, scenario } = createHarness(F16GimpoScenario.STAGES.ROLLOUT);
+    sim.telemetry.groundSpeedKnots = 7;
+    sim.telemetry.onGround = false;
+    scenario.update(0.05);
+    assert.equal(director.currentStage, F16GimpoScenario.STAGES.ROLLOUT);
+    sim.telemetry.onGround = true;
+    sim.currentAirport.isOnRunway = () => false;
+    scenario.update(0.05);
+    assert.equal(director.currentStage, F16GimpoScenario.STAGES.ROLLOUT);
+    sim.currentAirport.isOnRunway = () => true;
+    scenario.update(0.05);
+    assert.equal(director.currentStage, F16GimpoScenario.STAGES.COMPLETED);
+  });
+
+  it('disengages the autopilot when the demo stops', () => {
+    const sim = createSim();
+    const director = new DemoFlightDirector(sim);
+    director.start('incheon', 'gimpo-sortie');
+    sim.autopilot.master = true;
+    director.stop();
+    assert.equal(sim.autopilot.master, false);
+    assert.equal(director.f16GimpoScenario.result.status, 'cancelled');
   });
 });
