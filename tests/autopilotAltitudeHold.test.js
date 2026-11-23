@@ -6,6 +6,7 @@ import { createHeadlessSimulation } from '../src/core/HeadlessSimulation.js';
 import {
   createSimulatorAutopilot,
   elevatorFeedforwardRelativeToTrim,
+  elevatorGainScale,
 } from '../src/physics/Autopilot.js';
 
 const DT = 1 / 120;
@@ -17,6 +18,22 @@ function trimmedCruise(aircraftId) {
   sim._apForward = new THREE.Vector3();
   sim._apState = {};
   sim.autopilot = createSimulatorAutopilot(sim);
+  for (let step = 0; step < 120; step++) sim.integratePhysics(DT);
+  return sim;
+}
+
+function fastLowF16() {
+  const sim = createHeadlessSimulation({ aircraftId: 'F16', airportId: 'coastal' });
+  sim.setPreset('cruise');
+  sim._apEuler = new THREE.Euler();
+  sim._apForward = new THREE.Vector3();
+  sim._apState = {};
+  sim.autopilot = createSimulatorAutopilot(sim);
+  sim.position.y = 200;
+  sim.linearVelocity.set(0, 0, -Atmosphere.knotsToMs(450));
+  sim.quaternion.setFromEuler(new THREE.Euler(0, 0, 0, 'YXZ'));
+  sim.applyComputedTrim();
+  sim.engines.settleSpool();
   for (let step = 0; step < 120; step++) sim.integratePhysics(DT);
   return sim;
 }
@@ -94,5 +111,42 @@ describe('production autopilot altitude hold', () => {
       `altitude ${altitudeFt(sim).toFixed(1)} ft vs ${targetAlt.toFixed(1)} ft`);
     assert.ok(Math.abs(sim.autopilot._speedIntegral) < 10,
       `speed integral ${sim.autopilot._speedIntegral.toFixed(1)} kt·s`);
+  });
+
+  it('schedules elevator gain down as dynamic pressure rises', () => {
+    const low = elevatorGainScale({ tasKnots: 220, altitudeFt: 0 });
+    const high = elevatorGainScale({ tasKnots: 450, altitudeFt: 656 });
+    assert.ok(low > 0.95, `low-speed gain ${low}`);
+    assert.ok(high >= 0.2 && high <= 0.3, `high-speed gain ${high}`);
+  });
+
+  it('does not excite a short-period G oscillation at 450 kt and 200 m', () => {
+    const sim = fastLowF16();
+    sim.autopilot.engage('ALT', sim.readAutopilotState());
+    sim.autopilot.engage('SPD', sim.readAutopilotState());
+    sim.autopilot.targets.altitudeFt = 200 / 0.3048;
+    sim.autopilot.targets.iasKnots = 450;
+    sim.autopilot.refreshTrim(sim.readAutopilotState());
+
+    const gs = [];
+    const vsis = [];
+    const elevators = [];
+    const altitudes = [];
+    for (let step = 0; step < 120 / DT; step++) {
+      sim.integratePhysics(DT);
+      if (step >= 40 / DT) {
+        gs.push(sim.telemetry.gForce);
+        vsis.push(sim.telemetry.vsiFpm);
+        elevators.push(sim.autopilot.output.elevator);
+        altitudes.push(altitudeFt(sim));
+      }
+    }
+    const range = xs => Math.max(...xs) - Math.min(...xs);
+    assert.ok(Math.min(...gs) > 0.8 && Math.max(...gs) < 2, `G range ${range(gs).toFixed(2)}`);
+    assert.ok(range(vsis) < 300, `VSI range ${range(vsis).toFixed(0)} fpm`);
+    assert.ok(range(elevators) < 0.1, `elevator range ${range(elevators).toFixed(3)}`);
+    const meanAlt = altitudes.reduce((a, b) => a + b, 0) / altitudes.length;
+    assert.ok(Math.abs(meanAlt - 200 / 0.3048) < 120,
+      `mean altitude ${meanAlt.toFixed(0)} ft`);
   });
 });

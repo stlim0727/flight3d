@@ -6,7 +6,7 @@ import { EngineModel } from '../src/physics/EngineModel.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
 import { solveTrim } from '../src/physics/TrimSolver.js';
 import { BOEING_737_800, CESSNA_172, F16_FALCON } from '../src/config/aircraftConfigs.js';
-import { AutopilotController } from '../src/physics/Autopilot.js';
+import { AutopilotController, elevatorGainScale } from '../src/physics/Autopilot.js';
 
 function trimmedAero() {
   return { aero: new Aerodynamics(), engines: new EngineModel() };
@@ -282,8 +282,10 @@ describe('AutopilotController trim feedforward', () => {
     assert.equal(cmd.elevator, 0.18);
     // Off-nominal state adds the proportional term on top of the feedforward:
     // 100 ft above the captured altitude commands nose-down.
-    const drifted = ap.update({ ...cruise, altitudeFt: 33100 }, 1 / 120);
-    assert.equal(drifted.elevator, 0.18 - 100 * ap.elevatorPerFtAlt);
+    const driftedState = { ...cruise, altitudeFt: 33100 };
+    const drifted = ap.update(driftedState, 1 / 120);
+    assert.ok(Math.abs(drifted.elevator -
+      (0.18 - 100 * ap.elevatorPerFtAlt * elevatorGainScale(driftedState))) < 1e-9);
   });
 
   it('SPD capture jumps to the trim throttle once, then integrates error', () => {
