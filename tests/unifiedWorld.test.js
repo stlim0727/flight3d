@@ -605,6 +605,15 @@ test('custom tangent-plane origin isolates distant global flights from built-in 
   assert.ok(Math.abs(jfkWgs.latitude - jfk.latitude) < 1e-6, 'JFK does not fold across Incheon horizon');
   assert.ok(Math.abs(jfkWgs.longitude - jfk.longitude) < 1e-6);
 
+  const toIncheon = world.destinationInfo(0, 0, 'incheon');
+  assert.equal(toIncheon.synthetic, false);
+  assert.ok(toIncheon.distanceM > 10_000_000, 'JFK -> Incheon distance is >10,000 km');
+  assert.ok(Math.abs(Math.hypot(toIncheon.dx, toIncheon.dz) - toIncheon.distanceM) < 1,
+    'destination marker vector matches great-circle distance under custom origin');
+  const markerBearing = (Math.atan2(toIncheon.dx, -toIncheon.dz) * 180 / Math.PI + 360) % 360;
+  assert.ok(Math.abs(markerBearing - toIncheon.bearingDeg) < 1e-6,
+    'destination marker vector aligns with great-circle bearing under custom origin');
+
   const dyn = fakeRegion(4, [0, 0]);
   dyn.airport.checkBuildingCollision = () => ({ point: new THREE.Vector3(0, 10, 0), part: 'JFK Terminal' });
   world.registerDynamic('KJFK', { ...dyn, baseOffset: [0, 0] });

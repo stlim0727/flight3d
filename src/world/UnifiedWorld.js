@@ -375,18 +375,26 @@ export class UnifiedWorld {
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
     const synthetic = !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
-    const authoredThreshold = APPROACH_DATA[id]?.threshold;
-    const markerLocal = synthetic || !authoredThreshold
-      ? null
-      : [target[0] - anchor[0] + authoredThreshold.x, target[1] - anchor[1] + authoredThreshold.z];
-    const dx = markerLocal ? markerLocal[0] - x : centreDx;
-    const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic
       ? planarDistanceM
       : haversineDistanceM(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
     const bearingDeg = synthetic
       ? (Math.atan2(centreDx, -centreDz) * 180 / Math.PI + 360) % 360
       : initialBearingDeg(from.latitude, from.longitude, threshold.latitude, threshold.longitude);
+    const authoredThreshold = APPROACH_DATA[id]?.threshold;
+    const markerLocal = synthetic || !authoredThreshold || this.customOrigin
+      ? null
+      : [target[0] - anchor[0] + authoredThreshold.x, target[1] - anchor[1] + authoredThreshold.z];
+    let dx;
+    let dz;
+    if (this.customOrigin && !synthetic) {
+      const bearingRad = bearingDeg * Math.PI / 180;
+      dx = Math.sin(bearingRad) * distanceM;
+      dz = -Math.cos(bearingRad) * distanceM;
+    } else {
+      dx = markerLocal ? markerLocal[0] - x : centreDx;
+      dz = markerLocal ? markerLocal[1] - z : centreDz;
+    }
     return {
       id,
       code: REGION_CODES[id],
