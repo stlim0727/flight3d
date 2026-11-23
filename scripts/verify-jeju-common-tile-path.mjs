@@ -169,6 +169,8 @@ const rkpcEntry = {
 };
 rkpcEntry.detail.map.value = rkpcEntry.baseMap;
 openWorld.tiles.set('1743/821', rkpcEntry);
+// Register wanted level to ensure request is tracked and failure/retry logic triggers
+openWorld.detailWanted.set('1743/821', 13);
 
 // Enable error injection
 injectTileError = true;
@@ -180,22 +182,25 @@ console.log(`  • Detail Level after failure: Zoom ${rkpcEntry.detailLevel}`);
 console.log(`  • detailMap retained as parent baseMap: ${rkpcEntry.detail.map.value === rkpcEntry.baseMap}`);
 assert.equal(rkpcEntry.detailLevel, 11, 'Detail level must remain at parent Zoom 11 upon sub-tile failure');
 assert.equal(rkpcEntry.detail.map.value, rkpcEntry.baseMap, 'Must keep parent baseMap active on error');
+assert.ok(rkpcEntry.detailRetryAt > performance.now(), 'Retry delay must be scheduled on sub-tile load failure');
 console.log('  ✔ Parent baseMap retained seamlessly without black tile or visual glitch');
+console.log('  ✔ Retry backoff successfully scheduled after network failure');
 
-// 5. Performance and Benchmark Metrics
-console.log('\n📊 5. Performance & Resource Budget Metrics:');
+// 5. Performance and Benchmark Metrics (CPU LOD Selection Microbenchmark)
+console.log('\n📊 5. CPU LOD Detail Selection Microbenchmark:');
 frameTimesMs.sort((a, b) => a - b);
 const p50 = frameTimesMs[Math.floor(frameTimesMs.length * 0.5)];
 const p95 = frameTimesMs[Math.floor(frameTimesMs.length * 0.95)];
 const maxFrame = frameTimesMs[frameTimesMs.length - 1];
 
-console.log(`  • Average Frame Processing Time: ${(frameTimesMs.reduce((a, b) => a + b, 0) / frameTimesMs.length).toFixed(2)} ms`);
-console.log(`  • P50 Processing Time: ${p50.toFixed(2)} ms`);
-console.log(`  • P95 Processing Time: ${p95.toFixed(2)} ms (Budget: < 25.0 ms)`);
-console.log(`  • Max Processing Time: ${maxFrame.toFixed(2)} ms`);
+console.log(`  • Average Step CPU Overhead: ${(frameTimesMs.reduce((a, b) => a + b, 0) / frameTimesMs.length).toFixed(2)} ms`);
+console.log(`  • P50 Step CPU Overhead: ${p50.toFixed(2)} ms`);
+console.log(`  • P95 Step CPU Overhead: ${p95.toFixed(2)} ms (Microbenchmark budget: < 25.0 ms)`);
+console.log(`  • Max Step CPU Overhead: ${maxFrame.toFixed(2)} ms`);
 
-assert.ok(p95 < 25.0, `P95 frame time must be under 25ms, got ${p95.toFixed(2)}ms`);
-console.log('  ✔ P95 processing time strictly satisfies 60 FPS real-time simulation budget');
+assert.ok(p95 < 25.0, `P95 CPU LOD selection time must be under 25ms, got ${p95.toFixed(2)}ms`);
+console.log('  ✔ P95 CPU LOD selection & elevation query overhead satisfies CPU step budget');
+console.log('  ℹ Note: Full WebGL tile geometry generation, texture upload, and GPU draw calls are validated via browser acceptance and GPU flight tests (npm run test:flight:visual).');
 
 // Clean disposal
 openWorld.dispose();
