@@ -4,6 +4,7 @@ import {
   approachPhase,
   decelerationThrottle,
   playbackDurations,
+  rolloutReason,
 } from '../scripts/record-flight-video.mjs';
 
 describe('recorded sortie guards', () => {
@@ -37,5 +38,11 @@ describe('recorded sortie guards', () => {
   it('applies playback speed only to encode durations', () => {
     assert.deepEqual(playbackDurations([0, 100, 250], 1), [100, 150, 150]);
     assert.deepEqual(playbackDurations([0, 100, 250], 3), [100 / 3, 50, 50]);
+  });
+
+  it('does not report a fast rollout timeout as a successful landing', () => {
+    assert.equal(rolloutReason(100, 42), 'rollout-timeout');
+    assert.equal(rolloutReason(5, 42), 'landed');
+    assert.equal(rolloutReason(100, 10), null);
   });
 });

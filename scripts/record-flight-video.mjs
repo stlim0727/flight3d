@@ -35,6 +35,13 @@ export function decelerationThrottle({ iasKnots, targetIasKnots, gearDown = fals
   return clamp(computed, gearDown ? 0.15 : 0.1, 0.8);
 }
 
+/** Stop reason for rollout: only low ground speed counts as a landing. */
+export function rolloutReason(groundSpeedKnots, elapsedSeconds) {
+  if (groundSpeedKnots < 8) return 'landed';
+  if (elapsedSeconds > 40) return 'rollout-timeout';
+  return null;
+}
+
 /** Concat durations in ms. Dividing by speed here is the whole playback change. */
 export function playbackDurations(frameTimesMs, speed = 1) {
   if (!(speed > 0)) throw new RangeError('speed must be positive');
@@ -89,6 +96,7 @@ export function buildControllerSource() {
     const clamp = ${clamp.toString()};
     const approachPhase = ${approachPhase.toString()};
     const decelerationThrottle = ${decelerationThrottle.toString()};
+    const rolloutReason = ${rolloutReason.toString()};
     return (async () => {
       const [
         { flyBank, flyVerticalPath },
@@ -227,7 +235,7 @@ export function buildControllerSource() {
         const dev = deviation();
         const courseErr = wrap(apData.headingDeg - s.telemetry.headingDeg) -
           clamp(dev.crossTrackM * 0.05, -25, 25);
-        flyBank(s, clamp(s.telemetry.rollDeg + courseErr, -35, 35), s.telemetry);
+        flyBank(s, clamp(courseErr * 1.2, -30, 30), s.telemetry);
       };
       const finalApproach = () => {
         if (apEngaged) { s.autopilot.disengage(); apEngaged = false; s.controls.clearVirtualInputs(); }
@@ -263,7 +271,8 @@ export function buildControllerSource() {
         s.controls.setVirtualInput('throttle', 0);
         s.controls.setVirtualInput('brakes', 1);
         s.aero.spoilers = 1;
-        if (s.telemetry.groundSpeedKnots < 8 || s.totalSimTime - rolloutStart > 40) finish('landed');
+        const reason = rolloutReason(s.telemetry.groundSpeedKnots, s.totalSimTime - rolloutStart);
+        if (reason) finish(reason);
       };
       setInterval(() => {
         ticks++;
