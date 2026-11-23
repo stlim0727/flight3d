@@ -105,9 +105,13 @@ try {
     } else if (process.env.CHECK_COCKPIT_BAKE) {
       await evaluate(`(async () => {
         sim.cameraSystem.setMode(0);
-        await sim.cockpitInteriorStatus();
+        const deadline = performance.now() + 30000;
+        while (sim.cockpitInteriorStatus() === 'loading' && performance.now() < deadline) {
+          await new Promise(r => setTimeout(r, 100));
+        }
       })()`);
-      const bakeStatus = await evaluate('({ bake: sim.aircraft.cockpit?.lightingBakeStatus, coverage: sim.aircraft.cockpit?.lightTransfer?.coverage })');
+      const bakeStatus = await evaluate('({ status: sim.cockpitInteriorStatus(), bake: sim.aircraft.cockpit?.lightingBakeStatus, coverage: sim.aircraft.cockpit?.lightTransfer?.coverage })');
+      assert.equal(bakeStatus.status, 'ready');
       assert.equal(bakeStatus.bake, 'ready');
       assert.equal(bakeStatus.coverage, 1);
     }
