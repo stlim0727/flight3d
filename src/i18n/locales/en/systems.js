@@ -92,6 +92,7 @@ export default {
   "notice.cockpit.loading": "Loading cockpit interior…",
   "notice.cockpit.unavailable": "Cockpit interior unavailable — showing exterior view",
   "notice.lights": "Lights: {state}",
+  "notice.mapUnavailable": "No map for this flight · Sound on/off is Shift+M",
   "notice.time": "Time of day: {time}",
   "notice.hotasConnected": "Controller connected: {name}",
   "notice.hotasDisconnected": "Controller disconnected: {name}",

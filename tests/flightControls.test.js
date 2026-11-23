@@ -325,7 +325,7 @@ it('aircraftControlsDisabled blocks airplane controls while permitting camera, l
     assert.strictEqual(cameraCycled, 1);
     controls.handleKeyDown({ code: 'Digit3' });
     assert.strictEqual(cameraSelected, 2);
-    controls.handleKeyDown({ code: 'KeyM' });
+    controls.handleKeyDown({ code: 'KeyM', shiftKey: true });
     assert.strictEqual(audioToggled, 1);
     controls.handleKeyDown({ code: 'KeyL' });
     assert.strictEqual(lightsToggled, 1);
@@ -409,6 +409,32 @@ it('keeps the aircraft neutral while the joystick check dialog samples HOTAS inp
     assert.strictEqual(controls.hotasBrakes, 0.0, 'Aircraft must not consume diagnostic brakes');
     assert.strictEqual(controls.throttle, 0.0, 'Diagnostic mode must not command aircraft throttle');
     assert.strictEqual(controls.brakes, 0.0, 'Brakes must stay released');
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
+it('M toggles the pilotage map and Shift+M toggles sound, once per press', () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = { addEventListener() {} };
+  try {
+    const controls = new FlightControls({ addEventListener() {} });
+    let map = 0, sound = 0;
+    controls.onToggleMap = () => map++;
+    controls.onToggleAudio = () => sound++;
+    controls.handleKeyDown({ code: 'KeyM' });
+    assert.deepStrictEqual([map, sound], [1, 0]);
+    controls.handleKeyDown({ code: 'KeyM', shiftKey: true });
+    assert.deepStrictEqual([map, sound], [1, 1]);
+    controls.handleKeyDown({ code: 'KeyM', repeat: true });
+    controls.handleKeyDown({ code: 'KeyM', ctrlKey: true });
+    controls.handleKeyDown({ code: 'KeyM', target: { closest: sel => sel.includes('input') ? {} : null } });
+    assert.deepStrictEqual([map, sound], [1, 1], 'held key, browser combos and typing do not toggle');
+    controls.setAircraftControlsDisabled(true);
+    controls.handleKeyDown({ code: 'KeyM' });
+    controls.handleKeyDown({ code: 'KeyM', shiftKey: true });
+    assert.deepStrictEqual([map, sound], [2, 2], 'both stay available during the demo');
   } finally {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;

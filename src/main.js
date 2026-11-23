@@ -299,6 +299,7 @@ class FlightSimulator {
     this.inputCoordinator.bindFlightPanels({
       controls: this.controls,
       aero: this.aero,
+      audio: this.audio,
       isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
@@ -685,6 +686,7 @@ class FlightSimulator {
     const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
     this.syncAudioPause();
     document.body.dataset.flow = state;
+    if (state !== FLOW.FLIGHT && this.pilotageLayout) this.setPilotageLayout('');
     if (state === FLOW.FLIGHT) {
       collapseMapAttribution();
       if (this.touchControls?.gyroRequested && !this.touchControls.gyroActive && !this.demoDirector?.isActive) {
@@ -1662,7 +1664,7 @@ class FlightSimulator {
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
     this.landmarkPins ??= new LandmarkPins(document.getElementById('landmark-pins'));
-    this.landmarkPins.update(this, this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight && !this.isCrashed);
+    this.landmarkPins.update(this, this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight && !this.isCrashed && !this.pilotageFlight);
     this.touchControls.updateUI();
     this.diagnostics.update(frameDelta, this.telemetry);
     this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);
