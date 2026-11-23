@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Vector3, Vector4 } from 'three';
-import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
+import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Texture, Vector3, Vector4 } from 'three';
+import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
+import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
+import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
 const origin = { latitude: 37.55, longitude: 126.98 };
 const x = 1746, y = 793;
@@ -138,10 +140,10 @@ test('prioritizes visible imagery at cruise altitude and fades back to the base 
   const behind = new Mesh(new BoxGeometry(4000, 100, 4000));
   behind.position.z = 10000;
   const detail = { map: { value: detailMap }, blend: { value: 0 } };
-  world.tiles.set(key, { mesh: front, baseMap, detailMap, detail, detailLevel: 13, detailUpdatedAt: 0 });
+  world.tiles.set(key, { mesh: front, baseMap, detailMap, detail, detailLevel: 14, detailUpdatedAt: 0 });
   world.tiles.set(`${x + 1}/${y}`, { mesh: behind });
   world.updateImageryDetail(camera, 1080, 350);
-  assert.equal(world.detailWanted.get(key), 13);
+  assert.equal(world.detailWanted.get(key), 14);
   assert.equal(world.detailWanted.has(`${x + 1}/${y}`), false);
   assert.equal(detail.blend.value, 1);
   camera.lookAt(0, 4000, 10000);
@@ -160,7 +162,10 @@ test('prioritizes visible imagery at cruise altitude and fades back to the base 
 });
 
 test('holds the high-detail slot when straight flight changes tile ranking', () => {
-  const world = new OpenWorldTerrain({ origin });
+  const world = new OpenWorldTerrain({
+    origin,
+    imageryBudget: { detailTileLimit: 4, highDetailTileLimit: 1, ultraDetailTileLimit: 0 },
+  });
   const camera = new PerspectiveCamera(55, 2, 1, 100000);
   camera.position.set(0, 4000, 0);
   camera.lookAt(0, 4000, -10000);
@@ -186,6 +191,44 @@ test('holds the high-detail slot when straight flight changes tile ranking', () 
   world.updateImageryDetail(camera, 1080, 1500);
   assert.equal(world.detailWanted.get('first'), undefined);
   assert.equal(world.detailWanted.get('next'), 13);
+  world.dispose();
+});
+
+test('scales multi-tile z13/z14 detail budget and anisotropy with render quality', () => {
+  const world = new OpenWorldTerrain({ origin });
+  const camera = new PerspectiveCamera(55, 2, 1, 100000);
+  camera.position.set(0, 2000, 0);
+  camera.lookAt(0, 0, -12000);
+  const near = new Mesh(new BoxGeometry(9000, 100, 9000));
+  const midA = new Mesh(new BoxGeometry(8000, 100, 8000));
+  const midB = new Mesh(new BoxGeometry(8000, 100, 8000));
+  near.position.set(0, 0, -7000);
+  midA.position.set(-6000, 0, -15000);
+  midB.position.set(6000, 0, -15000);
+  world.tiles.set('near', { mesh: near });
+  world.tiles.set('midA', { mesh: midA });
+  world.tiles.set('midB', { mesh: midB });
+
+  world.setImageryQuality('balanced', 16);
+  assert.equal(world.imageryBudget.anisotropy, 8);
+  world.updateImageryDetail(camera, 1080, 200);
+  assert.equal(world.detailWanted.get('near'), 14);
+  assert.equal(world.detailWanted.get('midA'), 13);
+  assert.equal(world.detailWanted.get('midB'), 13);
+
+  // Lowering quality while tiles remain visible must immediately reconcile retained selections.
+  world.setImageryQuality('performance', 4);
+  assert.equal(world.imageryBudget.anisotropy, 4);
+  world.updateImageryDetail(camera, 1080, 500);
+  assert.equal(world.detailWanted.get('near'), 13);
+  assert.equal(world.detailWanted.get('midA'), 12);
+  assert.equal(world.detailWanted.get('midB'), 12);
+
+  world.setImageryQuality('ultraLow', 16);
+  assert.equal(world.imageryBudget.anisotropy, 2);
+  world.updateImageryDetail(camera, 1080, 800);
+  assert.equal(world.detailWanted.size, 2);
+  assert.ok([...world.detailWanted.values()].every(level => level === 12));
   world.dispose();
 });
 
@@ -304,9 +347,12 @@ test('building tiles crossing the Incheon scenery edge wait for their DEM parent
 });
 
 test('refreshes failed imagery and water without rebuilding the terrain tile', async () => {
-  let imageAttempts = 0, waterAttempts = 0;
+  let imageAttempts = 0, waterAttempts = 0, imageryOffline = true;
   const image = { width: 256, height: 256 };
-  const imageryCache = { getTileImage: async () => ++imageAttempts === 1 ? null : image, dispose() {} };
+  const imageryCache = {
+    getTileImage: async () => { imageAttempts += 1; return imageryOffline ? null : image; },
+    dispose() {},
+  };
   const world = new OpenWorldTerrain({ origin, imageryCache });
   const mesh = new Mesh();
   mesh.geometry.setIndex([0, 1, 2]);
@@ -322,17 +368,41 @@ test('refreshes failed imagery and water without rebuilding the terrain tile', a
   assert.equal(entry.baseMap, null);
   assert.equal(entry.water, undefined);
   world.updateTileResources();
-  assert.equal(imageAttempts, 1);
+  assert.equal(imageAttempts, 2, 'z11 and its z10 parent are both attempted before failing');
   assert.equal(waterAttempts, 1);
 
+  imageryOffline = false;
   entry.imageryRetryAt = entry.waterRetryAt = 0;
   world.updateTileResources();
   await Promise.all([world.pendingImagery, world.pendingWater]);
   assert.equal(world.tiles.get(key).mesh, mesh);
   assert.equal(mesh.material.map.image, image);
   assert.equal(entry.water, mask);
-  assert.equal(imageAttempts, 2);
+  assert.equal(imageAttempts, 3);
   assert.equal(waterAttempts, 2);
+  world.dispose();
+});
+
+test('falls back to the z10 parent quadrant when a z11 image is unavailable', async () => {
+  const parentImage = { width: 256, height: 256 };
+  const attempts = [];
+  const imageryCache = {
+    getTileImage: async (z, tx, ty) => {
+      attempts.push([z, tx, ty]);
+      return z === 11 ? null : parentImage;
+    },
+    dispose() {},
+  };
+  const world = new OpenWorldTerrain({ origin, imageryCache });
+  const key = `${x}/${y}`;
+  const entry = { mesh: new Mesh(), baseMap: null, detail: { base: { value: null } } };
+  world.tiles.set(key, entry);
+  await world.loadBaseImagery({ x, y, key }, entry);
+  assert.deepEqual(attempts, [[11, x, y], [10, Math.floor(x / 2), Math.floor(y / 2)]]);
+  assert.equal(entry.baseFromParent, true);
+  assert.deepEqual(entry.baseMap.repeat.toArray(), [0.5, 0.5]);
+  assert.deepEqual(entry.baseMap.offset.toArray(), [(x % 2) * 0.5, y % 2 === 0 ? 0.5 : 0]);
+  assert.equal(entry.mesh.material.map, entry.baseMap);
   world.dispose();
 });
 
@@ -434,3 +504,306 @@ test('streamed edge follows local mesh breakpoints and collision samples the sti
   localGeometry.dispose();
   world.dispose();
 });
+
+test('open-world terrain suppresses Jeju corridor streamer across unified world regions', () => {
+  const world = new UnifiedWorld('incheon');
+  const incheonMesh = new Group();
+  const incheonTerrain = { mesh: incheonMesh, size: 12000 };
+  const corridorGroup = new Group();
+  const jejuTerrain = { mesh: new Group(), corridorStreamer: { group: corridorGroup } };
+  let receivedHasOpenWorld = null;
+  const jejuAirport = {
+    terrain: jejuTerrain,
+    corridorStreamer: jejuTerrain.corridorStreamer,
+    update(_dt, _pos, _time, options) {
+      receivedHasOpenWorld = options.hasOpenWorld;
+    },
+  };
+  world.register('incheon', { terrain: incheonTerrain, airport: null, mesh: incheonMesh, extent: REGION_EXTENTS.incheon });
+  world.register('jeju', { terrain: jejuTerrain, airport: jejuAirport, mesh: jejuTerrain.mesh, extent: REGION_EXTENTS.jeju });
+
+  const sim = {
+    activeAirport: 'incheon',
+    currentTerrain: world,
+    position: new Vector3(238900, 1200, 252400),
+    linearVelocity: new Vector3(100, 0, -40),
+    camera: new PerspectiveCamera(58, 16 / 9, 0.08, 45000),
+  };
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, false, 'non-anchor Jeju corridorStreamer must be hidden while OpenWorldTerrain is active');
+
+  const facade = createWorldAirportFacade(world, null);
+  facade.update(0.016, sim.position, 0, {});
+  assert.equal(receivedHasOpenWorld, true, 'WorldAirportFacade must inform mounted airports that OpenWorldTerrain is active');
+
+  sim.activeAirport = 'coastal';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored when OpenWorldTerrain is disposed');
+  facade.update(0.016, sim.position, 0, {});
+  assert.equal(receivedHasOpenWorld, false);
+
+  // Also restore when PresetSpawner.syncUnifiedWorld() disposes openWorld and clears openWorldSurface before updateOpenWorldTerrain()
+  sim.activeAirport = 'incheon';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, false);
+  incheonTerrain.openWorld.dispose();
+  incheonTerrain.openWorld = null;
+  sim.openWorldSurface = null;
+  sim.activeAirport = 'coastal';
+  updateOpenWorldTerrain(sim);
+  assert.equal(corridorGroup.visible, true, 'corridorStreamer visibility is restored even after external openWorld disposal on anchor switch');
+});
+
+test('OpenWorldTerrain blends vertices near registered external airport runways', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const fakeWorld = {
+    regions: new Map([
+      ['RKPK', {
+        extent: { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 },
+        terrain: {
+          runways: [{ id: '18R' }],
+          nearest(lx, lz) {
+            return {
+              hit: {
+                distance: Math.hypot(lx, lz),
+                elevationM: 4.0,
+              },
+            };
+          },
+        },
+      }],
+    ]),
+    offsets: new Map([['RKPK', [0, 0]]]),
+  };
+  const raster = flat(25);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(raster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const tile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(tile);
+  const sampled = openWorld.sample(0, 0);
+  assert.ok(sampled);
+  assert.ok(sampled.height < 10, `Height at airport centre should be close to runway elevation: got ${sampled.height}`);
+  const raw = openWorld.sampleRaw(0, 0);
+  assert.equal(Math.round(raw), 25, 'sampleRaw must return the unblended DEM height');
+  openWorld.dispose();
+});
+
+test('invalidateArea retains existing tiles until reload finishes without gap', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  let allowDelay = false;
+  let resolveGate;
+  const gate = new Promise(resolve => { resolveGate = resolve; });
+  openWorld.raster = () => {
+    if (allowDelay) {
+      return gate.then(() => raster);
+    }
+    return Promise.resolve(raster);
+  };
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const initialTile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(initialTile);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), true);
+  assert.equal(openWorld.readyAt(0, 0), true);
+
+  allowDelay = true;
+  openWorld.invalidateArea([-1000, -1000, 1000, 1000]);
+
+  // While reloading in background, tile remains accessible and rendered
+  assert.equal(openWorld.tiles.get(`${x}/${y}`), initialTile);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), true);
+  assert.equal(openWorld.readyAt(0, 0), true);
+  assert.equal(openWorld.sample(0, 0)?.height, 50);
+
+  // Complete reload
+  resolveGate();
+  await new Promise(resolve => setTimeout(resolve, 20));
+  const newTile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(newTile && newTile !== initialTile);
+  assert.equal(openWorld.group.children.includes(newTile.mesh), true);
+  assert.equal(openWorld.group.children.includes(initialTile.mesh), false);
+
+  openWorld.dispose();
+});
+
+test('sampleRaw matches triangle interpolation on rawHeight matching mesh vertices', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const slopeRaster = new Float32Array(256 * 256);
+  for (let r = 0; r < 256; r++) {
+    for (let c = 0; c < 256; c++) {
+      slopeRaster[r * 256 + c] = 100 + r * 0.5 + c * 0.25;
+    }
+  }
+  const fakeWorld = {
+    regions: new Map([
+      ['RKPK', {
+        extent: { minX: -5000, maxX: 5000, minZ: -5000, maxZ: 5000 },
+        terrain: {
+          runways: [{ id: '18R' }],
+          nearest() {
+            return { hit: { distance: 0, elevationM: 10 } };
+          },
+        },
+      }],
+    ]),
+    offsets: new Map([['RKPK', [0, 0]]]),
+  };
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(slopeRaster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const tile = openWorld.tiles.get(`${x}/${y}`);
+  assert.ok(tile.fullGeometry.attributes.rawHeight, 'rawHeight attribute must be populated on geometry');
+
+  const blended = openWorld.sample(0, 0);
+  assert.equal(blended.height, 10);
+
+  const raw = openWorld.sampleRaw(0, 0);
+  assert.equal(Math.round(raw), 196);
+
+  openWorld.dispose();
+});
+
+test('reloaded tile preserves transferred detail imagery timestamp without NaN blend', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  openWorld.raster = () => Promise.resolve(raster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const entry = openWorld.tiles.get(`${x}/${y}`);
+  const texture = new Texture();
+  entry.detailMap = texture;
+  entry.detailLevel = 13;
+  entry.detail.map.value = texture;
+  entry.detail.blend.value = 0.5;
+  entry.detailUpdatedAt = 1000;
+
+  // Invalidate to reload
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+  const reloaded = openWorld.tiles.get(`${x}/${y}`);
+  assert.equal(reloaded.detailMap, texture);
+  assert.equal(reloaded.detailUpdatedAt, 1000);
+
+  // updateImageryDetail should advance blend without NaN
+  const camera = new PerspectiveCamera(60, 1, 0.1, 1000);
+  openWorld.detailWanted.set(`${x}/${y}`, 13);
+  openWorld.updateImageryDetail(camera, 1080, 1500);
+  assert.equal(Number.isFinite(reloaded.detail.blend.value), true);
+  assert.ok(reloaded.detail.blend.value > 0.5);
+
+  openWorld.dispose();
+});
+
+test('aborted load finally does not remove newer pending controller for same tile', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  let resolveFirst, resolveSecond;
+  const unblockFirst = new Promise(resolve => { resolveFirst = resolve; });
+  const unblockSecond = new Promise(resolve => { resolveSecond = resolve; });
+  let phase = 1;
+  openWorld.raster = () => {
+    if (phase === 1) return unblockFirst.then(() => raster);
+    if (phase === 2) return unblockSecond.then(() => raster);
+    return Promise.resolve(raster);
+  };
+  openWorld.fetchWater = () => Promise.resolve(null);
+
+  // Start first load (blocked on unblockFirst)
+  const firstPromise = openWorld.load({ x, y, key: `${x}/${y}` });
+  const firstController = openWorld.pending.get(`${x}/${y}`);
+  assert.ok(firstController);
+
+  // Start second load for same key (which aborts first and sets second controller, blocked on unblockSecond)
+  phase = 2;
+  const secondPromise = openWorld.load({ x, y, key: `${x}/${y}` });
+  const secondController = openWorld.pending.get(`${x}/${y}`);
+  assert.ok(secondController && secondController !== firstController);
+
+  // Allow first to unblock and run its finally block
+  resolveFirst();
+  await firstPromise;
+
+  // The second controller must NOT have been deleted from pending by first's finally
+  assert.equal(openWorld.pending.get(`${x}/${y}`), secondController);
+
+  // Allow second to complete
+  resolveSecond();
+  await secondPromise;
+  assert.equal(openWorld.pending.has(`${x}/${y}`), false);
+
+  openWorld.dispose();
+});
+
+test('OpenWorldTerrain jeju frame protects only the airport precinct, leaving Hallasan and island terrain open', () => {
+  const terrain = { mesh: new Group() };
+  const sim = {
+    activeAirport: 'jeju',
+    currentTerrain: terrain,
+    renderQuality: 'medium',
+    position: new Vector3(3741.4, 3048, 16591.7),
+    linearVelocity: new Vector3(0, 0, 100),
+    camera: new PerspectiveCamera(58, 16 / 9, 0.08, 45000),
+    world: null,
+  };
+  updateOpenWorldTerrain(sim);
+
+  const openWorld = terrain.openWorld;
+  assert.ok(openWorld, 'openWorld must be mounted on jeju terrain');
+
+  // RKPC Runway precinct (0, 0) is protected
+  assert.equal(openWorld.protects(0, 0), true, 'RKPC airport precinct must be protected');
+  assert.equal(openWorld.protects(-1463, 621), true, 'Runway 07 threshold must be protected');
+
+  // Mount Hallasan (3741.4, 16591.7) must NOT be protected
+  assert.equal(openWorld.protects(3741.4, 16591.7), false, 'Mount Hallasan must NOT be protected; open-world streams it');
+
+  // Coastal waters and island perimeter must NOT be protected
+  assert.equal(openWorld.protects(20000, 20000), false, 'East island slopes must be open to streaming');
+  assert.equal(openWorld.protects(-20000, 10000), false, 'West island slopes must be open to streaming');
+
+  openWorld.dispose();
+});
+

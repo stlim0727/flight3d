@@ -10,9 +10,11 @@ export class WingCameraMode {
     camera.position.copy(eyeWorld);
     const upWorld = new THREE.Vector3(0, 1, 0).applyQuaternion(aircraftMesh.quaternion);
     camera.up.copy(upWorld);
+    const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
+    const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
     const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
-    lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), cs.wingLookYaw);
-    lookLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), cs.wingLookPitch);
+    lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), cs.wingLookYaw + headYaw);
+    lookLocal.applyAxisAngle(new THREE.Vector3(1, 0, 0), cs.wingLookPitch + headPitch);
     const lookWorld = eyeWorld.clone().add(lookLocal.applyQuaternion(aircraftMesh.quaternion));
     camera.lookAt(lookWorld);
   }
@@ -30,8 +32,10 @@ export class WingCameraMode {
 
     const cursorWingYaw = cs.enableCursorTrack ? (-cs.cursorNormX * 0.16) : 0;
     const cursorWingPitch = cs.enableCursorTrack ? (-cs.cursorNormY * 0.12) : 0;
-    const totalWingYaw = cs.wingLookYaw + cursorWingYaw;
-    const totalWingPitch = cs.wingLookPitch + cursorWingPitch;
+    const headYaw = cs.headLookActive ? cs.headLookYaw : 0;
+    const headPitch = cs.headLookActive ? cs.headLookPitch : 0;
+    const totalWingYaw = cs.wingLookYaw + cursorWingYaw + headYaw;
+    const totalWingPitch = cs.wingLookPitch + cursorWingPitch + headPitch;
 
     const lookLocal = new THREE.Vector3(-15.0, -1.2, -4.0);
     lookLocal.applyAxisAngle(new THREE.Vector3(0, 1, 0), totalWingYaw);

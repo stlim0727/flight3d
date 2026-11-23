@@ -63,16 +63,16 @@ const data = () => tileData({
   land_cover: [{ properties: { class: 'forest' }, points: square.map(([x, y]) => [x + 1000, y]) }],
 });
 
-test('streams park and forest polygons but not commercial land use', () => {
+test('streams urban park polygons while leaving broad forest cover to satellite imagery', () => {
   const geometry = buildGeographicGreenTile(data(), tile, project, terrain);
   assert.ok(geometry);
-  assert.ok(geometry.attributes.position.count >= 8);
+  assert.ok(geometry.attributes.position.count >= 4);
   const first = geometry.attributes.color;
   const expected = new THREE.Color(0x4a7a3a);
   assert.ok(Math.abs(first.getX(0) - expected.r) < 1e-6);
   assert.equal(first.count, geometry.attributes.position.count, 'one color per vertex, not per triangle index');
   const forest = new THREE.Color(0x3f6a33);
-  assert.ok([...Array(first.count).keys()].some(i => Math.abs(first.getX(i) - forest.r) < 1e-6));
+  assert.equal([...Array(first.count).keys()].some(i => Math.abs(first.getX(i) - forest.r) < 1e-6), false);
   geometry.dispose();
   assert.equal(buildGeographicGreenTile(data(), tile, project, { ...terrain, isWater: () => true }), null);
 });

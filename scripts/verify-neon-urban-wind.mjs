@@ -66,7 +66,8 @@ const HELPERS = async () => {
     async start(aircraft, airport, preset) {
       s.demoDirector.stop(); s.replayDirector.stop(); s.gameFlow.returnToLobby(true);
       document.getElementById(`lobby-aircraft-${aircraft}`).click();
-      document.getElementById(`lobby-airport-${airport}`).click();
+      const placeId = { incheon: 'RKSI', jeju: 'RKPC' }[airport] ?? airport;
+      document.querySelector(`#lobby-map-default-bookmarks [data-place-id="${placeId}"]`)?.click();
       document.getElementById(`lobby-preset-${preset}`).click();
       document.getElementById('btn-fly').click();
       for (let i = 0; i < 3600 && (s.startingFlight || !document.getElementById('startup-overlay').hidden); i++) {

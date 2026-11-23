@@ -8,7 +8,7 @@ test('URL overrides saved selection, preserving omitted fields', () => {
   assert.deepEqual(resolveFlightUrl('?scenario=runway', saved), { ...saved, scenario: 'runway' });
 });
 test('invalid values and unsupported combinations resolve safely', () => {
-  assert.deepEqual(resolveFlightUrl('?aircraft=no&terrain=no&scenario=no', saved), { airport: 'coastal', aircraft: 'B738', scenario: 'runway' });
+  assert.deepEqual(resolveFlightUrl('?aircraft=no&terrain=no&scenario=no', saved), { airport: 'incheon', aircraft: 'B738', scenario: 'runway' });
   // The retired Hangang region links to the Neon Metropolis bridge flight (#551).
   assert.deepEqual(resolveFlightUrl('?terrain=hangang&aircraft=F16&scenario=demo', saved), { airport: 'neon', aircraft: 'C172', scenario: 'bridge' });
   assert.deepEqual(resolveFlightUrl('?terrain=neon&aircraft=B738&scenario=bridge', saved), { airport: 'neon', aircraft: 'C172', scenario: 'bridge' });

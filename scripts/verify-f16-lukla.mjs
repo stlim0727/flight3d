@@ -51,7 +51,7 @@ try {
   assert.ok(await evaluate('Boolean(window.simulator?.startupReady)'), 'startup ready');
   await evaluate(`(() => {
     const s=window.simulator; s.demoDirector.stop(); s.gameFlow.isPhysicsFrozen=()=>true;
-    document.getElementById('lobby-airport-lukla')?.click();
+    document.querySelector('#lobby-map-default-bookmarks [data-place-id="lukla"]')?.click();
     s.setAirport('lukla'); s.setAircraft('F16'); s.lobby.aircraft='F16';
     s.lobby.preset='demo'; s.lobby.demoProfile=${JSON.stringify(profile)}; s.gameFlow.enterFlight();
   })()`);

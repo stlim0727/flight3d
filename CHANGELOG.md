@@ -1,6 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(demo):** add the F-16 Incheon → Gimpo sortie demo
+  - Selecting the F-16 at Incheon now offers a second cinematic demo: runway takeoff, a heading-led transit to the streamed RKSS airport, RW14R interception, a 3° final and a braked rollout with manual handover on the runway.
+  - The demo owns its destination: it mounts and reads the streamed Gimpo runway before releasing the takeoff, so no lobby destination choice is required. Stage captions are available in English and Korean.
+  - Registered in the demo sweep route table and covered by `tests/f16GimpoDemo.test.js`; the hardware-GPU sweep verifies staged flight, landing and parked handoff.
+- **feat(record):** record an F-16 Incheon → Gimpo sortie as an mp4
+  - `scripts/record-flight-video.mjs --destination rkss` targets the streamed RKSS runway using its indexed threshold and course, with a hardware Vulkan Chrome screencast encoded by ffmpeg. `--destination jeju` keeps the existing Incheon → Jeju flight and output name.
+  - The flight-persona anomaly evaluator now samples the recorded sortie; anomalies and a flight summary are saved with the controller log in `<output>.frames/flight-report.json`.
+  - Covered by `tests/recordFlightVideo.test.js` and the hardware-GPU `--controller-check --destination rkss` phase gates.
+- **feat(camera):** add opt-in webcam head look for mobile and desktop
+  - A new head-tracking panel requests the front camera on click, detects a face with locally hosted MediaPipe assets, and drives a dedicated yaw/pitch channel in cockpit, wing and gear views.
+  - Explicit mouse/touch look keeps precedence over head look, and the tracking assets load only when the feature is enabled. Reset zeroes at the current head position; Calibrate uses recent head movement as the full look range.
+  - MediaPipe assets are served from `public/mediapipe` with the Apache-2.0 licence in `public/licenses/mediapipe-LICENSE.txt`.
 - **feat(landmarks):** automatically discover, rank, and display major landmarks from Overture Maps
   - `GeographicLandmarks` and `src/geospatial/overtureLandmarks.js` automatically extract cities, districts, airports, bridges, towers, peaks, national parks, large campuses, and tall non-residential buildings from streamed Overture Maps PMTiles (`divisions` z9–z10, `base` z11/z13 with camera look-ahead, and shared `GeographicGreenSpace` / `GeographicBuildings` tiles) without requiring manual per-place configuration.
   - `nearestLandmarks()` now ranks candidates by prominence-weighted priority (`landmarkPriorityScore`) and resolves dynamic terrain-relative heights (`resolveLandmarkHeight`), while `dedupeLandmarks()` collapses duplicate names/Wikidata IDs and `LandmarkPins` adds `city`, `bridge`, `park`, and `water` pin icons.

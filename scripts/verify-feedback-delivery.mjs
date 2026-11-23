@@ -43,6 +43,8 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
       };
       sim.openFeedbackDialog();
     });
+    assert.equal(await evaluate('document.querySelector("[data-feedback-include-screenshot]").checked'), true,
+      'screenshot is attached by default when the canvas can be captured');
     const cardScroll = () => evaluate("document.querySelector('.feedback-card').scrollTop");
     const touch = (type, y, x = 20) => send('Input.dispatchTouchEvent', {
       type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }],
@@ -90,6 +92,11 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
     assert.equal(failed.request.touchdowns[0].contactG, 2.9);
     assert.equal(failed.request.flightDurationSec, 120);
     assert.ok(!failed.request.api_key, 'properties contain no API credential');
+    assert.ok(failed.request.screenshot?.startsWith('data:image/jpeg;base64,'), 'default screenshot in report');
+    assert.ok(Number.isFinite(failed.request.altitudeFt), 'altitude in report');
+    assert.ok(Number.isFinite(failed.request.headingDeg), 'heading in report');
+    assert.ok('geoPosition' in failed.request && 'renderedTiles' in failed.request,
+      'geo and tile diagnostics present even when unavailable');
     await screenshot(`${artifacts}/blocked-mobile.png`);
     await evaluate(() => {
       document.querySelector('[data-feedback-close]').click();
@@ -101,12 +108,15 @@ await withBrowserSession({ path: '/?telemetry=0', width: 390, height: 844, mobil
     await evaluate(() => document.querySelector('[data-feedback-download]').click());
     let downloaded;
     for (let i = 0; i < 40; i++) {
-      try { downloaded = JSON.parse(await readFile(`${artifacts}/flight3d-report-${failed.id}.json`, 'utf8')); break; }
-      catch { await delay(50); }
+      try {
+        downloaded = await readFile(`${artifacts}/flight3d-report-${failed.id}.zip`);
+        if (downloaded.length > 0) break;
+      } catch { await delay(50); }
     }
-    assert.equal(downloaded?.reportId, failed.id, 'actual report JSON downloaded');
-    assert.equal(downloaded.properties.peakG, 50.25);
-    assert.equal(downloaded.api_key, undefined);
+    assert.ok(downloaded?.length, 'actual report archive downloaded');
+    assert.equal(downloaded.subarray(0, 4).toString('hex'), '504b0304', 'ZIP local header');
+    assert.ok(downloaded.includes(Buffer.from('report.json')), 'archive contains report.json');
+    assert.ok(downloaded.includes(Buffer.from('screenshot.jpg')), 'archive contains screenshot.jpg');
     await evaluate(() => {
       window.feedbackMode = 'waiting';
       document.querySelector('[data-feedback-form]').requestSubmit();

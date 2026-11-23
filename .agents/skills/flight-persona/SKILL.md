@@ -58,6 +58,35 @@ refuses to sample when `detectGpuAngle()` is not `vulkan`, or when the page repo
 software/unknown renderer. Software rendering needs explicit task approval and is enabled
 only with `PERSONA_ALLOW_SOFTWARE_GPU=1`, which also records the limitation in the report.
 
+## Recorded sortie (mp4)
+
+When the ask is a **video of a flown sortie** rather than free exploration, use
+`scripts/record-flight-video.mjs`; it owns Vite, hardware-Vulkan Chrome, the GPU
+preflight, CDP screencast frames and ffmpeg encoding.
+
+```sh
+node scripts/record-flight-video.mjs --dry-run
+node scripts/record-flight-video.mjs --controller-check
+node scripts/record-flight-video.mjs --speed 1 --output ~/fff/sortie.mp4
+```
+
+- `--dry-run` checks pure helpers; `--controller-check` is also mandatory before
+  a long take. It boots hardware Chrome, installs the controller from
+  `scripts/lib/recordedSortieController.js` directly (no `Runtime.evaluate`
+  source string), forces `enroute → intercept → final → flare → rollout`, and
+  asserts AP modes, targets, gear and virtual inputs.
+- The simulation always runs at 1×. Playback speed is an encode-time choice:
+  `--speed 1` (default) or `--speed 3`. Never accelerate the sim clock to fake
+  video speed.
+- Use absolute distance to the threshold **and** a cross-track gate for the
+  final-approach switch. Along-course distance alone can trigger final while
+  the aircraft is still kilometres off the localizer.
+- Keep thrust up while decelerating with gear down; `flyVerticalPath`'s
+  proportional throttle goes idle when IAS is far above target and causes a
+  sink.
+- Report crashes honestly in the final answer and keep the frame/report
+  artifacts. Do not re-fly unless the user asks.
+
 ## How I play
 
 I run the **`src/persona/flight_persona.js`** persona (imported by the game in browser context) and let it **freely explore**:

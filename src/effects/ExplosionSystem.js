@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
+import { createEffectAtlas, createFlipbookMaterial, effectAtlasFromData, updateFlipbook } from './EffectFlipbook.js';
 
 // Idle flash lights stay visible at zero intensity. Three includes the visible
 // point-light count in every material program key, so hiding them on impact
@@ -8,7 +8,7 @@ const FLASH_LIGHT_POOL_SIZE = 1;
 
 // Bounded impact particles: ballistic spray, surface foam, dust and short-lived heat.
 export class ExplosionSystem {
-  constructor(scene, terrain = null) {
+  constructor(scene, terrain = null, options = {}) {
     this.scene = scene;
     this.terrain = terrain;
 
@@ -31,12 +31,30 @@ export class ExplosionSystem {
     this.lightPool = [];
     this.initLightPool();
 
-    // Procedural Particle Textures
-    this.fireTexture = createEffectAtlas('fire');
-    this.smokeTexture = createEffectAtlas('smoke');
-    this.waterTexture = createEffectAtlas('water');
-    this.dustTexture = createEffectAtlas('tire');
-    this.sparkTexture = this.createSparkTexture();
+    this.fireTexture = null;
+    this.smokeTexture = null;
+    this.waterTexture = null;
+    this.dustTexture = null;
+    this.sparkTexture = null;
+    if (!options.deferTextures) {
+      this.ensureTextures();
+    }
+  }
+
+  ensureTextures() {
+    this.fireTexture ??= createEffectAtlas('fire');
+    this.smokeTexture ??= createEffectAtlas('smoke');
+    this.waterTexture ??= createEffectAtlas('water');
+    this.dustTexture ??= createEffectAtlas('tire');
+    this.sparkTexture ??= this.createSparkTexture();
+  }
+
+  applyAtlasBuffers(buffers = {}) {
+    if (!this.fireTexture && buffers.fire) this.fireTexture = effectAtlasFromData('fire', buffers.fire);
+    if (!this.smokeTexture && buffers.smoke) this.smokeTexture = effectAtlasFromData('smoke', buffers.smoke);
+    if (!this.waterTexture && buffers.water) this.waterTexture = effectAtlasFromData('water', buffers.water);
+    if (!this.dustTexture && buffers.tire) this.dustTexture = effectAtlasFromData('tire', buffers.tire);
+    this.sparkTexture ??= this.createSparkTexture();
   }
 
   createSparkTexture() {
@@ -82,6 +100,7 @@ export class ExplosionSystem {
    */
   createShaderWarmupRoot() {
     if (this.shaderWarmupRoot) return this.shaderWarmupRoot;
+    this.ensureTextures();
     const root = new THREE.Group();
     root.name = 'ExplosionShaderWarmup';
     root.visible = false;
@@ -147,6 +166,7 @@ export class ExplosionSystem {
    * Spawns an explosion at the given collision result
    */
   spawnExplosion(crashResult, velocity = new THREE.Vector3(), options = {}) {
+    this.ensureTextures();
     const pos = (crashResult.point || new THREE.Vector3()).clone();
     const isWater = crashResult.type === 'WATER';
     const speed = Math.max(velocity.length(), (crashResult.speedKnots || 0) / 1.94384);
@@ -719,6 +739,7 @@ export class ExplosionSystem {
 
   spawnWaterFoam(pos) {
     if (this.waterPlumes.length >= 90) return;
+    this.ensureTextures();
     const spriteMat = createFlipbookMaterial(this.waterTexture, {
       transparent: true,
       opacity: 0.8,
@@ -750,6 +771,7 @@ export class ExplosionSystem {
 
   spawnWreckageSmoke(pos) {
     if (this.smokePuffs.length >= 120) return; // Particle budget cap
+    this.ensureTextures();
     const spriteMat = createFlipbookMaterial(this.smokeTexture, {
       transparent: true,
       opacity: 0.75,
@@ -789,7 +811,7 @@ export class ExplosionSystem {
   dispose() {
     this.clear();
     this.disposeShaderWarmup();
-    for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.dustTexture, this.sparkTexture]) texture.dispose();
+    for (const texture of [this.fireTexture, this.smokeTexture, this.waterTexture, this.dustTexture, this.sparkTexture]) texture?.dispose?.();
     this.scene.remove(this.group);
   }
 

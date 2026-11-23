@@ -27,10 +27,11 @@ const source = new PMTiles(
 const COLORS = {
   park: 0x4a7a3a, garden: 0x5f8f43, grass: 0x6a9a4e, recreation_ground: 0x568a3c,
   playground: 0x6f9a55, golf_course: 0x47763b, meadow: 0x64934a, green: 0x5b8c42,
-  forest: 0x3f6a33, shrub: 0x537a3e, nature_reserve: 0x3d6733, village_green: 0x628f45,
+  village_green: 0x628f45,
 };
-const LAND_USE = new Set(Object.keys(COLORS).filter(name => name !== 'shrub'));
-const LAND_COVER = new Set(['forest', 'shrub']);
+// Keep urban parks and manicured lawns; leave broad natural forest/shrub/reserve
+// land cover to the underlying satellite imagery so mountain texture is preserved.
+const LAND_USE = new Set(Object.keys(COLORS));
 
 function ringArea(ring) {
   return ring.reduce((sum, [x, y], i) => {
@@ -89,7 +90,7 @@ function createGreenMaterial(alphaMap) {
             any(greaterThanEqual(vAlphaMapUv, vec2(${tileEnd})))) discard;
         // Geometry defines coverage. Sub-pixel polygons can be absent from the
         // blurred mask, so use it only to reduce opacity near the edges.
-        diffuseColor.a *= mix(0.55, 1.0, smoothstep(0.45, 0.95, coverage));
+        diffuseColor.a *= mix(0.32, 0.62, smoothstep(0.45, 0.95, coverage));
       #endif
     `);
   };
@@ -175,7 +176,7 @@ export function buildGeographicGreenTile(data, tile, project, terrain, exclude =
     if (!centerMasked) triangles.push(a.index, b.index, c.index);
   };
 
-  for (const [name, allowed] of [['land_use', LAND_USE], ['land_cover', LAND_COVER]]) {
+  for (const [name, allowed] of [['land_use', LAND_USE]]) {
     const layer = layers[name];
     for (let i = 0; i < (layer?.length ?? 0); i++) {
       const feature = layer.feature(i);

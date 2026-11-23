@@ -26,6 +26,7 @@ export function createWorldAirportFacade(world, spawnAirport) {
         localOptions.paused = options.paused;
         localOptions.headingDeg = options.headingDeg;
         localOptions.trackDeg = options.trackDeg;
+        localOptions.hasOpenWorld = Boolean(world.openWorld);
         region.airport.update(dt, localPosition, time, localOptions);
       }
     },
@@ -53,10 +54,21 @@ export function createWorldAirportFacade(world, spawnAirport) {
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
     if (spawnAirport?.[key]) facade[key] = spawnAirport[key];
   }
-  facade.airportRegions = [...world.regions].map(([id, region]) => ({
-    airport: region.airport,
-    offset: world.offsets.get(id),
-  })).filter(entry => entry.airport);
+  let customAirportRegions = null;
+  Object.defineProperty(facade, 'airportRegions', {
+    get() {
+      if (customAirportRegions) return customAirportRegions;
+      return [...world.regions].map(([id, region]) => ({
+        airport: region.airport,
+        offset: world.offsets.get(id) || [0, 0],
+      })).filter(entry => entry.airport);
+    },
+    set(val) {
+      customAirportRegions = val;
+    },
+    enumerable: true,
+    configurable: true,
+  });
   if (spawnAirport?.parked) facade.parked = spawnAirport.parked;
   return facade;
 }

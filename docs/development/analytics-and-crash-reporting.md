@@ -198,14 +198,27 @@ average silently drops the loads this feature was added to capture.
      duration, build and browser/viewport data. A completed debrief's sortie metadata,
      peak and trace take precedence over a different live aircraft. G is simulated CG
      body-normal specific force, not a certified crash or occupant measurement.
+   - A captured JPEG screenshot is attached **by default** when the canvas can be read;
+     the checkbox lets the pilot remove it. The snapshot also carries `altitudeFt`,
+     `headingDeg`, `geoPosition` (WGS84 latitude/longitude, real airports only) and
+     `renderedTiles` snapshots the source actually on screen: `open-world` for
+     Incheon/Jeju/Lukla (base/far zoom, bounded tile keys, imagery and detail levels,
+     pending loads, far tiles and quality budget), or `legacy-streamers` only when
+     those streamers are visible. Hidden streamers are never reported as rendered.
+     Fictional arenas have no WGS84 frame; regions without tile streaming report `null`.
+   - **신고 파일 저장** downloads `flight3d-report-<id>.zip`, not a JSON blob: `report.json`
+     holds the metadata, diagnostics and an attachment manifest; `screenshot.jpg` is a real
+     image file when included; `full-report.json` holds the optional sortie report.
+     Delivery still sends one JSON event with those attachments embedded for PostHog.
    - Unchecking diagnostics removes simulator/browser details from both delivery and
-     JSON export. The SDK no longer silently adds them back. Export contains no API token.
+     archive export. The SDK no longer silently adds them back. Export contains no API token.
    - `flightDurationSec` reads `FlightRecorder.elapsed`, not the nonexistent `elapsedSeconds`.
 
-Verification: `node --test tests/analytics.test.js tests/feedbackReport.test.js`.
+Verification: `node --test tests/analytics.test.js tests/feedbackReport.test.js tests/feedbackArchive.test.js`.
 `CHROME_PATH=/home/stlim/.local/bin/chrome-headless node scripts/verify-feedback-delivery.mjs`
-checks the 390px simulator dialog, blocked requests, retained text/G snapshot, JSON save,
-and delayed acknowledgement/retry. Add `--live` to submit one clearly labelled synthetic
+checks the 390px simulator dialog, default screenshot attachment, blocked requests,
+retained text/G snapshot, ZIP save and delayed acknowledgement/retry.
+Add `--live` to submit one clearly labelled synthetic
 verification report; confirm its exact UUID in PostHog afterward. The script always runs
 hardware-GPU preflight. Chrome mobile emulation is not evidence of native Brave Shields.
 

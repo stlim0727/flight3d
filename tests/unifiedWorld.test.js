@@ -4,8 +4,11 @@ import assert from 'node:assert/strict';
 import { UnifiedWorld, BASE_OFFSETS, REGION_EXTENTS, WORLD_REGIONS } from '../src/world/UnifiedWorld.js';
 import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
-import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS } from '../src/geospatial/airportGeodesy.js';
+import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84 } from '../src/geospatial/airportGeodesy.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
+import { APPROACH_DATA } from '../src/config/approachData.js';
+import { projectToLocal } from '../src/geospatial/incheon.js';
+import { haversineDistanceM, initialBearingDeg } from '../src/geospatial/CorridorCoordinateSystem.js';
 
 function fakeRegion(height, runwayLocal = null) {
   const group = { position: { x: 0, y: 0, z: 0, set(x, y, z) { this.x = x; this.y = y; this.z = z; } }, visible: false };
@@ -84,6 +87,30 @@ test('all registered regions stay mounted after anchor changes', () => {
   assert.equal(lukla.group.position.x, 0);
   assert.equal(lukla.group.position.z, 0);
   assert.equal(world.regions.size, 3);
+});
+
+test('unmounted regions keep altitude and runway surfaces across anchor changes', () => {
+  const { world, jeju } = makeWorld();
+  const [jx, jz] = BASE_OFFSETS.jeju;
+  assert.equal(world.setMounted('jeju', false), true);
+  assert.equal(jeju.group.visible, false);
+  assert.equal(world.isMounted('jeju'), false);
+  assert.equal(world.regions.has('jeju'), true);
+  assert.equal(world.getHeight(jx + 10, jz + 10), 36);
+  assert.equal(world.isOnRunway(jx + 10, jz + 10), true);
+  world.setAnchor('jeju');
+  assert.equal(jeju.group.visible, false);
+  assert.equal(jeju.group.position.x, 0);
+  assert.equal(world.getHeight(10, 10), 36);
+});
+
+test('region distance is measured to the world-frame box in the active anchor frame', () => {
+  const world = new UnifiedWorld('incheon');
+  world.register('coastal', { ...fakeRegion(0), extent: REGION_EXTENTS.coastal });
+  assert.equal(world.distanceToRegion('coastal', BASE_OFFSETS.coastal[0], BASE_OFFSETS.coastal[1]), 0);
+  assert.ok(world.distanceToRegion('coastal', 0, 0) > 60000);
+  world.setAnchor('coastal');
+  assert.equal(world.distanceToRegion('coastal', 0, 0), 0);
 });
 
 test('readiness follows the spawn region DEM state', () => {
@@ -343,16 +370,52 @@ test('destination info uses great-circle bearings to real runway thresholds', ()
   assert.ok(info.distanceNm > 200);
   assert.equal(info.synthetic, false);
   assert.equal(info.target, 'threshold');
-  const expected = wgs84ToLocal(
-    RUNWAY_THRESHOLDS.jeju.latitude, RUNWAY_THRESHOLDS.jeju.longitude, AIRPORT_ORIGINS.incheon,
-  );
-  assert.ok(Math.hypot(info.dx - expected[0], info.dz - expected[1]) < 1);
+  const expected = [
+    BASE_OFFSETS.jeju[0] + APPROACH_DATA.jeju.threshold.x,
+    BASE_OFFSETS.jeju[1] + APPROACH_DATA.jeju.threshold.z,
+  ];
+  assert.ok(Math.hypot(info.dx - expected[0], info.dz - expected[1]) < 1e-6);
   const synthetic = world.destinationInfo(0, 0, 'neon');
   assert.equal(synthetic.synthetic, true);
   assert.equal(synthetic.target, 'centre');
   assert.equal(world.destinationInfo(0, 0, 'unknown'), null);
   const fromJeju = world.destinationInfo(BASE_OFFSETS.jeju[0], BASE_OFFSETS.jeju[1], 'incheon');
   assert.ok(fromJeju.bearingDeg < 10 || fromJeju.bearingDeg > 350);
+});
+
+test('real threshold guidance and ND marker follow the active anchor', () => {
+  const anchors = ['incheon', 'jeju', 'lukla'];
+  for (const anchor of anchors) {
+    for (const target of anchors) {
+      if (anchor === target) continue;
+      const info = new UnifiedWorld(anchor).destinationInfo(0, 0, target);
+      const origin = AIRPORT_ORIGINS[anchor];
+      const threshold = RUNWAY_THRESHOLDS[target];
+      assert.equal(info.synthetic, false, `${anchor} -> ${target}`);
+      assert.equal(info.target, 'threshold', `${anchor} -> ${target}`);
+      assert.ok(Math.abs(info.distanceM - haversineDistanceM(
+        origin.latitude, origin.longitude, threshold.latitude, threshold.longitude,
+      )) < 0.5, `${anchor} -> ${target} distance`);
+      assert.ok(Math.abs(info.bearingDeg - initialBearingDeg(
+        origin.latitude, origin.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${anchor} -> ${target} bearing`);
+      const marker = [
+        BASE_OFFSETS[target][0] - BASE_OFFSETS[anchor][0] + APPROACH_DATA[target].threshold.x,
+        BASE_OFFSETS[target][1] - BASE_OFFSETS[anchor][1] + APPROACH_DATA[target].threshold.z,
+      ];
+      assert.ok(Math.hypot(info.dx - marker[0], info.dz - marker[1]) < 1e-6,
+        `${anchor} -> ${target} rendered threshold marker`);
+      const reverse = new UnifiedWorld(target).destinationInfo(0, 0, anchor);
+      assert.equal(reverse.synthetic, false, `${target} -> ${anchor}`);
+      assert.ok(Math.abs(reverse.distanceM - haversineDistanceM(
+        AIRPORT_ORIGINS[target].latitude, AIRPORT_ORIGINS[target].longitude,
+        RUNWAY_THRESHOLDS[anchor].latitude, RUNWAY_THRESHOLDS[anchor].longitude,
+      )) < 0.5, `${target} -> ${anchor} distance`);
+    }
+    const synthetic = new UnifiedWorld(anchor).destinationInfo(0, 0, 'neon');
+    assert.equal(synthetic.synthetic, true, `${anchor} -> neon`);
+    assert.equal(synthetic.target, 'centre', `${anchor} -> neon`);
+  }
 });
 
 test('streamed external airport registers as a dynamic region and reports preparation', () => {
@@ -403,4 +466,123 @@ test('unmount keeps destination guidance and unknown codes never point at the or
   assert.deepEqual(world.incheonFrameToAnchor(30000, -2000), [
     30000 - BASE_OFFSETS.jeju[0], -2000 - BASE_OFFSETS.jeju[1],
   ]);
+});
+
+test('Lukla uses its surveyed WGS84 origin in the world frame', () => {
+  const expected = projectToLocal(AIRPORT_ORIGINS.lukla.latitude, AIRPORT_ORIGINS.lukla.longitude);
+  assert.deepEqual([...BASE_OFFSETS.lukla], expected);
+  const world = new UnifiedWorld('incheon');
+  const info = world.destinationInfo(0, 0, 'lukla');
+  assert.equal(info.id, 'lukla');
+  assert.equal(info.code, 'LUK');
+  assert.equal(info.synthetic, false);
+  assert.equal(info.target, 'threshold');
+  assert.ok(info.bearingDeg > 260 && info.bearingDeg < 270);
+  assert.ok(info.distanceNm > 1000, 'Lukla should be far from Incheon in the real world frame');
+  const expectedThreshold = [
+    BASE_OFFSETS.lukla[0] + APPROACH_DATA.lukla.threshold.x,
+    BASE_OFFSETS.lukla[1] + APPROACH_DATA.lukla.threshold.z,
+  ];
+  assert.ok(Math.hypot(info.dx - expectedThreshold[0], info.dz - expectedThreshold[1]) < 1e-6);
+  const reprojected = wgs84ToLocal(
+    RUNWAY_THRESHOLDS.lukla.latitude, RUNWAY_THRESHOLDS.lukla.longitude, AIRPORT_ORIGINS.incheon,
+  );
+  assert.ok(Math.hypot(info.dx - reprojected[0], info.dz - reprojected[1]) > 50,
+    'do not use a separate tangent-plane projection for the rendered threshold marker');
+});
+
+// Anchor-local positions live on the Incheon tangent plane, translated by
+// -BASE_OFFSETS[anchor]. One rendered world point must produce the same WGS84
+// fix from every anchor, not only from the origin where both planes coincide.
+const REAL_ANCHORS = ['incheon', 'jeju', 'lukla'];
+
+function renderedThreshold(anchor, target) {
+  return [
+    BASE_OFFSETS[target][0] - BASE_OFFSETS[anchor][0] + APPROACH_DATA[target].threshold.x,
+    BASE_OFFSETS[target][1] - BASE_OFFSETS[anchor][1] + APPROACH_DATA[target].threshold.z,
+  ];
+}
+
+test('standing on a rendered real threshold reports near-zero distance from any anchor', () => {
+  for (const anchor of REAL_ANCHORS) {
+    for (const target of REAL_ANCHORS) {
+      if (anchor === target) continue;
+      const label = `${anchor} -> ${target}`;
+      const marker = renderedThreshold(anchor, target);
+      const info = new UnifiedWorld(anchor).destinationInfo(marker[0], marker[1], target);
+      assert.equal(info.synthetic, false, label);
+      assert.equal(info.target, 'threshold', label);
+      assert.ok(Math.hypot(info.dx, info.dz) < 1e-6, `${label} rendered marker`);
+      const routeM = haversineDistanceM(
+        AIRPORT_ORIGINS[anchor].latitude, AIRPORT_ORIGINS[anchor].longitude,
+        RUNWAY_THRESHOLDS[target].latitude, RUNWAY_THRESHOLDS[target].longitude,
+      );
+      assert.ok(info.distanceM < routeM * 1e-4,
+        `${label} distance at rendered threshold: ${info.distanceM} m`);
+    }
+  }
+});
+
+test('mid-route guidance matches the Incheon-plane position from any anchor', () => {
+  for (const anchor of REAL_ANCHORS) {
+    for (const target of REAL_ANCHORS) {
+      if (anchor === target) continue;
+      const label = `${anchor} -> ${target}`;
+      const marker = renderedThreshold(anchor, target);
+      const mid = [marker[0] / 2, marker[1] / 2];
+      const info = new UnifiedWorld(anchor).destinationInfo(mid[0], mid[1], target);
+      const reference = worldPositionToWgs84(
+        'incheon', mid[0] + BASE_OFFSETS[anchor][0], mid[1] + BASE_OFFSETS[anchor][1],
+      );
+      const threshold = RUNWAY_THRESHOLDS[target];
+      assert.ok(Math.abs(info.distanceM - haversineDistanceM(
+        reference.latitude, reference.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${label} mid-route distance`);
+      assert.ok(Math.abs(info.bearingDeg - initialBearingDeg(
+        reference.latitude, reference.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${label} mid-route bearing`);
+      const full = haversineDistanceM(
+        AIRPORT_ORIGINS[anchor].latitude, AIRPORT_ORIGINS[anchor].longitude,
+        threshold.latitude, threshold.longitude,
+      );
+      assert.ok(Math.abs(info.distanceM - full / 2) < full * 0.06,
+        `${label} half-route distance: ${info.distanceM} m`);
+    }
+  }
+});
+
+test('10 km offset guidance keeps the true bearing from any anchor', () => {
+  for (const anchor of REAL_ANCHORS) {
+    for (const target of REAL_ANCHORS) {
+      if (anchor === target) continue;
+      const label = `${anchor} -> ${target}`;
+      const marker = renderedThreshold(anchor, target);
+      const x = marker[0];
+      const z = marker[1] + 10000; // 10 km south of the rendered threshold
+      const info = new UnifiedWorld(anchor).destinationInfo(x, z, target);
+      const reference = worldPositionToWgs84(
+        'incheon', x + BASE_OFFSETS[anchor][0], z + BASE_OFFSETS[anchor][1],
+      );
+      const threshold = RUNWAY_THRESHOLDS[target];
+      assert.ok(Math.abs(info.distanceM - haversineDistanceM(
+        reference.latitude, reference.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${label} 10 km distance`);
+      assert.ok(Math.abs(info.bearingDeg - initialBearingDeg(
+        reference.latitude, reference.longitude, threshold.latitude, threshold.longitude,
+      )) < 1e-6, `${label} 10 km bearing`);
+      assert.ok(Math.abs(info.distanceM - 10000) < 200,
+        `${label} 10 km great-circle distance: ${info.distanceM} m`);
+      // Incheon-plane grid convergence rotates "north" to ~339 deg at Lukla.
+      const expected = target === 'lukla' ? 339.1 : 0;
+      const error = Math.abs(((info.bearingDeg - expected + 540) % 360) - 180);
+      assert.ok(error < 1, `${label} bearing ${info.bearingDeg} vs ${expected}`);
+    }
+  }
+});
+
+test('worldPositionToWgs84 has no frame for fictional anchors', () => {
+  for (const id of ['coastal', 'neon', 'valley', 'unknown']) {
+    assert.equal(worldPositionToWgs84(id, 100, 200), null, id);
+  }
+  assert.ok(worldPositionToWgs84('incheon', 0, 0));
 });

@@ -1,4 +1,4 @@
-import { isExternalDestination } from '../config/externalDestinations.js';
+import { isExternalDestination, externalDestinationTileId, normalizeExternalTileId } from '../config/externalDestinations.js';
 import { loadAirportManifest, findAirportByCode } from '../geospatial/airportIndex.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 
@@ -8,9 +8,9 @@ import { projectToLocal } from '../geospatial/incheon.js';
  * branches on its state.
  */
 
-async function defaultLoadAirport(code, { baseUrl, fetchImpl } = {}) {
+async function defaultLoadAirport(code, { baseUrl, fetchImpl, tileId } = {}) {
   const manifest = await loadAirportManifest({ baseUrl, fetchImpl });
-  const airport = await findAirportByCode(manifest, code, { baseUrl, fetchImpl });
+  const airport = await findAirportByCode(manifest, code, { baseUrl, fetchImpl, tileId });
   if (!airport) throw new Error(`Airport ${code} not found in index`);
   return airport;
 }
@@ -59,6 +59,9 @@ export class ExternalAirportStreamer {
 
     this._state = 'idle';
     this._code = null;
+    this._home = null;
+    this._hold = null;
+    this._tileId = null;
     this._error = null;
     this._distanceM = null;
     this._loaded = null;
@@ -81,15 +84,43 @@ export class ExternalAirportStreamer {
     };
   }
 
+  /** Spawn airport kept ready independently of the player's navigation target. */
+  setHome(code) {
+    this._home = isExternalDestination(code) ? code.trim().toUpperCase() : null;
+  }
+
+  get homeCode() {
+    return this._home;
+  }
+
+  /** Pin a destination for the duration of a spawn load. */
+  holdDestination(code) {
+    this._hold = isExternalDestination(code) ? code.trim().toUpperCase() : null;
+  }
+
+  releaseDestinationHold() {
+    this._hold = null;
+  }
+
+  /** Loaded common region for a code, or null when not streamed. */
+  regionFor(code) {
+    const normalized = typeof code === 'string' ? code.trim().toUpperCase() : null;
+    return this._loaded?.code === normalized ? this._loaded.region : null;
+  }
+
   statusFor(code) {
     if (this._disposed || !isExternalDestination(code)) return null;
     return this._code === code.trim().toUpperCase() ? this.status : null;
   }
 
-  setDestination(code) {
+  setDestination(code, { tileId } = {}) {
     if (this._disposed) return;
     const next = isExternalDestination(code) ? code.trim().toUpperCase() : null;
-    if (next === this._code) return;
+    const explicitTile = normalizeExternalTileId(tileId);
+    if (next === this._code) {
+      if (next && explicitTile && explicitTile !== this._tileId) this._retile(explicitTile);
+      return;
+    }
     this._token += 1;
     this._loadingPromise = null;
     // A destination change is only a wish. Keep the currently occupied region
@@ -98,6 +129,7 @@ export class ExternalAirportStreamer {
     if (this._loaded && this._loaded.code === next) {
       this._retired = null;
       this._code = next;
+      this._tileId = explicitTile ?? this._tileId;
       this._state = 'ready';
       this._error = null;
       this._failedAt = 0;
@@ -108,6 +140,7 @@ export class ExternalAirportStreamer {
     if (this._loaded && this._loaded.code !== next) this._retired = this._loaded.code;
     else this._unmount();
     this._code = next;
+    this._tileId = next ? explicitTile ?? externalDestinationTileId(next) : null;
     this._state = 'idle';
     this._error = null;
     this._distanceM = null;
@@ -115,19 +148,51 @@ export class ExternalAirportStreamer {
     this._needsRearm = false;
     this._report();
   }
+
+  /** Same airport, different index tile: drop the old load/contact before reloading. */
+  _retile(tileId) {
+    this._token += 1;
+    this._loadingPromise = null;
+    if (this._loaded) this._retired = this._code;
+    else this._unmount();
+    this._tileId = tileId;
+    this._state = 'idle';
+    this._error = null;
+    this._distanceM = null;
+    this._failedAt = 0;
+    this._needsRearm = false;
+    this._report();
+  }
+
+  /** Release a ground-hold from a previous airport before starting at another. */
+  releaseGroundHold() {
+    if (!this._retired) return null;
+    const code = this._retired;
+    this._retired = null;
+    this._unmount();
+    this._state = 'idle';
+    this._report();
+    return code;
+  }
   /**
    * Explicit load for spawn/UI paths. Ready and in-flight loads are reused;
    * an explicit call after a failure retries immediately (automatic retries
-   * from update() remain rate-limited).
+   * from update() remain rate-limited). A tileId pin disambiguates codes that
+   * are both an ident and another airport's IATA.
    */
-  ensure(code) {
+  ensure(code, { tileId } = {}) {
     if (this._disposed) return false;
     if (!isExternalDestination(code)) {
       this.setDestination(code);
       return false;
     }
     const normalized = code.trim().toUpperCase();
-    if (this._code !== normalized) this.setDestination(normalized);
+    const hint = normalizeExternalTileId(tileId)
+      ?? externalDestinationTileId(normalized)
+      ?? (this._code === normalized ? this._tileId : null);
+    if (this._code !== normalized || hint !== this._tileId) {
+      this.setDestination(normalized, { tileId: hint });
+    }
     if (this._retired) return false;
     if (this._state === 'ready' && this._loaded) return true;
     if (this._state === 'loading' && this._loadingPromise) return this._loadingPromise;
@@ -137,7 +202,10 @@ export class ExternalAirportStreamer {
   update({ x, z, speedMps = 0, onGround = false, onRunway = false, destinationCode, now } = {}) {
     if (this._disposed) return;
     try {
-      if (destinationCode !== undefined) this.setDestination(destinationCode);
+      if (destinationCode !== undefined) {
+        const requested = this._hold ?? (isExternalDestination(destinationCode) ? destinationCode : this._home);
+        this.setDestination(requested);
+      }
       if (this._retired) {
         if (onGround || onRunway) return;
         this._retired = null;
@@ -172,10 +240,13 @@ export class ExternalAirportStreamer {
     this._token += 1;
     this._unmount();
     this._retired = null;
-    this._loadingPromise = null;
     this._code = null;
+    this._home = null;
+    this._hold = null;
+    this._loadingPromise = null;
     this._state = 'idle';
     this._error = null;
+    this._tileId = null;
     this._distanceM = null;
     this._failedAt = 0;
     this._needsRearm = false;
@@ -206,12 +277,22 @@ export class ExternalAirportStreamer {
     if (!loaded) return;
     // Keep the Incheon-frame base offset; the anchor can change while unmounted.
     this._lastOffset = [loaded.baseOffset[0], loaded.baseOffset[1]];
+    const unmountExtent = loaded.region?.extent;
+    const unmountOffset = loaded.offset;
     this._loaded = null;
     if (loaded.group) {
       try { this.scene?.remove?.(loaded.group); } catch { /* cleanup must continue */ }
     }
     this._disposeRegion(loaded.region);
     try { this.world?.unregister?.(loaded.code); } catch { /* cleanup must continue */ }
+    if (unmountExtent && unmountOffset) {
+      try {
+        this.world?.anchorTerrain?.openWorld?.invalidateArea?.([
+          unmountExtent.minX + unmountOffset[0], unmountExtent.minZ + unmountOffset[1],
+          unmountExtent.maxX + unmountOffset[0], unmountExtent.maxZ + unmountOffset[1],
+        ]);
+      } catch { /* ignore */ }
+    }
   }
 
   _disposeRegion(region) {
@@ -238,22 +319,22 @@ export class ExternalAirportStreamer {
     this._report();
   }
 
-  _startLoad(code) {
+  _startLoad(code, tileId = this._tileId) {
     this._token += 1;
     const token = this._token;
     this._state = 'loading';
     this._error = null;
     this._failedAt = 0;
     this._report();
-    const promise = this._runLoad(token, code);
+    const promise = this._runLoad(token, code, tileId);
     this._loadingPromise = promise;
     return promise;
   }
 
-  async _runLoad(token, code) {
+  async _runLoad(token, code, tileId) {
     let region = null;
     try {
-      const descriptor = await this._loadAirport(code, { baseUrl: this.baseUrl, fetchImpl: this.fetchImpl });
+      const descriptor = await this._loadAirport(code, { baseUrl: this.baseUrl, fetchImpl: this.fetchImpl, tileId });
       if (this._stale(token, code)) return false;
       if (!Number.isFinite(descriptor?.latitude) || !Number.isFinite(descriptor?.longitude)) {
         throw new Error(`Invalid airport record for ${code}`);
@@ -287,6 +368,15 @@ export class ExternalAirportStreamer {
       const offset = validOffset(published)
         ? [published[0], published[1]]
         : [baseOffset[0], baseOffset[1]];
+      const e = region.extent;
+      if (e) {
+        try {
+          this.world?.anchorTerrain?.openWorld?.invalidateArea?.([
+            e.minX + offset[0], e.minZ + offset[1],
+            e.maxX + offset[0], e.maxZ + offset[1],
+          ]);
+        } catch { /* cleanup must continue */ }
+      }
       this._loaded = { code, region, descriptor, baseOffset, offset, group };
       this._lastOffset = [baseOffset[0], baseOffset[1]];
       this._state = 'ready';

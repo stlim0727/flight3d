@@ -168,7 +168,11 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
     });
 
     // 5. Lobby - Lukla Airport
-    await evaluate(() => { document.querySelector('#lobby-airport-lukla')?.click(); });
+    await evaluate(() => {
+      const picker = document.querySelector('#lobby-place-picker');
+      if (picker && !picker.open) picker.querySelector('summary')?.click();
+      document.querySelector('#lobby-map-default-bookmarks [data-place-id="lukla"]')?.click();
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '05_lobby_airport_lukla',
@@ -178,12 +182,16 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       title_en: 'Main Lobby — Lukla Mountain Airport (VNLK)',
       description_ko: '해발 9,334 FT 고산지대, 12% 경사 단거리 절벽 활주로(Rwy 24) 브리핑',
       description_en: 'Elevation 9,334 FT, 12% sloping short cliff runway (Rwy 24) briefing',
-      selector: '#lobby-airport-lukla',
+      selector: '#lobby-map-default-bookmarks [data-place-id="lukla"]',
       tier: 'full',
     });
 
     // 6. Lobby - Incheon Airport
-    await evaluate(() => { document.querySelector('#lobby-airport-incheon')?.click(); });
+    await evaluate(() => {
+      const picker = document.querySelector('#lobby-place-picker');
+      if (picker && !picker.open) picker.querySelector('summary')?.click();
+      document.querySelector('#lobby-map-default-bookmarks [data-place-id="RKSI"]')?.click();
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '06_lobby_airport_incheon',
@@ -193,12 +201,16 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       title_en: 'Main Lobby — Incheon International Airport (RKSI)',
       description_ko: '인천국제공항 장거리 평행 활주로(33L/33R) 및 해상 접근 브리핑',
       description_en: 'Dual parallel long runways (33L/33R) and oceanic approach briefing',
-      selector: '#lobby-airport-incheon',
+      selector: '#lobby-map-default-bookmarks [data-place-id="RKSI"]',
       tier: 'full',
     });
 
     // 7. Lobby - Valley Slalom Mode
-    await evaluate(() => { document.querySelector('#lobby-airport-valley')?.click(); });
+    await evaluate(() => {
+      const missions = document.querySelector('#lobby-missions');
+      if (missions && !missions.open) missions.querySelector('summary')?.click();
+      document.querySelector('#lobby-preset-valley')?.click();
+    });
     await delay(300);
     await recordScreen(screenshot, {
       id: '07_lobby_airport_valley',
@@ -208,7 +220,7 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
       title_en: 'Main Lobby — Valley Slalom Mode Selection',
       description_ko: '사람 직접 조종 vs AI 자율 비행 라디오 버튼 및 자이로 사전 점검 박스',
       description_en: 'Human manual piloting vs. AI autonomous flight radio controls and gyro preflight',
-      selector: '#lobby-airport-valley',
+      selector: '#lobby-preset-valley',
       tier: 'full',
     });
   }
@@ -277,7 +289,9 @@ async function runSession1({ evaluate, screenshot, send, delay, origin, exceptio
   // Switch to Coastal runway with Boeing 737 and enter flight!
   await evaluate(() => {
     document.querySelector('#lobby-tab-scenario')?.click();
-    document.querySelector('#lobby-airport-coastal')?.click();
+    const picker = document.querySelector('#lobby-place-picker');
+    if (picker && !picker.open) picker.querySelector('summary')?.click();
+    document.querySelector('#lobby-map-default-bookmarks [data-place-id="coastal"]')?.click();
     document.querySelector('#lobby-aircraft-b738')?.click();
     document.querySelector('#lobby-preset-rwy')?.click();
   });

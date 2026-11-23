@@ -9,6 +9,42 @@ import { HAZE_HEIGHT_FALLOFF, installHeightFog } from './AerialPerspective.js';
 
 const OVERCAST_GREY = new THREE.Color(0.55, 0.57, 0.60);
 
+/**
+ * Lightweight 1024x4 equirectangular fallback environment texture matching sky_1k.hdr's
+ * 1024px width (PMREM cubeSize=256) so swapping in the real HDR never alters envMapCubeUVHeight
+ * or triggers full-scene USE_ENVMAP shader recompilation.
+ */
+export function createFallbackEnvironmentTexture() {
+  const width = 1024;
+  const height = 4;
+  const data = new Uint8Array(width * height * 4);
+  const rows = [
+    [92, 100, 108, 255],
+    [165, 185, 205, 255],
+    [205, 224, 245, 255],
+    [105, 165, 235, 255],
+  ];
+  for (let y = 0; y < height; y++) {
+    const [r, g, b, a] = rows[y];
+    const rowOffset = y * width * 4;
+    for (let x = 0; x < width; x++) {
+      const idx = rowOffset + x * 4;
+      data[idx] = r;
+      data[idx + 1] = g;
+      data[idx + 2] = b;
+      data[idx + 3] = a;
+    }
+  }
+  const tex = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 // Tail height of the tallest shipped airliner (737-800, 12.6 m), used to size the
 // sun-shadow box so a low sun's projected airframe shadow stays inside the map.
 export const GROUND_SHADOW_HEIGHT_M = 13;
@@ -37,17 +73,21 @@ export function sunShadowPlacement(sunPosition, aircraftPosition, out = new THRE
  * and instanced cumulus density volumes at 2,800–3,600m altitude.
  */
 export class SkyAtmosphere {
-  constructor(scene, renderer = null, water = null) {
+  constructor(scene, renderer = null, water = null, options = {}) {
     this.scene = scene;
     this.renderer = renderer;
     this.water = water;
+    this.deferCloudDensity = Boolean(options.deferCloudDensity);
+    this.deferHdr = Boolean(options.deferHdr);
+    this.fallbackEnvTexture = null;
+    this._hdrRequested = false;
 
     // Atmospheric Exponential Height Fog parameters
     installHeightFog();
     this.fogColor = new THREE.Color(0xc8def4);
-    this.baseDensity = 0.00020;
+    this.baseDensity = 0.00016;
     this.heightFalloff = HAZE_HEIGHT_FALLOFF;
-    this.currentDensity = 0.00020;
+    this.currentDensity = 0.00016;
     this.currentExposure = 1.05;
 
     // Time of day (hours: 0.0 to 24.0, default 16.5 = Golden Hour Afternoon)
@@ -113,6 +153,16 @@ export class SkyAtmosphere {
 
   initEnvironmentMap() {
     if (typeof window === 'undefined') return;
+    this.fallbackEnvTexture = createFallbackEnvironmentTexture();
+    this.scene.environment = this.fallbackEnvTexture;
+    if (!this.deferHdr) {
+      this.loadEnvironmentHdr();
+    }
+  }
+
+  loadEnvironmentHdr() {
+    if (this._hdrRequested || typeof window === 'undefined') return;
+    this._hdrRequested = true;
     try {
       const loader = new RGBELoader();
       loader.load(
@@ -120,19 +170,12 @@ export class SkyAtmosphere {
         (texture) => {
           texture.mapping = THREE.EquirectangularReflectionMapping;
           this.scene.environment = texture;
+          this.fallbackEnvTexture?.dispose();
+          this.fallbackEnvTexture = null;
         },
         undefined,
         () => {
-          // Fallback: generate PMREM from sky shader if HDR is unreachable
-          if (this.renderer && this.sky) {
-            try {
-              const pmrem = new THREE.PMREMGenerator(this.renderer);
-              this.scene.environment = pmrem.fromScene(this.sky).texture;
-              pmrem.dispose();
-            } catch (e) {
-              // Ignore in headless / unsupported contexts
-            }
-          }
+          // Keep the lightweight fallback environment texture active if HDR fails to load
         }
       );
     } catch (e) {
@@ -257,7 +300,7 @@ export class SkyAtmosphere {
       this.ambientLight.color.setRGB(0.85, 0.92, 1.0);
       this.ambientLight.intensity = 0.85 + t * 0.45;
 
-      this.baseDensity = 0.00021 - t * 0.00003; // 0.00018 at noon
+      this.baseDensity = 0.00016 - t * 0.00004; // 0.00012 at noon
       this.fogColor.setRGB(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03); // Crisp Rayleigh sky-blue haze
       exposure = 1.04 - t * 0.06; // 0.98 at noon to eliminate white fuselage highlight blowout
     } else if (elevation > -4.0) {
@@ -359,7 +402,7 @@ export class SkyAtmosphere {
   }
 
   initClouds() {
-    this.cloudLayer = new CloudLayer();
+    this.cloudLayer = new CloudLayer({ deferDensity: this.deferCloudDensity });
     this.cloudsGroup.add(this.cloudLayer);
   }
 

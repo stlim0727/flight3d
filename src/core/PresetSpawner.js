@@ -13,12 +13,13 @@ import { stallSpeedEstimate } from '../physics/stallSpeedEstimate.js';
 import { setSimulationWind, WindField } from '../physics/WindField.js';
 import { UrbanWindField } from '../physics/UrbanWindField.js';
 import { alignSpawnToWind } from './windSpawn.js';
-import { loadIncheonAirport } from '../environment/IncheonAirport.js';
-import { incheonSpawn } from '../geospatial/IncheonFlightSurface.js';
-import { loadJejuAirport } from '../environment/JejuAirport.js';
-import { jejuSpawn } from '../geospatial/JejuFlightSurface.js';
-import { LuklaTerrain } from '../environment/LuklaTerrain.js';
-import { LuklaAirport } from '../environment/LuklaAirport.js';
+import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
+import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js';
+import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
+import { REGION_SURFACES } from '../config/regionSurfaces.js';
+import { getAirportOverride } from '../config/airportOverrides.js';
+import { castFarSunShadow } from '../environment/FarSunShadow.js';
+import { RENDER_QUALITY } from '../config/renderQuality.js';
 import { APPROACH_DATA } from '../config/approachData.js';
 import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
@@ -33,6 +34,28 @@ import {
   saveSavedScenario,
 } from '../config/flightSelection.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
+
+export const REGION_STREAM_DISTANCE_M = 65000;
+const REGION_STREAM_INTERVAL_MS = 500;
+const REGION_STREAM_MOVE_M = 500;
+
+export function distanceToRegionBoundsM(x, z, offset, extent) {
+  if (!offset || !extent) return Infinity;
+  const minX = offset[0] + extent.minX;
+  const maxX = offset[0] + extent.maxX;
+  const minZ = offset[1] + extent.minZ;
+  const maxZ = offset[1] + extent.maxZ;
+  const dx = x < minX ? minX - x : x > maxX ? x - maxX : 0;
+  const dz = z < minZ ? minZ - z : z > maxZ ? z - maxZ : 0;
+  return Math.hypot(dx, dz);
+}
+
+// Visual mounting follows the aircraft with hysteresis: scenery appears while
+// still well outside its extent, and only unloads after a wider retreat.
+const REGION_MOUNT_BASE_MARGIN_M = 25000;
+const REGION_MOUNT_SPEED_LEAD_S = 60;
+const REGION_MOUNT_MAX_MARGIN_M = 80000;
+const REGION_UNMOUNT_EXTRA_MARGIN_M = 30000;
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
@@ -49,10 +72,6 @@ class PresetSpawnerMethods {
       this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
       this.currentTerrain = this.incheonAirport.terrain;
       this.currentAirport = this.incheonAirport;
-    } else if (this.activeAirport === 'jeju' && this.jejuAirport) {
-      this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = true;
-      this.currentTerrain = this.jejuAirport.terrain;
-      this.currentAirport = this.jejuAirport;
     }
     if (type === 'shadow' && !this.devRunner?.changingState) {
       return this.devRunner?.start('shadow') ?? false;
@@ -228,11 +247,14 @@ class PresetSpawnerMethods {
       this.showToast(() => t(`regional.cruise.${type}`));
     } else if (this.activeAirport === 'incheon') {
       this.currentAirport.resetTraffic();
-      const spawn = incheonSpawn(type, groundClearance, this.currentAircraftId);
+      const spawn = airportSpawnPlan('RKSI', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);
-      const pitchAttitude = type === 'approach' ? .04 : type === 'challenge' ? .01 : 0;
+      const pitchAttitude = THREE.MathUtils.degToRad(spawn.pitchDeg ?? 0);
       this.quaternion.setFromEuler(new THREE.Euler(pitchAttitude, spawn.yaw, 0, 'YXZ'));
       const airborne = type !== 'runway';
       const cruise = type === 'cruise';
@@ -251,7 +273,10 @@ class PresetSpawnerMethods {
       const label = { runway: 'incheon.runway', approach: 'incheon.approach', cruise: 'incheon.cruise', challenge: 'incheon.challenge' }[type];
       this.showToast(() => t(label));
     } else if (this.activeAirport === 'jeju') {
-      const spawn = jejuSpawn(type, groundClearance, this.currentAircraftId);
+      const spawn = airportSpawnPlan('RKPC', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
       this.position.set(spawn.x, spawn.y, spawn.z);
       this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
       this.angularVelocity.set(0, 0, 0);
@@ -286,12 +311,18 @@ class PresetSpawnerMethods {
       const label = { runway: 'jeju.runway', approach: 'jeju.approach', cruise: 'jeju.cruise', challenge: 'jeju.challenge' }[type];
       if (label) this.showToast(() => t(label));
     } else if (this.activeAirport === 'lukla') {
-      const sin58 = 0.848048;
-      const cos58 = 0.529919;
       const isF16 = this.currentAircraftId === 'F16';
       const isC172 = this.currentAircraftId === 'C172';
-      const spawnS = isF16 ? 200.0 : 195.0;
-      const spawnY = 2836.0 + spawnS * (62 / 527) + groundClearance;
+      const spawn = airportSpawnPlan('VNLK', type, {
+        groundClearanceM: groundClearance,
+        aircraftId: this.currentAircraftId,
+      });
+      const poseEuler = new THREE.Euler(
+        THREE.MathUtils.degToRad(spawn.pitchDeg ?? 0),
+        spawn.yaw,
+        0,
+        'YXZ',
+      );
       const luklaTrim = isF16 ? 0.3 : isC172 ? 0.8 : 1.9;
 
       if (type === 'runway') {
@@ -301,18 +332,10 @@ class PresetSpawnerMethods {
         // offset keeps the wide wing clear of the raised apron.
         // Spawned with clearance in front of the retaining wall so chase cameras
         // remain completely clear of the upper stone barrier.
-        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
-        this.linearVelocity.set(0, 0, 0);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-
-        // Pitch -6.71° nose-down along the 11.7% downhill gradient, Heading 238° (yaw -238°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(-6.71),
-          -THREE.MathUtils.degToRad(238.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.0;
         this.engines.setThrottle(0.0);
@@ -330,19 +353,10 @@ class PresetSpawnerMethods {
         // Distance to threshold 06 (s = -263.5m) is 3,536.5m
         // Elevation drop to threshold (2,805m): 265m -> slope = 4.28°
         // At 69.4 m/s (135 kts), required sink rate is -5.20 m/s (-1,025 FPM)
-        const distSW = -3800.0;
-        this.position.set(distSW * sin58, 3070.0, -distSW * cos58);
-        this.linearVelocity.set(69.4 * sin58, -5.20, -69.4 * cos58);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-
-        // Pitch 1.0° nose-up on 4.3° descent path, Heading 058° (yaw -58°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(1.0),
-          -THREE.MathUtils.degToRad(58.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.56;
         this.engines.setThrottle(0.56);
@@ -357,17 +371,10 @@ class PresetSpawnerMethods {
         // Lukla Runway 24 Downhill Cliff Dive Takeoff!
         // Start near the upper threshold with wheel clearance; a 5m lateral
         // offset keeps the wide wing clear of the raised apron.
-        this.position.set(spawnS * sin58 - 5 * cos58, spawnY, -spawnS * cos58 - 5 * sin58);
-        this.linearVelocity.set(0, 0, 0);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-        // Pitch nose down -6.71° along 11.7% downhill slope, Heading 238° (yaw -238°)
-        const euler = new THREE.Euler(
-          THREE.MathUtils.degToRad(-6.71),
-          -THREE.MathUtils.degToRad(238.0),
-          0,
-          'YXZ'
-        );
-        this.quaternion.setFromEuler(euler);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 1.0; // TOGA 100%
         this.engines.setThrottle(1.0);
@@ -382,12 +389,10 @@ class PresetSpawnerMethods {
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
         // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
-        this.position.set(-1500, 3960, -800);
-        this.linearVelocity.set(80, 0, -60);
-        // 100 m/s TAS is ~159 KIAS, beyond what the C172 can hold level (#599).
-        if (isC172) this.linearVelocity.setLength(53);
+        this.position.set(spawn.x, spawn.y, spawn.z);
+        this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
-        this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.3);
+        this.quaternion.setFromEuler(poseEuler);
 
         this.controls.throttle = 0.65;
         this.engines.setThrottle(0.65);
@@ -586,6 +591,45 @@ class PresetSpawnerMethods {
     return this.takeoff;
   }
 
+  /** Install a pure map-flight spawn plan after setPreset configured the aircraft. */
+  applyMapSpawn(spawn, state) {
+    if (!spawn || ![spawn.x, spawn.y, spawn.z, spawn.yaw].every(Number.isFinite)) return false;
+    this.position.set(spawn.x, spawn.y, spawn.z);
+    this.linearVelocity.set(spawn.vx ?? 0, spawn.vy ?? 0, spawn.vz ?? 0);
+    this.angularVelocity.set(0, 0, 0);
+    this.quaternion.setFromEuler(new THREE.Euler(0, spawn.yaw, 0, 'YXZ'));
+    this._hasGroundContact = state === 'runway';
+    if (this.telemetry) this.telemetry.onGround = state === 'runway';
+    this.gear.setGearTarget(state !== 'cruise');
+    this.gear.gearState = state === 'cruise' && !this.gear.isFixed ? 0 : 1;
+    this.aero.setFlapPosition(state === 'approach' ? 5 : state === 'runway' ? 2 : 0);
+    this.aero.spoilers = 0;
+    this.controls.throttle = state === 'cruise' ? 0.5 : state === 'runway' ? 0 : this.controls.throttle;
+    this.engines.setThrottle(this.controls.throttle);
+    this.engines.setReverser(false, true);
+    if (state === 'runway') this.controls.setParkingBrake?.(true);
+    else this.controls.setParkingBrake?.(false);
+    if (state !== 'runway') {
+      this.aero.currentFlapAngle = this.aero.flapAngles[this.aero.flapsIndex];
+      this.controls.elevator = this.controls.aileron = this.controls.rudder = 0;
+      this.aero.massProperties.setConfiguration(
+        this.gear.gearState,
+        this.aero.currentFlapAngle / (this.aero.flapAngles.at(-1) || 1),
+      );
+      this.aero.syncMassProperties();
+
+    }
+    this.applyComputedTrim();
+    if (state !== 'runway') this.engines.settleSpool();
+    this.refreshTakeoffPerformance();
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
+    this.aircraft.group.updateMatrixWorld(true);
+    this.renderPose.reset(this.position, this.quaternion);
+    this.cameraSystem?.snapToTarget(this.aircraft.group);
+    return true;
+  }
+
   applyComputedTrim() {
     const tas = this.linearVelocity.length();
     if (tas < 20) return;
@@ -632,11 +676,11 @@ class PresetSpawnerMethods {
       mesh: this.incheonAirport.terrain.mesh,
       extent: REGION_EXTENTS.incheon,
     });
-    if (this.jejuAirport) world.register('jeju', {
-      terrain: this.jejuAirport.terrain,
-      airport: this.jejuAirport,
-      group: this.jejuAirport.group,
-      mesh: this.jejuAirport.terrain.mesh,
+    if (this.jejuSurface) world.register('jeju', {
+      terrain: this.jejuSurface,
+      airport: this.jejuAirportFacade,
+      group: null,
+      mesh: this.jejuSurface.mesh,
       extent: REGION_EXTENTS.jeju,
     });
     if (this.luklaTerrain) world.register('lukla', {
@@ -679,11 +723,13 @@ class PresetSpawnerMethods {
     world.syncMeshes();
     // Coastal foliage and ships are separate scene groups; keep them aligned
     // with the coastal terrain group when the world anchor moves.
-    const [coastalX, coastalZ] = world.offsets.get('coastal');
-    this.foliage?.group?.position.set(coastalX, 0, coastalZ);
-    this.ships?.group?.position.set(coastalX, 0, coastalZ);
-    if (this.foliage?.group) this.foliage.group.visible = true;
-    if (this.ships?.group) this.ships.group.visible = true;
+    const coastalOffset = world.offsets.get('coastal');
+    if (coastalOffset) {
+      const [coastalX, coastalZ] = coastalOffset;
+      this.foliage?.group?.position.set(coastalX, 0, coastalZ);
+      this.ships?.group?.position.set(coastalX, 0, coastalZ);
+    }
+    // updateRegionMounting() owns foliage/ships visibility with the coastal region.
     if (previousAnchor !== id) {
       previousOpenWorld?.dispose?.();
       previousBuildings?.dispose?.();
@@ -704,23 +750,106 @@ class PresetSpawnerMethods {
     // surface and Valley mission hides the shared ocean, so leave those alone.
     if (this.water && id !== 'neon' && id !== 'valley') this.water.mesh.visible = true;
 
-    const spawnAirport = id === 'incheon' ? this.incheonAirport
-      : id === 'jeju' ? this.jejuAirport
+    this.currentTerrain = world;
+    const mountingChanged = this.updateRegionMounting();
+    const spawnAirport = this.spawnAirportFor(id);
+    const facade = mountingChanged ? this.currentAirport : createWorldAirportFacade(world, spawnAirport);
+    this.currentAirport = facade;
+    if (this.collisionDetector) this.collisionDetector.airport = facade;
+    return true;
+  }
+
+  spawnAirportFor(id) {
+    return id === 'incheon' ? this.incheonAirport
+      : id === 'jeju' ? this.jejuAirportFacade
       : id === 'lukla' ? this.luklaAirport
       : id === 'neon' ? this.neonCity?.airport
+      : id === 'valley' ? null
       : this.airport;
-    const facade = createWorldAirportFacade(world, spawnAirport);
-    this.currentTerrain = world;
+  }
+
+  /** Regions that must stay mounted regardless of distance to the aircraft. */
+  requiredMountedRegions() {
+    const world = this.world;
+    const required = new Set([world.anchor]);
+    const x = this.position?.x ?? 0;
+    const z = this.position?.z ?? 0;
+    const under = world.regionAt(x, z);
+    if (under && WORLD_REGIONS.includes(under.id)) required.add(under.id);
+    if (this.telemetry?.onGround && WORLD_REGIONS.includes(this.activeAirport)) {
+      required.add(this.activeAirport);
+    }
+    return required;
+  }
+
+  /** Mount/unmount visuals with separate approach and retreat distances. */
+  /** Restore legacy runway meshes whenever their common region unmounts. */
+  syncLegacyRunwayHandoff() {
+    for (const [code, objects] of Object.entries(this._handedOffRunways ?? {})) {
+      const mounted = Boolean(this.airportStreamer?.regionFor?.(code));
+      for (const object of objects) {
+        if (object) object.visible = !mounted;
+      }
+    }
+  }
+
+  updateRegionMounting() {
+    const world = this.world;
+    if (!world || !this.scene || this.currentTerrain !== world) return false;
+    const required = this.requiredMountedRegions();
+    const speed = Math.max(0, this.linearVelocity?.length?.() ?? 0);
+    const approachMargin = Math.min(
+      REGION_MOUNT_MAX_MARGIN_M,
+      REGION_MOUNT_BASE_MARGIN_M + speed * REGION_MOUNT_SPEED_LEAD_S,
+    );
+    const unmountMargin = approachMargin + REGION_UNMOUNT_EXTRA_MARGIN_M;
+    const x = this.position?.x ?? 0;
+    const z = this.position?.z ?? 0;
+    let changed = false;
+    this.syncLegacyRunwayHandoff();
+    for (const id of WORLD_REGIONS) {
+      const region = world.regions.get(id);
+      if (!region) continue;
+      const distance = world.distanceToRegion(id, x, z);
+      const mounted = required.has(id)
+        || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin);
+      if (world.setMounted(id, mounted)) changed = true;
+      this.setSceneObject(region.group, mounted);
+      if (region.mesh !== region.group) this.setSceneObject(region.mesh, mounted);
+    }
+    const coastalMounted = world.isMounted('coastal');
+    this.setSceneObject(this.foliage?.group, coastalMounted);
+    this.setSceneObject(this.ships?.group, coastalMounted);
+    if (this.foliage?.group) this.foliage.group.visible = coastalMounted;
+    if (this.ships?.group) this.ships.group.visible = coastalMounted;
+    if (!changed) return false;
+    const facade = createWorldAirportFacade(world, this.spawnAirportFor(world.anchor));
     this.currentAirport = facade;
+    this.collisionDetector?.setEnvironment(
+      world,
+      facade,
+      this.worldObstacles(),
+      this.ships,
+      this.activeAirport === 'coastal' ? this.water : null,
+    );
     return true;
+  }
+
+  setSceneObject(object, mounted) {
+    if (!object) return;
+    if (mounted) {
+      if (object.parent !== this.scene) this.scene.add(object);
+    } else if (object.parent === this.scene) {
+      this.scene.remove(object);
+    }
   }
 
   /** Static obstacles from all mounted regions, translated into world coordinates. */
   worldObstacles() {
     const world = this.world;
     if (!world) return null;
-    const [cx, cz] = world.offsets.get('coastal');
-    const [nx, nz] = world.offsets.get('neon');
+    const [cx, cz] = world.offsets.get('coastal') ?? [0, 0];
+    const [nx, nz] = world.offsets.get('neon') ?? [0, 0];
     const shifted = (data, ox, oz) => (data ?? []).map(item => ({ ...item, x: item.x + ox, z: item.z + oz }));
     return {
       treeData: shifted(this.foliage?.treeData, cx, cz),
@@ -731,47 +860,228 @@ class PresetSpawnerMethods {
     };
   }
 
-  /** Load the other unified regions in the background; the world stays flyable meanwhile. */
+  async ensureCoastalRegion() {
+    if (this.terrain && this.airport) return this.airport;
+    this._coastalLoad ??= Promise.all([
+      import('../environment/Terrain.js'),
+      import('../environment/Airport.js'),
+      import('../environment/FoliageAndCities.js'),
+      import('../environment/Ships.js'),
+    ]).then(([{ Terrain }, { Airport }, { FoliageAndCities }, { Ships }]) => {
+      const preset = RENDER_QUALITY[this.renderQuality] ?? RENDER_QUALITY.balanced;
+      this.terrain = new Terrain(22000, preset.terrainSegments ?? 256, {
+        quality: preset.terrain,
+        asyncTextures: true,
+      });
+      this.terrain.mesh.visible = false;
+      this.airport = new Airport();
+      this.airport.group.visible = false;
+      this.terrain.excludePavement(this.airport.group);
+      this.foliage = new FoliageAndCities(this.terrain);
+      this.foliage.setQuality?.(this.renderQuality);
+      if (this.sky) this.foliage.setTimeOfDay(this.sky.timeOfDay);
+      this.foliage.group.visible = false;
+      this.ships = new Ships(this.water, { deferAssets: true });
+      this.ships.group.visible = false;
+      this.scene?.add(this.terrain.mesh, this.airport.group, this.foliage.group, this.ships.group);
+      return this.airport;
+    }).catch(error => {
+      this._coastalLoad = null;
+      throw error;
+    });
+    return this._coastalLoad;
+  }
+
+  async ensureNeonRegion() {
+    if (this.neonCity) return this.neonCity;
+    this._neonLoad ??= import('../environment/NeonCity.js')
+      .then(({ NeonCity }) => {
+        this.neonCity = new NeonCity();
+        this.neonCity.group.visible = false;
+        this.scene?.add(this.neonCity.group);
+        return this.neonCity;
+      })
+      .catch(error => {
+        this._neonLoad = null;
+        throw error;
+      });
+    return this._neonLoad;
+  }
+
+  async ensureValleyRegion() {
+    if (this.persistentValley) return this.persistentValley;
+    this._valleyLoad ??= Promise.all([
+      import('../arena/generatedValley.js'),
+      import('../environment/GeneratedValleyTerrain.js'),
+    ]).then(([{ generateValley }, { GeneratedValleyTerrain }]) => {
+      this.persistentValley = new GeneratedValleyTerrain(generateValley({ seed: 1 }).terrain, this);
+      this.persistentValley.group.visible = false;
+      return this.persistentValley;
+    }).catch(error => {
+      this._valleyLoad = null;
+      throw error;
+    });
+    return this._valleyLoad;
+  }
+
+  async ensureLuklaRegion() {
+    if (this.luklaTerrain && this.luklaAirport) return this.luklaAirport;
+    this._luklaLoad ??= Promise.all([
+      import('../environment/RasterRegionSurface.js'),
+      import('../environment/luklaSurfaceMaterial.js'),
+      import('../environment/LuklaAirport.js'),
+    ]).then(([{ RasterRegionSurface }, { luklaSurfaceMaterial }, { LuklaAirport }]) => {
+      const config = REGION_SURFACES.lukla;
+      this.luklaTerrain = new RasterRegionSurface(config, {
+        createMaterial: texture => luklaSurfaceMaterial(texture),
+        castShadow: mesh => castFarSunShadow(mesh),
+      });
+      this.luklaAirport = new LuklaAirport();
+      this.luklaTerrain.mesh.visible = false;
+      this.luklaAirport.group.visible = false;
+      this.scene?.add(this.luklaTerrain.mesh, this.luklaAirport.group);
+      return this.luklaAirport;
+    }).catch(error => {
+      this._luklaLoad = null;
+      throw error;
+    });
+    return this._luklaLoad;
+  }
+
+  async ensureIncheonRegion() {
+    if (this.incheonAirport) return this.incheonAirport;
+    this.incheonLoad ??= import('../environment/IncheonAirport.js')
+      .then(({ loadIncheonAirport }) => loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`))
+      .then(airport => {
+        this.incheonAirport = airport;
+        airport.group.visible = airport.terrain.mesh.visible = false;
+        this.scene?.add(airport.group, airport.terrain.mesh);
+        return airport;
+      })
+      .catch(error => {
+        this.incheonLoad = null;
+        throw error;
+      });
+    return this.incheonLoad;
+  }
+
+  ensureJejuRegion() {
+    if (this.jejuSurface) return this.jejuSurface;
+    const config = REGION_SURFACES.jeju;
+    const fallback = new CorridorFlightSurface({ activeOrigin: config.origin });
+    this.jejuSurface = new OpenWorldRegionSurface({ ...config, fallback });
+    const streamer = this.airportStreamer;
+    const streamedRunway = (x, z, method) => {
+      const region = streamer?.regionFor?.('RKPC');
+      if (!region) return false;
+      const [lx, lz] = this.world.local('RKPC', x, z);
+      return Boolean(region.airport?.[method]?.(lx, lz));
+    };
+    this.jejuAirportFacade = {
+      isOnRunway: (x, z) => streamedRunway(x, z, 'isOnRunway') || Boolean(fallback.isOnRunway?.(x, z)),
+      isRunwaySafetyArea: (x, z) => streamedRunway(x, z, 'isRunwaySafetyArea')
+        || Boolean(fallback.isRunwaySafetyArea?.(x, z)),
+      hasModeledBuilding: () => false,
+      update() {},
+    };
+    this.scene?.add(this.jejuSurface.mesh);
+    return this.jejuSurface;
+  }
+
+  ensureRegionLoaded(id) {
+    if (id === 'coastal') return this.ensureCoastalRegion();
+    if (id === 'neon') return this.ensureNeonRegion();
+    if (id === 'valley') return this.ensureValleyRegion();
+    if (id === 'lukla') return this.ensureLuklaRegion();
+    if (id === 'incheon') return this.ensureIncheonRegion();
+    if (id === 'jeju') return this.ensureJejuRegion();
+    return Promise.resolve(null);
+  }
+
+  _isRegionLoaded(id) {
+    if (id === 'coastal') return Boolean(this.terrain && this.airport);
+    if (id === 'lukla') return Boolean(this.luklaTerrain && this.luklaAirport);
+    if (id === 'incheon') return Boolean(this.incheonAirport);
+    if (id === 'jeju') return Boolean(this.jejuSurface);
+    if (id === 'neon') return Boolean(this.neonCity);
+    if (id === 'valley') return Boolean(this.persistentValley);
+    return false;
+  }
+
+  _isRegionLoadingOrLoaded(id) {
+    if (id === 'coastal') return Boolean((this.terrain && this.airport) || this._coastalLoad);
+    if (id === 'lukla') return Boolean((this.luklaTerrain && this.luklaAirport) || this._luklaLoad);
+    if (id === 'incheon') return Boolean(this.incheonAirport || this.incheonLoad);
+    if (id === 'jeju') return Boolean(this.jejuSurface);
+    if (id === 'neon') return Boolean(this.neonCity || this._neonLoad);
+    if (id === 'valley') return Boolean(this.persistentValley || this._valleyLoad);
+    return false;
+  }
+
+  /** Load the real-world unified regions in the background; other regions stream on approach. */
   ensureUnifiedRegions() {
     if (!this.world) return;
-    if (!this.luklaTerrain) {
-      this.luklaTerrain = new LuklaTerrain();
-      this.luklaAirport = new LuklaAirport();
-      this.scene.add(this.luklaTerrain.mesh, this.luklaAirport.group);
-    }
     for (const id of ['incheon', 'jeju']) {
-      if (id === 'incheon' && (this.incheonAirport || this.incheonLoad)) continue;
-      if (id === 'jeju' && (this.jejuAirport || this.jejuLoad)) continue;
+      if (this._isRegionLoadingOrLoaded(id)) continue;
       this.preloadUnifiedRegion(id).catch(error => console.warn(`Unified world: ${id} preload failed:`, error));
     }
   }
 
+  /** Stream neighboring unified regions only as the aircraft approaches their 65 km perimeter. */
+  updateUnifiedRegionStreaming(nowMs = performance.now()) {
+    if (!this.world || !this.position || !WORLD_REGIONS.includes(this.activeAirport)) return;
+    const x = this.position.x;
+    const z = this.position.z;
+    const movedSq = this._lastRegionStreamX === undefined
+      ? Infinity
+      : (x - this._lastRegionStreamX) ** 2 + (z - this._lastRegionStreamZ) ** 2;
+    if (movedSq < REGION_STREAM_MOVE_M ** 2
+      && this._lastRegionStreamMs !== undefined
+      && nowMs - this._lastRegionStreamMs < REGION_STREAM_INTERVAL_MS) {
+      return;
+    }
+    this._lastRegionStreamMs = nowMs;
+    this._lastRegionStreamX = x;
+    this._lastRegionStreamZ = z;
+    for (const id of WORLD_REGIONS) {
+      if (this.world.regions.has(id) || this._isRegionLoadingOrLoaded(id)) continue;
+      const distM = distanceToRegionBoundsM(x, z, this.world.offsets.get(id), REGION_EXTENTS[id]);
+      if (distM <= REGION_STREAM_DISTANCE_M) {
+        this.preloadUnifiedRegion(id).catch(error => console.warn(`Unified world: ${id} preload failed:`, error));
+      }
+    }
+  }
+
   async preloadUnifiedRegion(id) {
-    const isIncheon = id === 'incheon';
-    const loadField = isIncheon ? 'incheonLoad' : 'jejuLoad';
-    this[loadField] ??= (isIncheon
-      ? loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`)
-      : loadJejuAirport(`${import.meta.env.BASE_URL}scenery/jeju/`)
-    ).then(airport => {
-      airport.group.visible = airport.terrain.mesh.visible = false;
-      this.scene.add(airport.group, airport.terrain.mesh);
-      if (isIncheon) this.incheonAirport = airport;
-      else this.jejuAirport = airport;
-      return airport;
-    });
-    await this[loadField];
-    if (WORLD_REGIONS.includes(this.activeAirport)) this.syncUnifiedWorld(this.activeAirport);
+    await this.ensureRegionLoaded(id);
+    if (WORLD_REGIONS.includes(this.activeAirport)) {
+      this.syncUnifiedWorld(this.activeAirport);
+      if (this.collisionDetector) {
+        this.collisionDetector.setEnvironment(
+          this.currentTerrain,
+          this.currentAirport,
+          this.worldObstacles(),
+          this.ships,
+          this.activeAirport === 'coastal' ? this.water : null,
+        );
+      }
+      if (id === 'coastal' && this.startupReady && this.ships) {
+        this.ships.loadAssets();
+      }
+      if (id === 'incheon' || id === 'jeju' || id === 'lukla') {
+        this.ensureGeographicLayers?.();
+      }
+    }
   }
 
   /**
-   * Switch the active airport; Incheon assets are loaded before committing the selection.
+   * Switch the active airport; selected region assets are loaded before committing the selection.
    */
   async setAirport(id, pilotPreparation = false) {
     if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
     if (!['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju'].includes(id)) return;
-    if (WORLD_REGIONS.includes(id)) this.ensureUnifiedRegions();
     if (this.activeAirport === id) {
       if (this.syncUnifiedWorld(id)) return;
       if (id === 'incheon' && this.incheonAirport) {
@@ -788,21 +1098,15 @@ class PresetSpawnerMethods {
     this.bridgeFlight?.stop();
     const request = this.airportRequest = (this.airportRequest || 0) + 1;
     this.airportLoading = false;
-    document.getElementById('btn-fly').disabled = false;
+    const flyBtn = globalThis.document?.getElementById?.('btn-fly');
+    if (flyBtn) flyBtn.disabled = false;
     if (id === 'incheon' && !this.incheonAirport) {
       this.airportLoading = true;
-      document.getElementById('btn-fly').disabled = true;
+      if (flyBtn) flyBtn.disabled = true;
       this.showToast(() => t('incheon.loading'));
       try {
-        this.incheonLoad ??= loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`).then(airport => {
-          this.incheonAirport = airport;
-          airport.group.visible = airport.terrain.mesh.visible = false;
-          this.scene.add(airport.group, airport.terrain.mesh);
-          return airport;
-        });
-        await this.incheonLoad;
+        await this.ensureIncheonRegion();
       } catch (error) {
-        this.incheonLoad = null;
         console.warn('Incheon loading failed:', error);
         if (request === this.airportRequest) {
           this.showToast(() => t('incheon.load.failed'));
@@ -815,24 +1119,17 @@ class PresetSpawnerMethods {
       } finally {
         if (request === this.airportRequest) {
           this.airportLoading = false;
-          document.getElementById('btn-fly').disabled = false;
+          if (flyBtn) flyBtn.disabled = false;
         }
       }
       if (request !== this.airportRequest) return;
     } else if (id === 'jeju' && !this.jejuAirport) {
       this.airportLoading = true;
-      document.getElementById('btn-fly').disabled = true;
+      if (flyBtn) flyBtn.disabled = true;
       this.showToast(() => t('jeju.loading'));
       try {
-        this.jejuLoad ??= loadJejuAirport(`${import.meta.env.BASE_URL}scenery/jeju/`).then(airport => {
-          this.jejuAirport = airport;
-          airport.group.visible = airport.terrain.mesh.visible = false;
-          this.scene.add(airport.group, airport.terrain.mesh);
-          return airport;
-        });
-        await this.jejuLoad;
+        await this.ensureJejuRegion();
       } catch (error) {
-        this.jejuLoad = null;
         console.warn('Jeju loading failed:', error);
         if (request === this.airportRequest) {
           this.showToast(() => t('jeju.load.failed'));
@@ -844,9 +1141,12 @@ class PresetSpawnerMethods {
       } finally {
         if (request === this.airportRequest) {
           this.airportLoading = false;
-          document.getElementById('btn-fly').disabled = false;
+          if (flyBtn) flyBtn.disabled = false;
         }
       }
+      if (request !== this.airportRequest) return;
+    } else if (!this._isRegionLoaded(id)) {
+      await this.ensureRegionLoaded(id);
       if (request !== this.airportRequest) return;
     }
     this.devRunner?.stop();
@@ -858,38 +1158,39 @@ class PresetSpawnerMethods {
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
     const isValley = id === 'valley';
-    if (isLukla && !this.luklaTerrain) {
-      this.luklaTerrain = new LuklaTerrain();
-      this.luklaAirport = new LuklaAirport();
-      this.scene.add(this.luklaTerrain.mesh, this.luklaAirport.group);
-    }
-    if (isCoastal && this.startupReady) this.ships.loadAssets();
+    if (isCoastal && this.startupReady && this.ships) this.ships.loadAssets();
+    if (isIncheon || isJeju || isLukla) this.ensureGeographicLayers?.();
     setMapAttributionSource('incheon-attribution', isIncheon);
 
     // Toggle 3D mesh visibility
-    this.terrain.mesh.visible = isCoastal;
-    this.airport.group.visible = isCoastal;
-    this.water.mesh.visible = !isLukla && !isNeon && !isValley;
-    this.ships.group.visible = isCoastal;
-    this.foliage.group.visible = isCoastal;
+    if (this.terrain?.mesh) this.terrain.mesh.visible = isCoastal;
+    if (this.airport?.group) this.airport.group.visible = isCoastal;
+    if (this.water?.mesh) this.water.mesh.visible = !isLukla && !isNeon && !isValley;
+    if (this.ships?.group) this.ships.group.visible = isCoastal;
+    if (this.foliage?.group) this.foliage.group.visible = isCoastal;
 
-    if (this.luklaTerrain) this.luklaTerrain.mesh.visible = isLukla;
-    if (this.luklaAirport) this.luklaAirport.group.visible = isLukla;
+    if (this.luklaTerrain?.mesh) this.luklaTerrain.mesh.visible = isLukla;
+    if (this.luklaAirport?.group) this.luklaAirport.group.visible = isLukla;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
-    if (this.jejuAirport) this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = isJeju;
-    if (this.neonCity) this.neonCity.group.visible = isNeon;
-    this.currentTerrain = isJeju ? this.jejuAirport.terrain : isNeon ? this.neonCity.terrain : isIncheon ? this.incheonAirport.terrain : isLukla ? this.luklaTerrain : this.terrain;
-    this.currentAirport = isJeju ? this.jejuAirport : isNeon ? this.neonCity.airport : isIncheon ? this.incheonAirport : isLukla ? this.luklaAirport : this.airport;
+    if (this.neonCity?.group) this.neonCity.group.visible = isNeon;
+    if (this.persistentValley?.group) this.persistentValley.group.visible = isValley;
+    this.currentTerrain = isNeon ? this.neonCity.terrain
+      : isIncheon ? this.incheonAirport.terrain
+      : isLukla ? this.luklaTerrain
+      : isValley ? this.persistentValley
+      : this.terrain;
+    this.currentAirport = isNeon ? this.neonCity.airport
+      : isIncheon ? this.incheonAirport
+      : isLukla ? this.luklaAirport
+      : isValley ? null
+      : this.airport;
     this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
       const obstacles = this.worldObstacles();
       this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
     }
-    // Coastal ships stay mounted in every world; their deferred GLB visuals
-    // must be requested even when another airport is the spawn anchor.
-    this.ships?.loadAssets?.();
 
     if (this.explosionSystem) {
       this.explosionSystem.terrain = this.currentTerrain;
@@ -908,9 +1209,15 @@ class PresetSpawnerMethods {
       } else if (isIncheon) {
         const cab = this.incheonAirport.towerCab;
         this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
-      } else if (isJeju && this.jejuAirport) {
-        const cab = this.jejuAirport.towerCab.position;
-        this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
+      } else if (isJeju) {
+        const tower = getAirportOverride('RKPC')?.facilities?.find(f => f.kind === 'tower');
+        if (tower) {
+          this.cameraSystem.towerPos.set(
+            tower.position[0],
+            tower.position[1] + tower.height + (tower.cabHeight ?? 8) / 2,
+            tower.position[2],
+          );
+        }
       } else if (isLukla) {
         const t = this.luklaAirport.controlTowerData;
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
@@ -945,11 +1252,16 @@ class PresetSpawnerMethods {
     this.gameFlow.setCinematicAvailable(isScenarioAvailable(id, 'demo'));
     this.lobbyScreen?.refresh();
 
-    if (this.demoDirector && this.demoDirector.isActive) {
+    const demoWaitingForThisAirport = this.demoDirector?.isActive
+      && this.demoDirector.waitingForTerrain
+      && this.demoDirector.activeDemoAirport === id;
+    if (this.demoDirector && this.demoDirector.isActive && !demoWaitingForThisAirport) {
       this.demoDirector.stop();
     }
 
-    if (!this.applyingPendingStart) this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
+    if (!this.applyingPendingStart && !demoWaitingForThisAirport) {
+      this.setPreset(defaultScenarioForRegion(id), false, pilotPreparation);
+    }
     this.lobbyScreen?.refresh();
 
     const airportKey = isIncheon ? 'incheon.airport' : isLukla

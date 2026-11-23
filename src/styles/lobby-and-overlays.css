@@ -241,6 +241,261 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-group { display: flex; flex-direction: column; gap: calc(4px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-label { color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); font-weight: 500; letter-spacing: .2px; }
 .lobby-buttons { display: flex; flex-wrap: wrap; gap: calc(4px * var(--ui-scale, 1)); }
+.lobby-start-options {
+  display: flex;
+  gap: calc(4px * var(--ui-scale, 1));
+}
+.lobby-card .lobby-start-options .btn {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(36px * var(--ui-scale, 1));
+  white-space: normal;
+}
+.lobby-disclosure {
+  border: 1px solid #334155;
+  border-radius: calc(8px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, .6);
+}
+.lobby-disclosure > summary {
+  display: flex;
+  align-items: center;
+  gap: .65em;
+  min-height: calc(36px * var(--ui-scale, 1));
+  padding: calc(4px * var(--ui-scale, 1)) calc(9px * var(--ui-scale, 1));
+  font-size: calc(12px * var(--ui-scale, 1));
+  cursor: pointer;
+  list-style: none;
+}
+.compact-ui .lobby-disclosure > summary { min-height: 44px; }
+.lobby-disclosure > summary::-webkit-details-marker { display: none; }
+.lobby-disclosure > summary::after {
+  content: '›';
+  margin-inline-start: auto;
+  color: #94a3b8;
+}
+.lobby-disclosure[open] > summary::after { transform: rotate(90deg); }
+.lobby-disclosure > summary:focus-visible { outline: 2px solid #67e8f9; outline-offset: -2px; }
+.lobby-disclosure > :not(summary) {
+  margin: calc(6px * var(--ui-scale, 1)) calc(9px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+}
+.lobby-disclosure-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #a5c9dd;
+}
+.lobby-disclosure-value:empty { display: none; }
+#lobby-map-svg {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  height: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+#lobby-map-svg:active { cursor: grabbing; }
+.lobby-map-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: calc(6px * var(--ui-scale, 1));
+}
+.lobby-map-row label { display: flex; flex-direction: column; gap: calc(3px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-map-row label[hidden] { display: none; }
+.lobby-map-row select { width: 100%; }
+.lobby-map-browser { display: grid; gap: calc(8px * var(--ui-scale, 1)); min-width: 0; }
+.lobby-map-toolbar { display: flex; gap: calc(6px * var(--ui-scale, 1)); position: relative; }
+.lobby-map-toolbar::before {
+  content: '⌕';
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-52%);
+  color: #5f6368;
+  font-size: 20px;
+  line-height: 1;
+  pointer-events: none;
+}
+.lobby-map-toolbar input {
+  flex: 1;
+  min-width: 0;
+  min-height: calc(40px * var(--ui-scale, 1));
+  padding: 0 12px 0 34px;
+  color: #202124;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, .28);
+  font-size: calc(11px * var(--ui-scale, 1));
+}
+.lobby-map-toolbar input:focus {
+  outline: none;
+  border-color: #4285f4;
+  box-shadow: 0 1px 6px rgba(66, 133, 244, .45);
+}
+.lobby-map-toolbar .btn-bookmark {
+  min-height: calc(40px * var(--ui-scale, 1));
+  color: #1a73e8;
+  background: #fff;
+  border-color: #dadce0;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, .2);
+}
+.lobby-map-frame {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .6);
+  border-radius: calc(12px * var(--ui-scale, 1));
+  background: #cfe5ff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .28);
+}
+.lobby-map-backdrop { fill: #cfe5ff; }
+.lobby-map-tile { pointer-events: none; }
+.lobby-map-attribution {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  padding: 1px 4px;
+  color: #3c4043;
+  background: rgba(255, 255, 255, .82);
+  border-radius: 4px;
+  font-size: 9px;
+  line-height: 1.3;
+}
+.lobby-map-attribution a { color: #174ea6; text-decoration: none; }
+.lobby-map-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 24px;
+  display: grid;
+  overflow: hidden;
+  border-radius: 8px;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, .32);
+}
+.lobby-map-zoom button {
+  width: calc(34px * var(--ui-scale, 1));
+  height: calc(34px * var(--ui-scale, 1));
+  min-height: 0;
+  padding: 0;
+  color: #3c4043;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #e8eaed;
+  border-radius: 0;
+  font-size: 19px;
+  line-height: 1;
+}
+.lobby-map-zoom button:last-child { border-bottom: 0; }
+.lobby-map-zoom button:hover { background: #f1f3f4; }
+.lobby-map-tools { display: flex; align-items: center; justify-content: space-between; gap: .5em; }
+.lobby-map-marker { cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45)); }
+.lobby-map-marker-pin { fill: #4285f4; stroke: #fff; stroke-width: 1.2px; }
+.lobby-map-marker-dot { fill: #fff; }
+.lobby-map-marker.active .lobby-map-marker-pin { fill: #ea4335; }
+.lobby-map-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(8px * var(--ui-scale, 1));
+  min-height: calc(20px * var(--ui-scale, 1));
+}
+.lobby-map-status { margin: 0; color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
+.lobby-card #lobby-map-search-retry {
+  min-height: calc(24px * var(--ui-scale, 1));
+  padding: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  font-size: calc(10px * var(--ui-scale, 1));
+  border-radius: calc(6px * var(--ui-scale, 1));
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, .35);
+  background: rgba(14, 165, 233, .1);
+  white-space: nowrap;
+}
+.lobby-card #lobby-map-search-retry:hover {
+  background: rgba(14, 165, 233, .22);
+  color: #e0f2fe;
+}
+.lobby-card #lobby-map-overview {
+  min-height: calc(26px * var(--ui-scale, 1));
+  padding: calc(2px * var(--ui-scale, 1)) calc(8px * var(--ui-scale, 1));
+  font-size: calc(11px * var(--ui-scale, 1));
+  white-space: nowrap;
+}
+.lobby-card .lobby-map-toolbar .btn-bookmark {
+  min-height: calc(40px * var(--ui-scale, 1));
+  padding: 0 calc(14px * var(--ui-scale, 1));
+  color: #1a73e8;
+  background: #fff;
+  border: 1px solid #dadce0;
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgba(60, 64, 67, .2);
+  font-weight: 600;
+  font-size: calc(11px * var(--ui-scale, 1));
+  white-space: nowrap;
+}
+.lobby-card .lobby-map-toolbar .btn-bookmark:hover {
+  background: #f8fafd;
+  border-color: #4285f4;
+  color: #174ea6;
+}
+.lobby-card .lobby-map-toolbar .btn-bookmark.active {
+  background: #e8f0fe;
+  border-color: #1a73e8;
+  color: #1a73e8;
+}
+.lobby-card .lobby-map-results,
+.lobby-card .lobby-map-bookmarks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(5px * var(--ui-scale, 1));
+}
+.lobby-card .lobby-map-results .btn,
+.lobby-card .lobby-map-bookmarks .btn {
+  min-width: 0;
+  min-height: calc(28px * var(--ui-scale, 1));
+  padding: calc(4px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  color: #e2e8f0;
+  background: rgba(30, 41, 59, .7);
+  border: 1px solid rgba(148, 163, 184, .25);
+  border-radius: 999px;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  font-weight: 500;
+  line-height: 1.35;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.lobby-card .lobby-map-results .btn:hover,
+.lobby-card .lobby-map-bookmarks .btn:hover {
+  background: rgba(51, 65, 85, .9);
+  border-color: rgba(148, 163, 184, .45);
+  color: #ffffff;
+}
+.lobby-card .lobby-map-results .btn.active,
+.lobby-card .lobby-map-bookmarks .btn.active {
+  color: #bae6fd;
+  background: rgba(14, 165, 233, .22);
+  border-color: #0ea5e9;
+  box-shadow: 0 0 10px rgba(14, 165, 233, .3);
+}
+.lobby-card .lobby-map-results > span,
+.lobby-card .lobby-map-bookmarks > span {
+  display: block;
+  color: #94a3b8;
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  padding: calc(3px * var(--ui-scale, 1)) 0;
+}
+
+@media (max-width: 600px) and (orientation: portrait) {
+  .lobby-map-frame { margin-inline: -6px; }
+  #lobby-map-svg { aspect-ratio: 1 / 1; }
+  .lobby-map-attribution { font-size: 10px; }
+}
+@media (max-width: 600px) and (orientation: landscape) {
+  #lobby-map-svg { aspect-ratio: 16 / 9; }
+}
 .lobby-card .btn {
   min-width: 0;
   min-height: calc(28px * var(--ui-scale, 1));
@@ -264,7 +519,6 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   border-color: #0ea5e9;
   box-shadow: inset 3px 0 0 #0ea5e9, 0 0 16px rgba(14, 165, 233, 0.25);
 }
-.lobby-card .btn-airport,
 .lobby-card .btn-aircraft {
   flex: 1;
   position: relative;
@@ -277,17 +531,16 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   color: #e0f2fe;
 }
 .lobby-scenarios .btn-preset {
-  flex: 1 1 calc(50% - 4px);
-  min-width: calc(120px * var(--ui-scale, 1));
+  flex: 1 1 100%;
+  justify-content: flex-start;
   text-align: left;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .lobby-language .btn { min-height: calc(24px * var(--ui-scale, 1)); padding: calc(2px * var(--ui-scale, 1)) calc(6px * var(--ui-scale, 1)); font-size: calc(10px * var(--ui-scale, 1)); }
 /* Panel content scrolls vertically; the tabs and flight action stay in place. */
 .lobby-card, .lobby-card button, .lobby-card select { touch-action: pan-y; }
-#lobby-time-select, #lobby-regional-cruise { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
+#lobby-time-select { width: 100%; font-variant-numeric: tabular-nums; color-scheme: dark; }
 .lobby-tabs { display: flex; gap: calc(3px * var(--ui-scale, 1)); padding: calc(3px * var(--ui-scale, 1)); background: rgba(0, 0, 0, .25); border-radius: calc(8px * var(--ui-scale, 1)); }
 .lobby-tabs > .lobby-tab { flex: 1; }
 .lobby-tabs > [hidden] { display: none; }
@@ -618,6 +871,14 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
 .lobby-card .lobby-actions #btn-fly {
   flex: 1.4 1 calc(130px * var(--ui-scale, 1));
 }
+.lobby-card:has(#lobby-panel-scenario:not([hidden])):not(:has(.lobby-disclosure[open])) {
+  height: auto;
+}
+.lobby-card:has(#lobby-panel-scenario:not([hidden]) #lobby-place-picker[open]) {
+  width: min(calc(560px * var(--ui-scale, 1)), calc(100vw - 32px));
+  max-height: calc(100dvh - 24px);
+  height: min(calc(820px * var(--ui-scale, 1)), calc(100dvh - 24px));
+}
 .lobby-card .lobby-actions .btn[hidden] { display: none; }
 .btn-icon,
 .tab-icon {
@@ -629,7 +890,6 @@ body[data-dev-scenario="true"]:not([data-dev-manual-flight="true"]) #touch-contr
   flex-shrink: 0;
   vertical-align: middle;
 }
-.lobby-hint { color: #94a3b8; font-size: calc(9.5px * var(--ui-scale, 1)); line-height: 1.35; margin: -2px 0 0; text-align: center; }
 
 /* Pause: dim the frozen scene lightly. */
 #pause-menu {
@@ -747,7 +1007,8 @@ body:is([data-flow="lobby"], .booting) #cockpit-pov-panel,
 body:is([data-flow="lobby"], .booting) .btn-gaze-exit,
 body:is([data-flow="lobby"], .booting) #btn-gaze-exit,
 body:is([data-flow="lobby"], .booting) .pov-actions-bar,
-body:is([data-flow="lobby"], .booting) .touch-controls-overlay { display: none !important; }
+body:is([data-flow="lobby"], .booting) .touch-controls-overlay,
+body:not([data-flow="flight"]) #head-tracking-panel { display: none !important; }
 /* Keep the menu affordance available during play; hide it until startup ends. */
 body.booting .menu-toggle { display: none !important; }
 
@@ -874,8 +1135,39 @@ body[data-flow="lobby"] .menu-toggle {
   padding: 16px 18px;
   gap: 12px;
 }
+.compact-ui .lobby-card:has(#lobby-panel-scenario:not([hidden]) #lobby-place-picker[open]) {
+  margin: max(8px, calc(var(--edge-top) + 8px)) auto max(8px, calc(var(--edge-bottom) + 8px));
+  width: min(620px, calc(100vw - 16px));
+  max-height: calc(100dvh - max(16px, calc(var(--edge-top) + var(--edge-bottom) + 16px)));
+  height: min(820px, calc(100dvh - max(16px, calc(var(--edge-top) + var(--edge-bottom) + 16px))));
+  padding: 12px 14px;
+  gap: 8px;
+}
 .compact-ui .lobby-card .btn,
 .compact-ui .lobby-settings #touch-btn-gyro { min-height: 44px; }
+.compact-ui .lobby-card .lobby-map-results .btn,
+.compact-ui .lobby-card .lobby-map-bookmarks .btn {
+  min-height: 32px;
+  padding: 4px 10px;
+  font-size: 11px;
+}
+.compact-ui .lobby-card #lobby-map-overview {
+  min-height: 28px;
+  padding: 3px 8px;
+  font-size: 11px;
+}
+.compact-ui .lobby-card #lobby-map-search-retry {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.compact-ui .lobby-card .lobby-map-toolbar input {
+  min-height: 38px;
+}
+.compact-ui .lobby-card .lobby-map-toolbar .btn-bookmark {
+  min-height: 38px;
+  padding: 0 12px;
+}
 .compact-ui .lobby-card .lobby-header { gap: 8px; }
 .compact-ui .lobby-header-actions { gap: 6px; }
 .compact-ui .lobby-language {
@@ -924,9 +1216,8 @@ body[data-flow="lobby"] .menu-toggle {
     width: min(420px, calc(100vw - var(--edge-left) - var(--edge-right) - 16px));
   }
   /* Short landscape: give the scrolling panel the height. The build line,
-     subtitle, language caption and ESC hint return in taller layouts. */
+     subtitle and language caption return in taller layouts. */
   .compact-ui .lobby-card .build-info,
-  .compact-ui .lobby-card .lobby-hint,
   .compact-ui .lobby-title > span,
   .compact-ui .lobby-language > .lobby-label { display: none; }
   .compact-ui .lobby-card .lobby-tabs { padding: 2px; }
@@ -1022,8 +1313,6 @@ body[data-flow="lobby"] #map-attribution {
   bottom: max(4px, env(safe-area-inset-bottom, 0px));
 }
 
-.lobby-card .btn-airport span { white-space: normal; overflow-wrap: anywhere; }
-
 #render-trials {
   display: flex; flex-direction: column;
   position: fixed; top: 145px; right: 12px; z-index: 75;
@@ -1083,8 +1372,7 @@ body:is([data-flow="lobby"], [data-flow="paused"], [data-flow="debrief"], .booti
 body.hud-folded #hud-locator-glass { display: none; }
 
 /* ===== Main menu: tactical flight-deck cards (see docs/design/main-menu-redesign-concept.jpg) ===== */
-.lobby-card .btn-aircraft,
-.lobby-card .btn-airport {
+.lobby-card .btn-aircraft {
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -1092,9 +1380,8 @@ body.hud-folded #hud-locator-glass { display: none; }
   gap: 3px;
   min-width: 0;
   text-align: left;
+  flex: 1 1 100%;
 }
-.lobby-card .btn-airport { flex: 1 1 calc(50% - 3px); }
-.lobby-card .btn-aircraft { flex: 1 1 100%; }
 /* Inline SVG stand-in for an emoji prefix where Unicode has no colour glyph. */
 .aircraft-icon { width: 1.25em; height: 1.25em; margin-right: .3em; vertical-align: -.25em; }
 .spec-badge {

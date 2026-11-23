@@ -4,7 +4,7 @@ import { projectToLocal } from '../geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../geospatial/CorridorCoordinateSystem.js';
 import { REAL_AIRPORTS, AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84, realOffsetInIncheonFrame } from '../geospatial/airportGeodesy.js';
 import { isExternalDestination } from '../config/externalDestinations.js';
-import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
+import { APPROACH_DATA } from '../config/approachData.js';
 
 /**
  * One always-present world for every persistent region: coastal, Incheon,
@@ -27,15 +27,15 @@ import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 
 const JEJU_IN_INCHEON = projectToLocal(JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
 
-// Region placement: Incheon <-> Jeju uses the surveyed WGS84 separation; Lukla
-// sits a flyable distance south of Jeju. Arcade regions have no WGS84 frame,
-// so they are separated in the same world instead of sharing the origin.
-const LUKLA_SOUTH_OF_JEJU_M = 260000;
+// Region placement: Incheon/Jeju/Lukla use surveyed WGS84 origins projected
+// into the Incheon scenery frame. Arcade regions have no WGS84 frame, so
+// they are separated in the same world instead of sharing an origin.
+const LUKLA_IN_INCHEON = projectToLocal(AIRPORT_ORIGINS.lukla.latitude, AIRPORT_ORIGINS.lukla.longitude);
 
 export const BASE_OFFSETS = Object.freeze({
   incheon: Object.freeze([0, 0]),
   jeju: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1]]),
-  lukla: Object.freeze([JEJU_IN_INCHEON[0], JEJU_IN_INCHEON[1] + LUKLA_SOUTH_OF_JEJU_M]),
+  lukla: Object.freeze([LUKLA_IN_INCHEON[0], LUKLA_IN_INCHEON[1]]),
   coastal: Object.freeze([-80000, -60000]),
   neon: Object.freeze([80000, -60000]),
   valley: Object.freeze([0, -180000]),
@@ -44,8 +44,8 @@ export const BASE_OFFSETS = Object.freeze({
 export const WORLD_REGIONS = Object.freeze(Object.keys(BASE_OFFSETS));
 
 // Extents in each region's own local frame. Jeju's north edge includes the
-// Chuja emergency strip at roughly (-18300, -50008), which is rendered by
-// JejuAirport but lies far outside the island's main terrain box.
+// Chuja emergency strip at roughly (-18300, -50008), rendered by the common
+// open-world anchor surface.
 export const REGION_EXTENTS = Object.freeze({
   incheon: Object.freeze({ minX: -7000, maxX: 22000, minZ: -7000, maxZ: 22000 }),
   jeju: Object.freeze({ minX: -30000, maxX: 45000, minZ: -54000, maxZ: 45000 }),
@@ -108,18 +108,49 @@ export class UnifiedWorld {
   get loadError() { return this.anchorTerrain?.loadError; }
   get openWorld() { return this.anchorTerrain?.openWorld; }
   set openWorld(value) { if (this.anchorTerrain) this.anchorTerrain.openWorld = value; }
+  get airportMesh() { return this.anchorTerrain?.airportMesh ?? null; }
   get geographicBuildingLayer() { return this.anchorTerrain?.geographicBuildingLayer; }
   set geographicBuildingLayer(value) { if (this.anchorTerrain) this.anchorTerrain.geographicBuildingLayer = value; }
   get corridorStreamer() { return this.anchorTerrain?.corridorStreamer; }
   set corridorStreamer(value) { if (this.anchorTerrain) this.anchorTerrain.corridorStreamer = value; }
 
   /** extent: {minX, maxX, minZ, maxZ} in the region's own local frame. */
-  register(id, { terrain, airport, group = null, mesh = null, extent }) {
+  register(id, { terrain, airport, group = null, mesh = null, extent, mounted }) {
     if (!BASE_OFFSETS[id] && !this.dynamicOffsets.has(id)) throw new Error(`Unknown unified region: ${id}`);
     if (!terrain || !extent) throw new Error(`Unified region ${id} needs terrain and extent`);
-    this.regions.set(id, { terrain, airport, group, mesh, extent });
+    const previous = this.regions.get(id);
+    const keepMounted = mounted === undefined ? (previous?.mounted ?? true) : mounted;
+    this.regions.set(id, { terrain, airport, group, mesh, extent, mounted: Boolean(keepMounted) });
     this.syncMeshes();
     return this;
+  }
+
+  /** Surface records stay registered when visuals are unmounted. */
+  isMounted(id) {
+    return this.regions.get(id)?.mounted === true;
+  }
+
+  setMounted(id, mounted) {
+    const region = this.regions.get(id);
+    if (!region || region.mounted === Boolean(mounted)) return false;
+    region.mounted = Boolean(mounted);
+    this.syncMeshes();
+    return true;
+  }
+
+  /** Distance in metres from an anchor-local point to a region's world-frame box. */
+  distanceToRegion(id, x, z) {
+    const region = this.regions.get(id);
+    const base = BASE_OFFSETS[id];
+    if (!region || !base) return Infinity;
+    const anchor = BASE_OFFSETS[this.anchor];
+    const ox = base[0] - anchor[0];
+    const oz = base[1] - anchor[1];
+    const e = region.extent;
+    return Math.hypot(
+      Math.max(e.minX + ox - x, 0, x - e.maxX - ox),
+      Math.max(e.minZ + oz - z, 0, z - e.maxZ - oz),
+    );
   }
 
   /** Add a streamed airport slot whose WGS84 placement is derived from index data. */
@@ -177,14 +208,14 @@ export class UnifiedWorld {
     return true;
   }
 
-  /** Keep every registered region visible, translated into the current frame. */
+  /** Keep every registered region in the active frame; only mounted ones draw. */
   syncMeshes() {
     for (const [id, region] of this.regions) {
       const [x, z] = this.offsets.get(id);
       region.group?.position.set(x, 0, z);
       region.mesh?.position.set(x, 0, z);
-      if (region.group) region.group.visible = true;
-      if (region.mesh) region.mesh.visible = true;
+      if (region.group) region.group.visible = region.mounted;
+      if (region.mesh) region.mesh.visible = region.mounted;
     }
   }
 
@@ -270,11 +301,12 @@ export class UnifiedWorld {
     const realOffset = realOffsetInIncheonFrame(id);
     const placementIsReal = realOffset
       && Math.hypot(target[0] - realOffset[0], target[1] - realOffset[1]) < 5;
-    const synthetic = this.anchor !== 'incheon' || !REAL_AIRPORTS.includes(id)
+    const synthetic = !REAL_AIRPORTS.includes(id)
       || !placementIsReal || !from || !threshold;
-    const markerLocal = synthetic
+    const authoredThreshold = APPROACH_DATA[id]?.threshold;
+    const markerLocal = synthetic || !authoredThreshold
       ? null
-      : wgs84ToLocal(threshold.latitude, threshold.longitude, AIRPORT_ORIGINS[this.anchor]);
+      : [target[0] - anchor[0] + authoredThreshold.x, target[1] - anchor[1] + authoredThreshold.z];
     const dx = markerLocal ? markerLocal[0] - x : centreDx;
     const dz = markerLocal ? markerLocal[1] - z : centreDz;
     const distanceM = synthetic

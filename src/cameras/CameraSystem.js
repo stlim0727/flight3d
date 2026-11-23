@@ -143,6 +143,52 @@ export class CameraSystem {
   applyHatLook(dirX, dirY, dt) { applyHatLook(this, dirX, dirY, dt); }
   updatePovReturn(dt) { updatePovReturn(this, dt); }
   resetLook(options = {}) { resetLook(this, options); }
+  setHeadTrackingEnabled(enabled) {
+    this.headTrackingEnabled = Boolean(enabled);
+    if (!this.headTrackingEnabled) {
+      this.targetHeadLookYaw = 0;
+      this.targetHeadLookPitch = 0;
+      this.headLookActive = false;
+    }
+  }
+  setHeadLook(yaw, pitch) {
+    if (!Number.isFinite(yaw) || !Number.isFinite(pitch)) return;
+    const maxYaw = this.headLookMaxYaw ?? Math.PI * 0.5;
+    const maxPitch = this.headLookMaxPitch ?? Math.PI * 0.45;
+    this.targetHeadLookYaw = Math.max(-maxYaw, Math.min(maxYaw, yaw));
+    this.targetHeadLookPitch = Math.max(-maxPitch, Math.min(maxPitch, pitch));
+  }
+  _lookYawWithHead() {
+    return this.lookYaw + (this.headLookActive ? this.headLookYaw : 0);
+  }
+  _lookPitchWithHead() {
+    return this.lookPitch + (this.headLookActive ? this.headLookPitch : 0);
+  }
+  isLookingAwayFromCenter() {
+    if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
+    const yaw = this._lookYawWithHead();
+    const pitch = this._lookPitchWithHead();
+    return Math.abs(yaw) > 0.38 || Math.abs(pitch - (this.aircraftLookPitch ?? -0.25)) > 0.42;
+  }
+  zoomGazeBlend() {
+    const yaw = this._lookYawWithHead();
+    const pitch = this._lookPitchWithHead();
+    return Math.max(0, 1 - Math.max(Math.abs(yaw) / 0.38, Math.abs(pitch - (this.aircraftLookPitch ?? -0.25)) / 0.42));
+  }
+  resetHeadLook() {
+    this.targetHeadLookYaw = 0;
+    this.targetHeadLookPitch = 0;
+    this.headLookYaw = 0;
+    this.headLookPitch = 0;
+  }
+  updateHeadLook(dt) {
+    const factor = 1 - Math.exp(-8 * Math.max(0, dt));
+    this.headLookYaw += (this.targetHeadLookYaw - this.headLookYaw) * factor;
+    this.headLookPitch += (this.targetHeadLookPitch - this.headLookPitch) * factor;
+    // Head look belongs to the head views only, and yields to an explicit drag.
+    this.headLookActive = this.headTrackingEnabled && !this.userLookOverridden
+      && [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.WING, CameraSystem.MODES.GEAR].includes(this.mode);
+  }
   togglePointerLock() {
     if (typeof document === 'undefined' || !this.domElement) return;
     if (document.pointerLockElement === this.domElement) {
@@ -150,13 +196,6 @@ export class CameraSystem {
     } else if (this.domElement.requestPointerLock) {
       this.domElement.requestPointerLock();
     }
-  }
-  isLookingAwayFromCenter() {
-    if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
-    return Math.abs(this.lookYaw) > 0.38 || Math.abs(this.lookPitch - (this.aircraftLookPitch ?? -0.25)) > 0.42;
-  }
-  zoomGazeBlend() {
-    return Math.max(0, 1 - Math.max(Math.abs(this.lookYaw) / 0.38, Math.abs(this.lookPitch - (this.aircraftLookPitch ?? -0.25)) / 0.42));
   }
   resetDroneOrbit(angle = 1.8, distance = 38.0, height = 11.5) {
     if (this.userLookOverridden) return;
@@ -290,6 +329,7 @@ export class CameraSystem {
     this.updateEdgePan(dt);
     this.updatePovReturn(dt);
     this.updatePovButtonState();
+    this.updateHeadLook(dt);
 
     if (this.customViewUpdater && !this.userModeSelected && !this.userLookOverridden) {
       if (this.customViewUpdater({

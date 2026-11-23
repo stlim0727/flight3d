@@ -94,8 +94,23 @@ await withBrowserSession({ path: '/?telemetry=0', width: 1280, height: 720 },
     }
 
     await click(evaluate, 'lobby-tab-scenario', { action: 'open-scenario-tab', target: 'lobby-tab-scenario' }, delay);
+    if (config.airport !== 'valley') {
+      const placeId = { incheon: 'RKSI', jeju: 'RKPC' }[config.airport] ?? config.airport;
+      let placeReady = false;
+      for (let i = 0; i < 60 && !placeReady; i++) {
+        placeReady = Boolean(await evaluate(`Boolean(document.querySelector('#lobby-map-default-bookmarks [data-place-id="${placeId}"]'))`));
+        if (!placeReady) await delay(250);
+      }
+      if (!placeReady) throw new Error(`Missing lobby place bookmark: ${placeId}`);
+      await evaluate((id) => {
+        const picker = document.querySelector('#lobby-place-picker');
+        if (picker && !picker.open) picker.querySelector('summary')?.click();
+        document.querySelector(`#lobby-map-default-bookmarks [data-place-id="${id}"]`)?.click();
+      }, placeId);
+      feedback.flow.push({ step: feedback.flow.length + 1, action: 'select-airport', value: config.airport });
+      await delay(500);
+    }
     const required = [
-      [`lobby-airport-${config.airport}`, { action: 'select-airport', value: config.airport }],
       [`lobby-aircraft-${aircraft.toLowerCase()}`, { action: 'select-aircraft', value: aircraft }],
       [scenario.lobbyButtonId, { action: 'select-scenario', value: config.scenario }],
     ];

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './EffectFlipbook.js';
+import { createEffectAtlas, createFlipbookMaterial, effectAtlasFromData, updateFlipbook } from './EffectFlipbook.js';
 
 /**
  * Realistic Aviation Tire Touchdown Smoke & Friction System
@@ -9,7 +9,7 @@ import { createEffectAtlas, createFlipbookMaterial, updateFlipbook } from './Eff
  * smoke plumes that trail rearward with the slipstream and wind.
  */
 export class TireSmokeSystem {
-  constructor(scene, terrain = null) {
+  constructor(scene, terrain = null, options = {}) {
     this.scene = scene;
     this.terrain = terrain;
 
@@ -20,12 +20,24 @@ export class TireSmokeSystem {
     this.particles = [];
     this.activeSpinUpEmitters = [];
 
-    // Realistic soft feathered smoke texture
-    this.smokeTexture = createEffectAtlas('tire');
-    this.waterTexture = createEffectAtlas('water');
+    this.smokeTexture = null;
+    this.waterTexture = null;
+    if (!options.deferTextures) {
+      this.ensureTextures();
+    }
 
     // Reusable vectors for performance
     this._tempVec = new THREE.Vector3();
+  }
+
+  ensureTextures() {
+    this.smokeTexture ??= createEffectAtlas('tire');
+    this.waterTexture ??= createEffectAtlas('water');
+  }
+
+  applyAtlasBuffers(buffers = {}) {
+    if (!this.smokeTexture && buffers.tire) this.smokeTexture = effectAtlasFromData('tire', buffers.tire);
+    if (!this.waterTexture && buffers.water) this.waterTexture = effectAtlasFromData('water', buffers.water);
   }
 
   /**
@@ -70,6 +82,7 @@ export class TireSmokeSystem {
    * Emits a burst of smoke particles at a specific contact patch
    */
   emitSmokeBurst(origin, linearVelocity, groundSpeed, count) {
+    this.ensureTextures();
     // Determine horizontal movement direction
     const velNorm = this._tempVec.set(linearVelocity.x, 0, linearVelocity.z);
     if (velNorm.lengthSq() > 0.001) {
@@ -143,6 +156,7 @@ export class TireSmokeSystem {
    * Spawns expanding water spray plumes for hydroplaning ditching
    */
   emitWaterSprayBurst(origin, linearVelocity, groundSpeed, count = 3) {
+    this.ensureTextures();
     const velNorm = this._tempVec.copy(linearVelocity).setY(0);
     const speed = velNorm.length();
     if (speed > 0.001) velNorm.normalize();

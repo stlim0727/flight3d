@@ -13,6 +13,7 @@ import { CessnaProximityScenario } from './scenarios/CessnaProximityScenario.js'
 import { resolveDemoProfile } from './demoProfiles.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
 import { NeonDepartureScenario } from './scenarios/NeonDepartureScenario.js';
+import { F16GimpoScenario } from './scenarios/F16GimpoScenario.js';
 
 /**
  * Autonomous Cinematic Demo Flight Director
@@ -65,6 +66,7 @@ export class DemoFlightDirector {
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.neonDepartureScenario = new NeonDepartureScenario(this, simulator);
+    this.f16GimpoScenario = new F16GimpoScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
     this.profile = 'classic';
 
@@ -100,6 +102,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if(this.activeDemoAirport==='incheon' && this.profile==='gimpo-sortie')return this.f16GimpoScenario;
     if(this.activeDemoAirport==='incheon' && this.profile==='sihwa-tour')return this.sihwaTourScenario;
     if (this.activeDemoAircraft === 'F16') {
       return this.profile === 'canyon-slalom' ? this.f16SlalomScenario
@@ -329,17 +332,21 @@ export class DemoFlightDirector {
     this.closeRestartConfirm?.();
     // The bridge flight is flown by hand; a demo may only take over another airport.
     if (this.sim.bridgeFlight?.active && (!targetAirport || targetAirport === this.sim.activeAirport)) return false;
-    const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';
-    if (!sihwa && (targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
-    if (!sihwa && this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
+    const incheon = (targetAirport || this.sim.activeAirport) === 'incheon';
+    const resolved = incheon ? resolveDemoProfile(this.sim.currentAircraftId, 'incheon', requestedProfile).id : null;
+    const sihwa = resolved === 'sihwa-tour';
+    const gimpo = resolved === 'gimpo-sortie';
+    if (!sihwa && !gimpo && incheon && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
+    if (!sihwa && !gimpo && this.sim.currentAircraftId === 'F16'
+      && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
-    if (this.sim.setAirport && this.sim.activeAirport !== airport) {
-      this.sim.setAirport(airport);
-    }
+    const airportSwitch = (this.sim.setAirport && this.sim.activeAirport !== airport)
+      ? this.sim.setAirport(airport)
+      : null;
 
     this.activeDemoAirport = airport;
     this.profile = resolveDemoProfile(this.activeDemoAircraft, airport, requestedProfile).id;
@@ -376,17 +383,42 @@ export class DemoFlightDirector {
     }
 
     // Keep the constructor's auto-start request alive while the asynchronous
-    // DEM loads. isActive lets Esc, presets and airport changes cancel it.
-    this.waitingForTerrain = airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false;
+    // region or DEM loads. isActive lets Esc, presets and airport changes cancel it.
+    const waitingForAirportSwitch = Boolean(this.sim.setAirport && this.sim.activeAirport !== airport);
+    this.waitingForTerrain = waitingForAirportSwitch || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
     if (this.waitingForTerrain) {
-      // Discard the previous airport's pose even when it has not crashed.
+      // Discard the previous airport's pose once the destination airport is active.
       // Cancellation must leave a safe runway spawn rather than sea-level flight.
-      this.sim.setPreset('runway', true);
+      if (!waitingForAirportSwitch) {
+        this.sim.setPreset('runway', true);
+      }
       this.currentStage = DemoFlightDirector.STAGES.IDLE;
       this.getActiveScenario().result = { status: 'pending', airborne: false };
       this.updateBanner(() => t('loading.lukla.terrain'), () => t('the.demo.will.start.when.terrain.data'));
       this.sim.controls?.setParkingBrake?.(true);
       this.sim.gear?.setBrakes(1);
+      if (waitingForAirportSwitch && typeof airportSwitch?.then === 'function') {
+        const expectedAirport = airport;
+        const expectedProfile = this.profile;
+        airportSwitch.then(() => {
+          if (!this.isActive || !this.waitingForTerrain || this.activeDemoAirport !== expectedAirport) return;
+          if (this.sim.activeAirport !== expectedAirport) {
+            this.stop();
+            return;
+          }
+          if (this.sim.currentTerrain?.isLoaded !== false) {
+            this.start(expectedAirport, expectedProfile);
+          } else {
+            this.sim.setPreset('runway', true);
+            this.sim.controls?.setParkingBrake?.(true);
+            this.sim.gear?.setBrakes(1);
+          }
+        }).catch(() => {
+          if (this.isActive && this.waitingForTerrain && this.activeDemoAirport === expectedAirport) {
+            this.stop();
+          }
+        });
+      }
       return;
     }
     this.sim.controls?.setParkingBrake?.(false);
@@ -398,7 +430,9 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
+    if (this.profile==='gimpo-sortie' && this.activeDemoAirport==='incheon') {
+      this.setStage(F16GimpoScenario.STAGES.PREPARE);
+    } else if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
       this.setStage(SihwaTourScenario.STAGES.COAST);
     } else if (this.activeDemoAircraft === 'F16') {
       if (this.profile === 'canyon-slalom') {
@@ -557,12 +591,13 @@ export class DemoFlightDirector {
   update(dt) {
     if (!this.isActive || this.isRestartConfirmOpen) return;
     if (this.waitingForTerrain) {
+      if (this.sim.activeAirport !== this.activeDemoAirport) return;
       if (this.sim.currentTerrain?.loadError) {
         this.getActiveScenario().recordFailure({ description: this.sim.currentTerrain.loadError });
         this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
-      if (this.sim.currentTerrain?.isLoaded === true) this.start(this.activeDemoAirport, this.profile);
+      if (this.sim.currentTerrain?.isLoaded !== false) this.start(this.activeDemoAirport, this.profile);
       return;
     }
 

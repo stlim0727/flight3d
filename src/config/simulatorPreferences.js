@@ -114,7 +114,7 @@ export function deviceTimeOfDay(now = new Date()) {
 
 function applySkyTime(sim, hours) {
   sim.sky.setTimeOfDay(hours);
-  sim.foliage.setTimeOfDay(sim.sky.timeOfDay);
+  sim.foliage?.setTimeOfDay(sim.sky.timeOfDay);
   sim.water.syncWithAtmosphere(sim.sky);
 }
 

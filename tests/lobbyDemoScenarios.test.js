@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
+import { DEFAULT_AIRPORT } from '../src/config/flightSelection.js';
 import { SPAWN_SCENARIOS } from '../src/config/scenarioRegistry.js';
-import { setLanguage } from '../src/i18n/index.js';
+import { setLanguage, t } from '../src/i18n/index.js';
 
 class MockElement {
   constructor(id = '', tag = 'div') {
@@ -53,9 +54,35 @@ class MockElement {
     if (!this.listeners[evt]) this.listeners[evt] = [];
     this.listeners[evt].push(fn);
   }
-  click() {
+  click(target = this) {
     if (this.onclick) this.onclick();
-    this.listeners['click']?.forEach(fn => fn({ preventDefault() {} }));
+    const event = { preventDefault() {}, target };
+    let cur = this;
+    while (cur) {
+      cur.listeners['click']?.forEach(fn => fn(event));
+      cur = cur.parentElement;
+    }
+  }
+  dispatchEvent(event) {
+    this.listeners[event.type]?.forEach(fn => fn(event));
+  }
+  contains(el) {
+    if (this === el) return true;
+    return this.children.some(child => child.contains?.(el));
+  }
+  closest(sel) {
+    const match = el => {
+      if (sel === '[data-place-kind]') return Boolean(el.dataset?.placeKind);
+      if (sel.startsWith('.')) return el.classList?.contains?.(sel.slice(1));
+      if (sel.startsWith('#')) return el.id === sel.slice(1);
+      return el.tagName === sel.toUpperCase();
+    };
+    let cur = this;
+    while (cur) {
+      if (match(cur)) return cur;
+      cur = cur.parentElement;
+    }
+    return null;
   }
   appendChild(child) {
     child.parentElement = this;
@@ -108,12 +135,16 @@ function setupMockDOM() {
   scenarioContainer.appendChild(lobbyButtons);
 
   for (const scenario of Object.values(SPAWN_SCENARIOS)) {
+    if (!scenario.lobbyButtonId) continue;
     const btn = getOrCreate(scenario.lobbyButtonId, 'button');
     btn.className = 'btn btn-preset';
     const span = new MockElement('', 'span');
     btn.appendChild(span);
     lobbyButtons.appendChild(btn);
   }
+  elements.get('lobby-preset-rwy').dataset.startLabel = 'lobby.takeoff';
+  elements.get('lobby-preset-cru').dataset.startLabel = 'lobby.cruiseStart';
+  elements.get('lobby-preset-app').dataset.startLabel = 'lobby.approachStart';
 
   // Pre-create standard lobby elements
   const commonIds = [
@@ -123,13 +154,13 @@ function setupMockDOM() {
     'lobby-valley-options', 'lobby-pilot-human', 'lobby-pilot-ai',
     'lobby-valley-gyro', 'lobby-valley-settings', 'lobby-valley-preflight',
     'lobby-time-select', 'lobby-tab-settings', 'dev-enabled',
-    'lobby-airport-incheon', 'lobby-airport-coastal',
-    'lobby-airport-lukla', 'lobby-airport-neon', 'lobby-airport-valley',
+    'lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks',
+    'lobby-map-default-bookmarks', 'lobby-map-bookmark-toggle', 'lobby-map-overview',
     'lobby-aircraft-b738', 'lobby-aircraft-c172', 'lobby-aircraft-f16',
     'lobby-lang-en', 'lobby-lang-ko',
   ];
   for (const id of commonIds) {
-    const tag = id.includes('select') ? 'select' : id.includes('btn') || id.includes('preset') || id.includes('airport') || id.includes('aircraft') || id.includes('lang') || id.includes('pilot') || id.includes('gyro') || id.includes('settings') ? 'button' : 'div';
+    const tag = id.includes('select') ? 'select' : id.includes('search') ? 'input' : id.includes('btn') || id.includes('preset') || id.includes('aircraft') || id.includes('lang') || id.includes('pilot') || id.includes('gyro') || id.includes('settings') || id.includes('toggle') || id.includes('overview') ? 'button' : 'div';
     getOrCreate(id, tag);
   }
 
@@ -309,6 +340,160 @@ test('time-of-day picker is locked at fixed-time airports (Neon, Valley)', () =>
       assert.ok(chips.every(chip => chip.disabled === locked), `${id} chips`);
     }
   } finally {
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
+
+test('all mission buttons remain visible with localized labels and switch to their target region on click', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    globalThis.document = mockDocument;
+    setLanguage('ko');
+
+    let airport = 'coastal';
+    let preset = 'runway';
+    const screen = initLobbyScreen({
+      getAirport: () => airport,
+      getPreset: () => preset,
+      getTime: () => 12,
+      getAircraft: () => 'B738',
+      getDemoProfile: () => null,
+      onAirport: a => { airport = a; },
+      onPreset: p => { preset = p; },
+      onTime: () => {},
+      onAircraft: () => {},
+      onDemoProfile: () => {},
+      onFly: () => {},
+    });
+
+    const missionExpectations = [
+      ['lobby-preset-challenge', 'incheon', 'challenge', 'incheon.challenge'],
+      ['lobby-preset-bridge', 'neon', 'bridge', 'neon.bridge'],
+      ['lobby-preset-cliff', 'lukla', 'cliff', 'downhill.takeoff.rwy.24'],
+      ['lobby-preset-valley', 'valley', 'valley', 'valley.slalom.title'],
+    ];
+    for (const [id, , , labelKey] of missionExpectations) {
+      const btn = elements.get(id);
+      assert.equal(btn.style.display, '', `${id} must stay visible`);
+      assert.equal(btn.querySelector('span').textContent, t(labelKey));
+      assert.notEqual(btn.querySelector('span').textContent, t('lobby.spawn'));
+    }
+
+    for (const [id, expectedAirport, expectedPreset] of missionExpectations) {
+      airport = 'coastal';
+      preset = 'runway';
+      screen.refresh();
+      elements.get(id).click();
+      screen.refresh();
+      assert.equal(airport, expectedAirport, `${id} should switch airport`);
+      assert.equal(preset, expectedPreset, `${id} should switch preset`);
+    }
+  } finally {
+    setLanguage('ko');
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
+
+test('clicking a start-state button from valley returns to DEFAULT_AIRPORT', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    globalThis.document = mockDocument;
+
+    let airport = 'valley';
+    let preset = 'valley';
+    const screen = initLobbyScreen({
+      getAirport: () => airport,
+      getPreset: () => preset,
+      getTime: () => 12,
+      getAircraft: () => 'F16',
+      getDemoProfile: () => null,
+      onAirport: a => { airport = a; },
+      onPreset: p => { preset = p; },
+      onTime: () => {},
+      onAircraft: () => {},
+      onDemoProfile: () => {},
+      onFly: () => {},
+    });
+
+    assert.equal(elements.get('lobby-preset-rwy').style.display, '');
+    elements.get('lobby-preset-rwy').click();
+    screen.refresh();
+    assert.equal(airport, DEFAULT_AIRPORT);
+    assert.equal(preset, 'runway');
+  } finally {
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
+
+test('special regions render in default bookmarks and search results, invoke onAirport, and highlight active state', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    globalThis.document = mockDocument;
+    setLanguage('ko');
+
+    let airport = 'incheon';
+    let mapPlan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => airport,
+      getPreset: () => 'runway',
+      getTime: () => 12,
+      getAircraft: () => 'B738',
+      getDemoProfile: () => null,
+      getMapPlan: () => mapPlan,
+      onMapPlan: plan => { mapPlan = plan?.state === 'none' ? null : plan; },
+      onAirport: a => { airport = a; mapPlan = null; },
+      onPreset: () => {},
+      onTime: () => {},
+      onAircraft: () => {},
+      onDemoProfile: () => {},
+      onFly: () => {},
+    });
+
+    screen.setMapPlaces({
+      airports: [
+        { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451, runways: [{ id: '15R/33L', ends: [{ ident: '15R', headingDegT: 150 }] }] },
+      ],
+      points: [],
+    });
+
+    const defaults = elements.get('lobby-map-default-bookmarks').children;
+    const rksiDefault = defaults.find(btn => btn.dataset.placeId === 'RKSI');
+    const luklaDefault = defaults.find(btn => btn.dataset.placeId === 'lukla');
+    const neonDefault = defaults.find(btn => btn.dataset.placeId === 'neon');
+    const coastalDefault = defaults.find(btn => btn.dataset.placeId === 'coastal');
+
+    assert.ok(rksiDefault && luklaDefault && neonDefault && coastalDefault);
+    assert.equal(rksiDefault.classList.contains('active'), true, 'incheon without mapPlan highlights RKSI');
+    assert.equal(luklaDefault.textContent, t('lukla.vnlk'));
+    assert.equal(neonDefault.textContent, t('neon.metropolis'));
+    assert.equal(coastalDefault.textContent, t('coastal.airport'));
+
+    const searchInput = elements.get('lobby-map-search');
+    for (const query of ['VNLK', '루클라']) {
+      searchInput.value = query;
+      searchInput.dispatchEvent({ type: 'input' });
+      const results = elements.get('lobby-map-results').children;
+      const luklaResult = results.find(btn => btn.dataset.placeKind === 'region' && btn.dataset.placeId === 'lukla');
+      assert.ok(luklaResult, `query ${query} should find region:lukla`);
+      assert.equal(luklaResult.textContent, t('lukla.vnlk'));
+    }
+
+    const luklaSearchBtn = elements.get('lobby-map-results').children.find(btn => btn.dataset.placeId === 'lukla');
+    luklaSearchBtn.click();
+    assert.equal(airport, 'lukla');
+    assert.equal(mapPlan, null);
+
+    const refreshedDefaults = elements.get('lobby-map-default-bookmarks').children;
+    assert.equal(refreshedDefaults.find(btn => btn.dataset.placeId === 'lukla').classList.contains('active'), true);
+    assert.equal(refreshedDefaults.find(btn => btn.dataset.placeId === 'RKSI').classList.contains('active'), false);
+  } finally {
+    setLanguage('ko');
     if (originalDoc === undefined) delete globalThis.document;
     else globalThis.document = originalDoc;
   }

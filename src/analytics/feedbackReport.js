@@ -1,4 +1,5 @@
 import { createSortie } from '../replay/ReplayStore.js';
+import { worldPositionToWgs84 } from '../geospatial/airportGeodesy.js';
 
 const finite = value => Number.isFinite(value) ? value : null;
 const vector = value => value ? ['x', 'y', 'z'].map(axis => finite(value[axis])) : null;
@@ -13,6 +14,73 @@ const LOG_UNITS = { time: 's', x: 'm', z: 'm', altitude: 'ft MSL', airspeed: 'kt
   gForce: 'g (simulator measured load)', sinkRate: 'ft/min positive down',
   impactSpeed: 'kt (world velocity magnitude at collision)' };
 const LOG_COORDINATES = 'Three.js world: +Y up; x/z horizontal; altitudeFt = world Y / 0.3048';
+const MAX_ACTIVE_TILE_KEYS = 40;
+const streamerMetrics = streamer => {
+  if (!streamer || typeof streamer.getMetrics !== 'function') return null;
+  try { return streamer.getMetrics(); } catch { return null; }
+};
+
+function gatherOpenWorldTiles(openWorld) {
+  const tileZoom = finite(openWorld.tileZoom);
+  const farZoom = finite(openWorld.farTileZoom);
+  const entries = [...(openWorld.tiles?.entries() ?? [])];
+  const tiles = entries.slice(0, MAX_ACTIVE_TILE_KEYS).map(([key, entry]) => ({
+    key: tileZoom === null ? key : `${tileZoom}/${key}`,
+    imageryLoaded: Boolean(entry?.baseMap),
+    detailLoaded: Boolean(entry?.detailMap),
+    detailLevel: finite(entry?.detailLevel) ?? tileZoom,
+    wantedDetailLevel: finite(openWorld.detailWanted?.get(key)),
+    imageryRetryAt: finite(entry?.imageryRetryAt),
+  }));
+  return {
+    tileZoom,
+    farZoom,
+    tiles,
+    tilesTotal: entries.length,
+    imageryLoadedCount: entries.filter(([, entry]) => Boolean(entry?.baseMap)).length,
+    detailLoadedCount: entries.filter(([, entry]) => Boolean(entry?.detailMap)).length,
+    detailWantedCount: openWorld.detailWanted?.size ?? 0,
+    pendingElevation: openWorld.pending?.size ?? 0,
+    pendingImagery: Boolean(openWorld.pendingImagery),
+    pendingDetail: Boolean(openWorld.pendingDetail),
+    reducedGeometry: Boolean(openWorld.reducedGeometry),
+    farTiles: openWorld.farTiles?.size ?? 0,
+    farVisible: Boolean(openWorld.farGroup?.visible),
+    farTileKeys: [...(openWorld.farTiles?.keys() ?? [])].slice(0, MAX_ACTIVE_TILE_KEYS)
+      .map(key => farZoom === null ? key : `${farZoom}/${key}`),
+    imageryBudget: { ...(openWorld.imageryBudget ?? {}) },
+    truncated: entries.length > tiles.length,
+  };
+}
+
+/** Imagery actually rendered when the dialog opened; hidden streamers are not evidence. */
+function gatherRenderedTiles(sim) {
+  const openWorld = sim?.currentTerrain?.openWorld ?? null;
+  if (openWorld) return { source: 'open-world', openWorld: gatherOpenWorldTiles(openWorld) };
+
+  const terrain = sim?.world?.anchorTerrain ?? sim?.terrain ?? sim?.currentTerrain ?? null;
+  const islandStreamer = terrain?.tileStreamer ?? null;
+  const corridorStreamer = sim?.world?.corridorStreamer ?? terrain?.corridorStreamer ?? null;
+  if (!islandStreamer && !corridorStreamer) return null;
+  const island = streamerMetrics(islandStreamer);
+  if (island) {
+    island.zoom = finite(islandStreamer.appliedZoom) ?? finite(islandStreamer.zoom) ?? null;
+  }
+  const active = corridorStreamer?.activeTiles instanceof Map
+    ? [...corridorStreamer.activeTiles.entries()] : [];
+  const keys = active.map(([key]) => key);
+  return {
+    source: 'legacy-streamers',
+    island,
+    corridor: streamerMetrics(corridorStreamer),
+    activeTileCount: active.length,
+    activeTileKeys: keys.slice(0, MAX_ACTIVE_TILE_KEYS),
+    loadedTileKeys: active.filter(([, entry]) => entry?.imageLoaded)
+      .map(([key]) => key).slice(0, MAX_ACTIVE_TILE_KEYS),
+    truncated: keys.length > MAX_ACTIVE_TILE_KEYS,
+  };
+}
+
 const touchdown = value => ({ timeSec: finite(value?.timeSec), sinkRateFpm: finite(value?.sinkRateFpm),
   contactG: finite(value?.contactG) });
 
@@ -111,7 +179,23 @@ export function gatherFeedbackDiagnostics(sim) {
   const peakIndex = samples.findIndex(value => value.timeSec >= peak?.timeSec);
   const pick = keys => Object.fromEntries(keys.map(key => [key, finite(telemetry[key])]));
   const diagnostics = {
-    diagnosticsVersion: 2,
+    altitudeFt: finite(telemetry.altitudeFt),
+    headingDeg: finite(telemetry.headingDeg),
+    geoPosition: (() => {
+      const anchor = held?.metadata?.airport ?? sim.activeAirport ?? null;
+      const x = finite(sim.position?.x);
+      const z = finite(sim.position?.z);
+      if (!anchor || x === null || z === null) return null;
+      try {
+        const position = worldPositionToWgs84(anchor, x, z);
+        return position ? { latitude: finite(position.latitude), longitude: finite(position.longitude), anchor } : null;
+      } catch {
+        return null;
+      }
+    })(),
+    renderedTiles: gatherRenderedTiles(sim),
+    diagnosticsVersion: 3,
+
     flightLog: buildFlightLog(sim),
     aircraft: held?.metadata?.aircraft ?? sim.currentAircraftId ?? null,
     airport: held?.metadata?.airport ?? sim.activeAirport ?? null,

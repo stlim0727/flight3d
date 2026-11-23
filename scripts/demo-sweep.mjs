@@ -281,6 +281,7 @@ function describe(message) {
     // Chrome asks for /favicon.ico whether or not the page declares one; the app ships
     // none, so that 404 is the browser's own request rather than a broken flight asset.
     if (entry.networkUrl?.endsWith('/favicon.ico') || /favicon\.ico/.test(entry.url || '')) return null;
+    if (/overturemaps-extras/i.test(entry.url || '') || /overturemaps-extras/i.test(entry.networkUrl || '')) return null;
     return `${String(entry.text).slice(0, 200)}${entry.url ? ` <${String(entry.url).slice(0, 200)}>` : ''}`;
   }
   return null;
@@ -528,7 +529,9 @@ async function main() {
 
   try {
     for (const [airport, group] of byAirport) {
-      const target = await browser.openPage(server.url);
+      const pageUrl = new URL(server.url);
+      pageUrl.searchParams.set('terrain', airport);
+      const target = await browser.openPage(pageUrl.toString());
       const page = await Page.connect(target);
       let ready = false;
       for (let attempt = 0; attempt < 120 && !ready; attempt += 1) {

@@ -309,123 +309,150 @@
           </button>
         </div>
       </header>
-      <p class="build-info" data-build-info>
-        <span data-i18n="build.branch">Branch</span> <span data-build-branch>unknown</span>
-        <span aria-hidden="true"> · </span>
-        <span data-i18n="build.commit">Commit</span> <a data-build-commit target="_blank" rel="noopener noreferrer">unknown</a>
-        <span aria-hidden="true"> · </span>
-        <span data-build-age>unknown</span>
-      </p>
       <p id="lobby-loading" class="lobby-loading" data-i18n="loading.lukla.terrain" hidden></p>
       <p id="lobby-selection" class="lobby-loading" data-i18n="lobby.applying" aria-live="polite" hidden></p>
       <div class="lobby-tabs" role="tablist" aria-labelledby="lobby-tabs-title">
         <span id="lobby-tabs-title" hidden data-i18n="lobby.title">메인 메뉴</span>
-        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span id="lobby-tab-scenario-label" data-i18n="lobby.tab.single">싱글</span></button>
+        <button id="lobby-tab-scenario" class="btn lobby-tab" type="button" role="tab" aria-selected="true" aria-controls="lobby-panel-scenario"><span class="tab-icon" aria-hidden="true">🎯</span> <span id="lobby-tab-scenario-label" data-i18n="lobby.tab.single">자유비행</span></button>
         <button id="lobby-tab-multi" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-multi" tabindex="-1"><span class="tab-icon" aria-hidden="true">👥</span> <span data-i18n="lobby.tab.multi">멀티</span></button>
         <button id="lobby-tab-settings" class="btn lobby-tab" type="button" role="tab" aria-selected="false" aria-controls="lobby-panel-settings" tabindex="-1"><span class="tab-icon" aria-hidden="true">⚙️</span> <span data-i18n="lobby.tab.option">옵션</span></button>
       </div>
       <button id="lobby-tab-dev" type="button" hidden style="display:none!important;" aria-hidden="true"><span class="tab-icon" aria-hidden="true">🛠️</span></button>
       <div class="lobby-panels">
         <section id="lobby-panel-scenario" class="lobby-tab-panel" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0">
-          <div class="lobby-group" role="group">
-            <span class="lobby-label" data-i18n="lobby.aircraft">기체</span>
+          <details id="lobby-aircraft-picker" name="lobby-flight-options" class="lobby-disclosure">
+            <summary><span data-i18n="lobby.aircraft">기체</span><span id="lobby-aircraft-summary" class="lobby-disclosure-value"></span></summary>
             <div class="lobby-buttons">
               <button id="lobby-aircraft-b738" class="btn btn-aircraft active"><span data-i18n="aircraft.b738">✈️ Boeing 737</span><small class="spec-badge" data-spec-aircraft="B738"></small></button>
               <button id="lobby-aircraft-c172" class="btn btn-aircraft"><span data-i18n="aircraft.c172">🛩️ Cessna 172</span><small class="spec-badge" data-spec-aircraft="C172"></small></button>
               <button id="lobby-aircraft-f16" class="btn btn-aircraft"><span><!-- Temaki fighter-jet icon, CC0 --><svg class="aircraft-icon" viewBox="0 0 48 48" aria-hidden="true"><path fill="currentColor" d="M46 26a2 2 0 0 0-2 2v3l-12-9v-4.52a2.49 2.49 0 0 0-4-1.97v-4.88a3 3 0 0 0-.21-1.11L25.1.74a1.18 1.18 0 0 0-2.19 0l-2.7 8.78a3 3 0 0 0-.21 1.11v4.88a2.49 2.49 0 0 0-4 1.97V22L4 31v-3a2 2 0 0 0-4 0v14a2 2 0 0 0 4 0v-2l16-4v5l-4.45 3.81A1.87 1.87 0 0 0 16.87 48l7.12-1l7.14 1a1.87 1.87 0 0 0 1.32-3.19L28 41v-5l16 4v2a2 2 0 1 0 4 0V28a2 2 0 0 0-2-2"/></svg><span data-i18n="aircraft.f16">F-16 Fighting Falcon</span></span><small class="spec-badge" data-spec-aircraft="F16"></small></button>
             </div>
-          </div>
-          <div class="lobby-group" role="group">
-            <span class="lobby-label" data-i18n="lobby.airport">비행 지역</span>
-            <div class="lobby-buttons">
-              <button id="lobby-airport-coastal" class="btn btn-airport active"><span data-i18n="coastal.airport">🌊 국제공항</span><small class="spec-badge" data-spec-airport="coastal"></small></button>
-              <button id="lobby-airport-incheon" class="btn btn-airport"><span>🛬 <span data-i18n="incheon.airport">인천공항 (RKSI)</span></span><small class="spec-badge" data-spec-airport="incheon"></small></button>
-              <button id="lobby-airport-jeju" class="btn btn-airport"><span>🌴 <span data-i18n="jeju.airport">제주공항 (RKPC)</span></span><small class="spec-badge" data-spec-airport="jeju"></small></button>
-              <button id="lobby-airport-lukla" class="btn btn-airport"><span data-i18n="lukla.vnlk">🏔️ 루클라 (VNLK)</span><small class="spec-badge" data-spec-airport="lukla"></small></button>
-              <button id="lobby-airport-neon" class="btn btn-airport"><span data-i18n="neon.metropolis">🌆 네온 메트로폴리스</span><small class="spec-badge" data-spec-airport="neon"></small></button>
-              <button id="lobby-airport-valley" class="btn btn-airport"><span data-i18n="valley.region">⛰️ 가상 계곡</span><small class="spec-badge" data-spec-airport="valley"></small></button>
+          </details>
+          <div class="lobby-group" role="group" aria-labelledby="lobby-start-label">
+            <span id="lobby-start-label" class="lobby-label" data-i18n="lobby.map.state">시작 상태</span>
+            <div class="lobby-start-options">
+              <button id="lobby-preset-rwy" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.takeoff"><span data-i18n="lobby.takeoff">이륙</span></button>
+              <button id="lobby-preset-cru" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.cruiseStart"><span data-i18n="lobby.cruiseStart">순항 중</span></button>
+              <button id="lobby-preset-app" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.approachStart"><span data-i18n="lobby.approachStart">착륙 접근</span></button>
             </div>
           </div>
-          <div class="lobby-links-row" style="display: flex; gap: 12px; margin: 4px 0 10px;">
-            <a class="lobby-link" href="./flights.html"><span aria-hidden="true">🌐</span> <span data-i18n="lobby.allFlights">All flight URLs</span></a>
-            <a class="lobby-link" href="./screens.html"><span aria-hidden="true">📱</span> <span>UI Screens</span></a>
-          </div>
-          <div class="lobby-group lobby-scenarios" role="group">
-            <span class="lobby-label" data-i18n="lobby.spawn">시나리오</span>
-            <div class="lobby-buttons">
-              <button id="lobby-preset-rwy" class="btn btn-preset"><span>🛫 활주로 이륙 (09L)</span></button>
-              <button id="lobby-preset-app" class="btn btn-preset"><span>🛬 착륙 접근 (3 NM)</span></button>
-              <button id="lobby-preset-challenge" class="btn btn-preset btn-challenge"><span>⚡ 15R 강풍·오프셋 착륙 챌린지</span></button>
-              <button id="lobby-preset-cru" class="btn btn-preset"><span>✈️ 순항 비행 (6,000 FT)</span></button>
-              <button id="lobby-preset-bridge" class="btn btn-preset"><span>🌉 강 다리 통과 저공비행</span></button>
-              <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
-              <button id="lobby-preset-valley" class="btn btn-preset btn-valley"><span>⚡ 계곡 저공 슬라롬</span></button>
-              <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
-            </div>
-          </div>
-          <div class="lobby-group">
-            <label class="lobby-label" for="lobby-regional-cruise" data-i18n="lobby.regional.cruise">지역 순항</label>
-            <select id="lobby-regional-cruise">
-              <option value="" disabled data-i18n="lobby.regional.pick">지역 선택</option>
-            </select>
-          </div>
-          <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
-            <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>
-            <div class="lobby-pilot-select" role="radiogroup" aria-label="조종 방식">
-              <button type="button" id="lobby-pilot-human" class="btn btn-pilot-mode active" role="radio" aria-checked="true">
-                <span class="pilot-mode-icon">👤</span>
-                <div class="pilot-mode-info">
-                  <span class="pilot-mode-title" data-i18n="valley.pilot.human.title">사람 직접 조종</span>
-                  <small class="pilot-mode-desc" data-i18n="valley.pilot.human.desc">20m 초저공 · 550~600 KT 고속 슬라롬 직접 도전</small>
+          <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure">
+            <summary><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span></summary>
+            <div id="lobby-map-flight" class="lobby-group">
+              <select id="lobby-map-state" hidden aria-hidden="true"></select>
+              <select id="lobby-map-point" hidden aria-hidden="true"></select>
+              <div id="lobby-map-browser" class="lobby-map-browser">
+                <div class="lobby-map-toolbar">
+                  <input id="lobby-map-search" type="search" autocomplete="off" data-i18n-aria-label="lobby.map.search.placeholder">
+                  <button type="button" id="lobby-map-bookmark-toggle" class="btn btn-bookmark" data-i18n="lobby.bookmark.add">Bookmark</button>
                 </div>
-              </button>
-              <button type="button" id="lobby-pilot-ai" class="btn btn-pilot-mode" role="radio" aria-checked="false">
-                <span class="pilot-mode-icon">🤖</span>
-                <div class="pilot-mode-info">
-                  <span class="pilot-mode-title" data-i18n="valley.pilot.ai.title">AI 자율 비행</span>
-                  <small class="pilot-mode-desc" data-i18n="valley.pilot.ai.desc">지형 추적 알고리즘 기반 자동 비행</small>
+                <div class="lobby-map-frame">
+                  <svg id="lobby-map-svg" viewBox="0 0 1024 1024" role="img" data-i18n-aria-label="lobby.map.overview">
+                    <rect x="0" y="0" width="1024" height="1024" class="lobby-map-backdrop"></rect>
+                    <image href="%BASE_URL%scenery/world-lobby-land.svg" width="1024" height="1024" pointer-events="none"></image>
+                    <g id="lobby-map-tiles" pointer-events="none"></g>
+                    <g id="lobby-map-markers"></g>
+                  </svg>
+                  <div class="lobby-map-attribution" title="Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, OpenStreetMap contributors, and the GIS User Community">Tiles © <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online/overview" target="_blank" rel="noopener">Esri</a> · © OpenStreetMap</div>
+                  <div class="lobby-map-zoom" role="group" aria-label="Map zoom">
+                    <button type="button" id="lobby-map-zoom-in" aria-label="Zoom in" data-i18n-aria-label="lobby.map.zoomIn" data-i18n-title="lobby.map.zoomIn" title="Zoom in">+</button>
+                    <button type="button" id="lobby-map-zoom-out" aria-label="Zoom out" data-i18n-aria-label="lobby.map.zoomOut" data-i18n-title="lobby.map.zoomOut" title="Zoom out">−</button>
+                  </div>
                 </div>
-              </button>
-            </div>
-            <div id="lobby-valley-preflight" class="valley-preflight-box">
-              <div class="valley-preflight-header">
-                <span class="lobby-label" data-i18n="valley.preflight.label">비행 전 조작 설정 (자이로·조종)</span>
+                <div class="lobby-map-tools">
+                  <span class="lobby-label" data-i18n="lobby.map.pickPoint">지도에서 순항 시작 지점을 선택하세요.</span>
+                  <button type="button" id="lobby-map-overview" class="btn" data-i18n="lobby.map.resetView">전체 지도</button>
+                </div>
+                <div class="lobby-map-status-row"><p id="lobby-map-search-status" class="lobby-map-status" aria-live="polite"></p><button type="button" id="lobby-map-search-retry" class="btn" data-i18n="lobby.map.search.retry" hidden></button></div>
+                <div id="lobby-map-results" class="lobby-map-results"></div>
+                <span class="lobby-label" data-i18n="lobby.map.savedPlaces">저장한 장소</span>
+                <div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div>
+                <span class="lobby-label" data-i18n="lobby.map.suggestedPlaces">기본 북마크</span>
+                <div id="lobby-map-default-bookmarks" class="lobby-map-bookmarks"></div>
               </div>
-              <div class="valley-preflight-controls">
-                <button type="button" id="lobby-valley-gyro" class="btn btn-valley-gyro">
-                  <span class="gyro-label" data-i18n="gyro.button">📱 GYRO 버튼</span>
+              <label class="lobby-group"><span class="lobby-label" data-i18n="lobby.map.airport">공항</span><select id="lobby-map-airport" class="btn"></select></label>
+            </div>
+            <label class="lobby-group" for="lobby-destination">
+              <span class="lobby-label" data-i18n="lobby.destination">Destination airport</span>
+              <select id="lobby-destination" class="btn"></select>
+            </label>
+          </details>
+          <details id="lobby-missions" name="lobby-flight-options" class="lobby-disclosure">
+            <summary><span data-i18n="lobby.missions">미션·훈련·데모</span><span id="lobby-mission-summary" class="lobby-disclosure-value"></span></summary>
+            <div class="lobby-group lobby-scenarios" role="group">
+              <div class="lobby-buttons">
+                <button id="lobby-preset-challenge" class="btn btn-preset btn-challenge"><span>⚡ 15R 강풍·오프셋 착륙 챌린지</span></button>
+                <button id="lobby-preset-bridge" class="btn btn-preset"><span>🌉 강 다리 통과 저공비행</span></button>
+                <button id="lobby-preset-cliff" class="btn btn-preset btn-cliff"><span>⚡ 내리막 이륙 (Rwy 24)</span></button>
+                <button id="lobby-preset-valley" class="btn btn-preset btn-valley"><span>⚡ 계곡 저공 슬라롬</span></button>
+                <button id="lobby-preset-demo" class="btn btn-preset"><span>🎬 데모 비행</span></button>
+              </div>
+            </div>
+            <div id="lobby-valley-options" class="lobby-group lobby-valley-options" hidden>
+              <span class="lobby-label" data-i18n="valley.mode.label">조종 방식 선택 (사람 / AI)</span>
+              <div class="lobby-pilot-select" role="radiogroup" aria-label="조종 방식">
+                <button type="button" id="lobby-pilot-human" class="btn btn-pilot-mode active" role="radio" aria-checked="true">
+                  <span class="pilot-mode-icon">👤</span>
+                  <div class="pilot-mode-info">
+                    <span class="pilot-mode-title" data-i18n="valley.pilot.human.title">사람 직접 조종</span>
+                    <small class="pilot-mode-desc" data-i18n="valley.pilot.human.desc">20m 초저공 · 550~600 KT 고속 슬라롬 직접 도전</small>
+                  </div>
                 </button>
-                <button type="button" id="lobby-valley-settings" class="btn btn-valley-settings">
-                  <span data-i18n="valley.preflight.openSettings">⚙️ 조작 및 자이로 상세 설정 열기</span>
+                <button type="button" id="lobby-pilot-ai" class="btn btn-pilot-mode" role="radio" aria-checked="false">
+                  <span class="pilot-mode-icon">🤖</span>
+                  <div class="pilot-mode-info">
+                    <span class="pilot-mode-title" data-i18n="valley.pilot.ai.title">AI 자율 비행</span>
+                    <small class="pilot-mode-desc" data-i18n="valley.pilot.ai.desc">지형 추적 알고리즘 기반 자동 비행</small>
+                  </div>
                 </button>
               </div>
-              <p class="valley-preflight-hint" data-i18n="valley.preflight.hint">모바일 기기에서 기기를 기울여 조종하려면 자이로를 켜거나 설정 탭에서 영점 및 화면 방향을 확인하세요.</p>
+              <div id="lobby-valley-preflight" class="valley-preflight-box">
+                <div class="valley-preflight-header">
+                  <span class="lobby-label" data-i18n="valley.preflight.label">비행 전 조작 설정 (자이로·조종)</span>
+                </div>
+                <div class="valley-preflight-controls">
+                  <button type="button" id="lobby-valley-gyro" class="btn btn-valley-gyro">
+                    <span class="gyro-label" data-i18n="gyro.button">📱 GYRO 버튼</span>
+                  </button>
+                  <button type="button" id="lobby-valley-settings" class="btn btn-valley-settings">
+                    <span data-i18n="valley.preflight.openSettings">⚙️ 조작 및 자이로 상세 설정 열기</span>
+                  </button>
+                </div>
+                <p class="valley-preflight-hint" data-i18n="valley.preflight.hint">모바일 기기에서 기기를 기울여 조종하려면 자이로를 켜거나 설정 탭에서 영점 및 화면 방향을 확인하세요.</p>
+              </div>
             </div>
-          </div>
-          <div id="lobby-demo-options" class="lobby-group" hidden>
-            <label class="lobby-label" for="lobby-demo-select" data-i18n="demo.route">데모 코스</label>
-            <select id="lobby-demo-select" class="btn"></select>
-            <p id="lobby-demo-briefing" class="demo-route-briefing" aria-live="polite"></p>
-          </div>
-          <label class="lobby-group" for="lobby-destination">
-            <span class="lobby-label" data-i18n="lobby.destination">Destination airport</span>
-            <select id="lobby-destination" class="btn"></select>
-          </label>
-          <label class="lobby-group" for="lobby-time-select">
-            <span class="lobby-label" data-i18n="lobby.time">시간대</span>
-            <select id="lobby-time-select" class="btn">
-              <option value="now" data-i18n="lobby.time.now">현재 시각</option>
-              <option value="6.5">06:30</option>
-              <option value="9.5">09:30</option>
-              <option value="12.5">12:30</option>
-              <option value="16.8">16:48</option>
-              <option value="17.6">17:36</option>
-              <option value="19.5">19:30</option>
-              <option value="22.5">22:30</option>
-            </select>
-          </label>
-          <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
-          <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+            <div id="lobby-demo-options" class="lobby-group" hidden>
+              <label class="lobby-label" for="lobby-demo-select" data-i18n="demo.route">데모 코스</label>
+              <select id="lobby-demo-select" class="btn"></select>
+              <p id="lobby-demo-briefing" class="demo-route-briefing" aria-live="polite"></p>
+            </div>
+          </details>
+          <details id="lobby-flight-details" name="lobby-flight-options" class="lobby-disclosure">
+            <summary data-i18n="lobby.flightDetails">상세 설정</summary>
+              <div class="lobby-buttons lobby-map-row">
+                <label><span data-i18n="lobby.map.runway">활주로 방향</span><select id="lobby-map-runway" class="btn"></select></label>
+                <label><span data-i18n="lobby.map.departure">출발지 (선택)</span><select id="lobby-map-departure" class="btn"></select></label>
+              </div>
+            <label class="lobby-group" for="lobby-time-select">
+              <span class="lobby-label" data-i18n="lobby.time">시간대</span>
+              <select id="lobby-time-select" class="btn">
+                <option value="now" data-i18n="lobby.time.now">현재 시각</option>
+                <option value="6.5">06:30</option>
+                <option value="9.5">09:30</option>
+                <option value="12.5">12:30</option>
+                <option value="16.8">16:48</option>
+                <option value="17.6">17:36</option>
+                <option value="19.5">19:30</option>
+                <option value="22.5">22:30</option>
+              </select>
+            </label>
+            <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
+            <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
+            <div class="lobby-links-row" style="display: flex; gap: 12px; margin: 4px 0 10px;">
+              <a class="lobby-link" href="./flights.html"><span aria-hidden="true">🌐</span> <span data-i18n="lobby.allFlights">All flight URLs</span></a>
+              <a class="lobby-link" href="./screens.html"><span aria-hidden="true">📱</span> <span>UI Screens</span></a>
+            </div>
+          </details>
         </section>
         <section id="lobby-panel-managed-flight" class="lobby-tab-panel lobby-managed-flight" role="tabpanel" aria-labelledby="lobby-tab-scenario" tabindex="0" hidden>
           <div class="lobby-group" role="group">
@@ -496,6 +523,13 @@
         </section>
         <section id="lobby-panel-settings" class="lobby-tab-panel lobby-settings" role="tabpanel" aria-labelledby="lobby-tab-settings" tabindex="0" hidden>
           <div class="lobby-buttons" id="lobby-settings"></div>
+          <p class="build-info" data-build-info>
+            <span data-i18n="build.branch">Branch</span> <span data-build-branch>unknown</span>
+            <span aria-hidden="true"> · </span>
+            <span data-i18n="build.commit">Commit</span> <a data-build-commit target="_blank" rel="noopener noreferrer">unknown</a>
+            <span aria-hidden="true"> · </span>
+            <span data-build-age>unknown</span>
+          </p>
           <div class="lobby-dev-section">
             <label class="dev-enable"><input id="dev-enabled" type="checkbox"><span data-i18n="dev.enable">개발자 모드 (이번 세션)</span></label>
             <div id="lobby-panel-dev" class="dev-controls-box" hidden>
@@ -519,9 +553,8 @@
         <button id="btn-lobby-restart" class="btn" hidden><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="pause.restart">시나리오 재시작</span></button>
         <button id="btn-lobby-end" class="btn" hidden><span class="btn-icon" aria-hidden="true">⏹️</span> <span data-i18n="debrief.end">비행 종료</span></button>
         <button id="btn-replays" class="btn"><span class="btn-icon" aria-hidden="true">📼</span> <span data-i18n="replay.library">저장된 리플레이</span></button>
-        <button id="btn-fly" class="btn btn-fly"><span class="btn-icon" aria-hidden="true">🛫</span> <span data-i18n="lobby.startNew">새 비행 시작</span></button>
+        <button id="btn-fly" class="btn btn-fly"><span class="btn-icon" aria-hidden="true">🛫</span> <span data-i18n="lobby.startNew">비행 시작</span></button>
       </div>
-      <p class="lobby-hint" data-i18n="lobby.hint.esc">비행 중 ESC를 누르면 일시정지 메뉴가 열립니다.</p>
     </div>
     <button id="btn-lobby-unfold" class="ui-unfold-pill lobby-unfold-pill" type="button" hidden data-i18n-title="ui.unfold" data-i18n-aria-label="ui.unfold">
       <span class="unfold-icon">✈️</span>

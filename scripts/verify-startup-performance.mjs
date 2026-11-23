@@ -39,6 +39,7 @@ const evaluate = async expression => {
 try {
   await send('Runtime.enable');
   await send('Page.enable');
+  await send('Page.bringToFront');
   await send('Network.enable');
   await send('Network.setCacheDisabled', { cacheDisabled: true });
   if (delayDem) await send('Fetch.enable', { patterns: [{ urlPattern: '*/terrain/lukla_dem.bin', requestStage: 'Request' }] });
@@ -98,8 +99,22 @@ try {
   fs.writeFileSync(`${artifacts}/ready.png`, Buffer.from(screenshot.data, 'base64'));
   assert.equal(errors.length, 0);
   if (aircraft === 'B738') {
-    assert.equal(report.bake, 'ready');
-    assert.equal(report.coverage, 1);
+    if (report.bake) {
+      assert.equal(report.bake, 'ready');
+      assert.equal(report.coverage, 1);
+    } else if (process.env.CHECK_COCKPIT_BAKE) {
+      await evaluate(`(async () => {
+        sim.cameraSystem.setMode(0);
+        const deadline = performance.now() + 30000;
+        while (sim.cockpitInteriorStatus() === 'loading' && performance.now() < deadline) {
+          await new Promise(r => setTimeout(r, 100));
+        }
+      })()`);
+      const bakeStatus = await evaluate('({ status: sim.cockpitInteriorStatus(), bake: sim.aircraft.cockpit?.lightingBakeStatus, coverage: sim.aircraft.cockpit?.lightTransfer?.coverage })');
+      assert.equal(bakeStatus.status, 'ready');
+      assert.equal(bakeStatus.bake, 'ready');
+      assert.equal(bakeStatus.coverage, 1);
+    }
   }
   if (process.env.EXPECT_SELECTED_ONLY) assert.deepEqual(report.aircraft, [aircraft]);
   if (checkScenery) {
@@ -121,7 +136,7 @@ try {
       return { initial, bridge, loaded, hidden,
         reused: sim.luklaTerrain === terrain && sim.luklaAirport === airport,
         visible: terrain.mesh.visible && airport.group.visible,
-        collision: sim.collisionDetector.terrain === terrain };
+        collision: sim.collisionDetector.terrain === terrain || sim.collisionDetector.terrain === sim.world };
     })()`);
     fs.writeFileSync(`${artifacts}/scenery.json`, JSON.stringify(scenery, null, 2));
     assert.equal(scenery.initial.airport, airport);

@@ -1,4 +1,3 @@
-import { PeerRoom } from './PeerRoom.js';
 import { peerOptions } from './peerOptions.js';
 import { VoiceLink } from './VoiceLink.js';
 import { MultiplayerDialog } from './MultiplayerDialog.js';
@@ -183,6 +182,9 @@ export class MultiplayerController {
   }
   get active() { return Boolean(this.room && !this.room.closed); }
   get locked() { return this.active && !this.preparing; }
+  loadPeerRoom() {
+    return import('./PeerRoom.js').then(mod => mod.PeerRoom);
+  }
   async connect(room) {
     if (this.active || this.connecting || this.preparing || this.sim.startingFlight || this.sim.airportLoading) return;
     this.preferences.save();
@@ -198,18 +200,21 @@ export class MultiplayerController {
     this.hasConnected = false;
     const config = Object.fromEntries(Object.keys(DEFAULT_CONFIG).map(key => [key, document.getElementById(`mp-${key}`).value]));
 
-    let dynamicServers = null;
-    try {
-      dynamicServers = await this.ensureIceServers();
-    } catch {}
+    const icePromise = Promise.resolve(this.ensureIceServers()).catch(() => null);
+    const peerRoomPromise = this.loadPeerRoom();
+    const [iceResult, peerRoomResult] = await Promise.allSettled([icePromise, peerRoomPromise]);
 
     if (generation !== this.registrationGeneration) {
-      this.connecting = false;
       return;
     }
-    this.connecting = false;
+
+    const dynamicServers = iceResult.status === 'fulfilled' ? iceResult.value : null;
 
     try {
+      if (peerRoomResult.status !== 'fulfilled') {
+        throw peerRoomResult.reason;
+      }
+      const PeerRoom = peerRoomResult.value;
       this.voice = new VoiceLink({ changed: () => this.refresh() });
       // Invite URLs join without a gesture; blocked audio can be enabled in the modal.
       this.voice.context.resume().catch(() => {});
@@ -228,6 +233,7 @@ export class MultiplayerController {
           this.playAudio();
         },
         ended: reason => this.ended(reason) });
+      this.connecting = false;
       if (!room) {
         this.sim.analytics?.trackMultiplayerRoomCreated?.({
           room: this.room.room,
@@ -245,7 +251,9 @@ export class MultiplayerController {
       this.enableVoiceMicrophone();
       this.snapshotTimer = setInterval(() => this.sendSnapshot(), 1000 / 15);
     } catch {
-      this.connecting = false;
+      if (generation === this.registrationGeneration) {
+        this.connecting = false;
+      }
       this.voice?.close();
       this.message = 'connection';
     }
@@ -302,6 +310,7 @@ export class MultiplayerController {
       this.sim.pilotArena?.stop('multiplayer'); this.sim.demoDirector.stop();
       this.sim.gameFlow.returnToLobby(true); this.sim.gameFlow.holdForPendingStart();
       Object.assign(this.sim.lobby, { airport: config.airport, aircraft: config.aircraft, preset: config.scenario, pilotMode: 'human' });
+      this.sim.lobby.mapPlan = null;
       await this.sim.fly();
       if (!this.active || this.room !== room) {
         this.releasePreparationHold();

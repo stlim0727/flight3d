@@ -1,14 +1,7 @@
 import { regionalCruise } from './config/regionalCruises.js';
-import { generateValley } from './arena/generatedValley.js';
-import { GeneratedValleyTerrain } from './environment/GeneratedValleyTerrain.js';
 import { ExternalAirportStreamer } from './world/ExternalAirportStreamer.js';
 import { UnifiedWorld } from './world/UnifiedWorld.js';
 import { LandmarkPins } from './ui/LandmarkPins.js';
-import { updateGeographicBuildings } from './environment/GeographicBuildings.js';
-import { updateGeographicRoads } from './environment/GeographicRoads.js';
-import { updateGeographicGreenSpace } from './environment/GeographicGreenSpace.js';
-import { updateGeographicLandmarks } from './environment/GeographicLandmarks.js';
-import { updateOpenWorldTerrain } from './environment/OpenWorldTerrain.js';
 import { StartupProgressView } from './ui/StartupProgressView.js';
 import { compileVisibleScene } from './core/sceneShaderWarmup.js';
 import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerformanceMonitor.js';
@@ -25,7 +18,6 @@ import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
-import { Atmosphere } from './physics/Atmosphere.js';
 import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
 import { PilotPhysiology } from './physics/PilotPhysiology.js';
@@ -34,8 +26,7 @@ import { advancePhysicsFrame, clampFrameDelta } from './core/physicsTiming.js';
 import { EngineModel } from './physics/EngineModel.js';
 import { LandingGear } from './physics/LandingGear.js';
 import { WaterDitching } from './physics/WaterDitching.js';
-import { AutopilotController } from './physics/Autopilot.js';
-import { solveTrim } from './physics/TrimSolver.js';
+import { createSimulatorAutopilot } from './physics/Autopilot.js';
 import { LoadingPanel } from './ui/LoadingPanel.js';
 import { PFDCanvas } from './aircraft/PFDCanvas.js';
 import { NDCanvas } from './aircraft/NDCanvas.js';
@@ -46,18 +37,16 @@ import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Cessna172 } from './aircraft/Cessna172.js';
 import { F16 } from './aircraft/F16.js';
-import { Terrain } from './environment/Terrain.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, initialRenderQuality, renderPixelRatio, applyFlatShading } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
-import { Airport } from './environment/Airport.js';
-import { FoliageAndCities } from './environment/FoliageAndCities.js';
-import { Ships } from './environment/Ships.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
 import { GroundContactShadow, contactShadowSurfaceHeight } from './environment/GroundContactShadow.js';
-import { NeonCity } from './environment/NeonCity.js';
+import { requestProceduralAsset } from './core/proceduralAssetPool.js';
 import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
+import { MobileHeadTracking } from './cameras/MobileHeadTracking.js';
+import { HeadTrackingUi } from './cameras/HeadTrackingUi.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
@@ -138,13 +127,12 @@ SimulatorInputCoordinator.installStartupInputShield();
 async function startupStage(value, message) {
   startupTrace?.noteStage(value);
   startupProgress.stage(value, message);
-  // Two frames ensure the updated stage paints before synchronous construction.
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await new Promise(resolve => requestAnimationFrame(resolve));
 }
 
 async function startupDetail(key) {
   startupProgress.detail(key);
-  if (!document.hidden) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  if (!document.hidden) await new Promise(resolve => requestAnimationFrame(resolve));
 }
 
 function showStartupError(error) {
@@ -263,10 +251,18 @@ class FlightSimulator {
 
     await startupStage(2, 'startup.world');
 
-    // 5. Procedural World & Real-World Environments
-    await startupDetail('startup.detail.terrain');
-    this.terrain = new Terrain(22000, initialPreset.terrainSegments ?? 256, { quality: initialPreset.terrain });
-    this.scene.add(this.terrain.mesh);
+    // 5. Procedural World & Real-World Environments (region geometry & scenery load on demand)
+    this.terrain = null;
+    this.airport = null;
+    this.foliage = null;
+    this.ships = null;
+    this.neonCity = null;
+    this.persistentValley = null;
+    this.activeAirport = null; // setAirport below builds and selects only the active region
+    this.currentTerrain = null;
+    this.currentAirport = null;
+    this._geoLayers = null;
+    this._geoLayersPromise = null;
 
     // Height-over-ground cue for the ultraLow tier, which ships without shadow maps.
     this.contactShadow = new GroundContactShadow(this.scene);
@@ -275,48 +271,19 @@ class FlightSimulator {
     this.water = new WaterOcean(36000, initialPreset.waterSegments ?? 180, { quality: this.renderQuality });
     this.scene.add(this.water.mesh);
 
-    await startupDetail('startup.detail.airport');
-    this.airport = new Airport();
-    this.scene.add(this.airport.group);
-    this.terrain.excludePavement(this.airport.group);
-
-    await startupDetail('startup.detail.foliage');
-    this.foliage = new FoliageAndCities(this.terrain);
-    this.foliage.setQuality?.(this.renderQuality);
-    this.scene.add(this.foliage.group);
-
-    this.ships = new Ships(this.water, { deferAssets: true });
-    this.scene.add(this.ships.group);
-
-    // Construct Lukla's terrain/airport only when selected, including its DEM
-    // and satellite requests. Hidden scenery must not compete with startup.
-
-    // Neon Metropolis 80s Synthwave City & Flight Canyons
-    await startupDetail('startup.detail.city');
-    this.neonCity = new NeonCity();
-    this.neonCity.group.visible = false;
-    this.scene.add(this.neonCity.group);
-
-    // A default generated valley stays mounted so it can be reached like any
-    // other region. Slalom missions still create their own seed-specific copy.
-    this.persistentValley = new GeneratedValleyTerrain(generateValley({ seed: 1 }).terrain, this);
-
-    this.activeAirport = null; // initUI and setAirport below configure the active airport
-    this.currentTerrain = this.terrain;
-    this.currentAirport = this.airport;
-
-    // Phase 1 unified world: Incheon, Jeju and Lukla coexist; the lobby choice
-    // is a spawn anchor, not a scene swap. Regions register as they load.
+    // Phase 1 unified world: regions register as they are selected or approached.
     this.world = new UnifiedWorld(savedSelection.airport);
 
     await startupDetail('startup.detail.sky');
-    this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water);
+    this.sky = new SkyAtmosphere(this.scene, this.renderer, this.water, {
+      deferCloudDensity: true,
+      deferHdr: true,
+    });
     this.sky.setShadowMapSize(initialPreset.shadowMapSize);
     this.sky.setFarShadowQuality(initialPreset.farShadowMapSize, initialPreset.farShadowRange);
     if (this.sky?.setCloudsVisible) {
       this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }
-    this.foliage.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
 
     await startupStage(3, 'startup.controls');
@@ -336,7 +303,11 @@ class FlightSimulator {
       isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
-    this.cameraSystem.setTerrain(this.terrain);
+    this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem, {
+      onStatusChange: (status) => this.headTrackingUi?.update(status),
+    });
+    this.headTrackingUi = new HeadTrackingUi(this.mobileHeadTracking);
+    this.cameraSystem.setTerrain(null);
     // The interior is fetched by the first cockpit view rather than by boot, and the cut is
     // held until it arrives so an entry never shows the bare airframe interior.
     this.cameraSystem.setCockpitInteriorGate(() => this.cockpitInteriorStatus());
@@ -371,7 +342,7 @@ class FlightSimulator {
     this.replayRecorder = new ReplayRecorder();
     this.replayStore = new ReplayStore();
     this.debriefReplay = null;
-    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human', destination: loadSavedDestination() };
+    this.lobby = { airport: savedSelection.airport, preset: savedSelection.scenario, aircraft: savedSelection.aircraft, pilotMode: 'human', destination: loadSavedDestination(), mapPlan: null };
     this.destinationAirport = this.lobby.destination;
     this.currentAircraftId = savedSelection.aircraft;
     this.lastPresetType = savedSelection.scenario;
@@ -380,14 +351,14 @@ class FlightSimulator {
 
     // 7. Collision Detection & Explosion & Tire Smoke Particle Systems
     this.collisionDetector = new CollisionDetector(
-      this.currentTerrain,
-      this.currentAirport,
-      this.foliage,
-      this.ships,
+      null,
+      null,
+      null,
+      null,
       this.water
     );
     this.collisionDetector.setTerrainOverrideProvider(() => this.terrainProviderOverride);
-    this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain);
+    this.explosionSystem = new ExplosionSystem(this.scene, this.currentTerrain, { deferTextures: true });
     this.aircraftBreakup = new AircraftBreakup(this.scene);
     this.missileCombat = new AirToAirMissileSystem();
     this.missileCombatView = new MissileCombatView(this.scene, this.missileCombat, {
@@ -418,7 +389,7 @@ class FlightSimulator {
       };
     });
     this._combatTerrainHeight = (x, z) => this.currentTerrain?.getHeight(x, z) ?? 0;
-    this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain);
+    this.tireSmokeSystem = new TireSmokeSystem(this.scene, this.currentTerrain, { deferTextures: true });
 
     // Step 2 streams one index-backed destination into the persistent world.
     // Terrain outside its pavement comes from the anchor's open-world sample;
@@ -432,11 +403,18 @@ class FlightSimulator {
           this.showToast(() => t('airport.stream.failed', { code: status.code }));
         }
       },
-      outsideHeight: (x, z) => {
+      outsideHeight: (x, z, { unblended = false } = {}) => {
         // ExternalSurface passes Incheon-frame coordinates; openWorld samples
         // are keyed in the current anchor's local frame.
+        // Use unblended raw DEM when available so ExternalAirportSurface.getHeight()
+        // blends with natural terrain without double-blending against the mesh.
         const [ax, az] = this.world.incheonFrameToAnchor(x, z);
-        const sampled = this.world.anchorTerrain?.openWorld?.sample?.(ax, az)?.height;
+        const openWorld = this.world.anchorTerrain?.openWorld;
+        if (unblended) {
+          const raw = openWorld?.sampleRaw?.(ax, az);
+          if (Number.isFinite(raw)) return raw;
+        }
+        const sampled = openWorld?.sample?.(ax, az)?.height;
         return Number.isFinite(sampled) ? sampled : null;
       },
     });
@@ -499,19 +477,9 @@ class FlightSimulator {
       }
     };
 
-    // Autopilot (pure control laws in src/physics/Autopilot.js). The trim
-    // solver runs only on mode/target capture, so its allocation is off the
-    // 120 Hz path.
-    this.autopilot = new AutopilotController({
-      trimSolver: (telemetry, flightPathAngleDeg) => solveTrim(this.aero, this.engines, {
-        iasKnots: telemetry.iasKnots,
-        altitudeMeters: Atmosphere.feetToMeters(telemetry.altitudeFt),
-        flightPathAngleDeg,
-        flapsIndex: this.aero.flapsIndex,
-        gearState: this.telemetry.gearState,
-        spoilers: this.aero.spoilers,
-      }),
-    });
+    // Autopilot owns its trim snapshot and Flight3d's airport/corridor guidance.
+    // The trim solver runs only on mode/target capture, off the 120 Hz path.
+    this.autopilot = createSimulatorAutopilot(this);
     // Reusable objects so 120 Hz substeps do not allocate for the AP snapshot.
     this._apEuler = new THREE.Euler();
     this._apForward = new THREE.Vector3();
@@ -797,6 +765,20 @@ class FlightSimulator {
     return this._scenarioStartCoordinator ??= createSimulatorScenarioStart(this);
   }
 
+  ensureGeographicLayers() {
+    if (this._geoLayers) return Promise.resolve(this._geoLayers);
+    this._geoLayersPromise ??= import('./environment/geographicLayers.js')
+      .then(mod => {
+        this._geoLayers = mod;
+        return mod;
+      })
+      .catch(error => {
+        this._geoLayersPromise = null;
+        throw error;
+      });
+    return this._geoLayersPromise;
+  }
+
   /** Install the selected scenario before publishing its successful start. */
   spawnFlight(options = {}) {
     return this.scenarioStartCoordinator.start(options);
@@ -1009,7 +991,7 @@ class FlightSimulator {
     if (userChoice) this.demoDirector?.onUserTimeOfDayChange();
     this.sky.setTimeOfDay(hours, this.position, this.camera.position);
     if (persist) saveSimulatorPreferences({ timeOfDay: this.sky.timeOfDay });
-    this.foliage.setTimeOfDay(this.sky.timeOfDay);
+    this.foliage?.setTimeOfDay(this.sky.timeOfDay);
     this.water.syncWithAtmosphere(this.sky);
     this.showTimeOfDayNotice();
   }
@@ -1178,23 +1160,40 @@ class FlightSimulator {
     const deadline = performance.now() + 60000;
     // Boot waits for the airframe only. The streamed interior belongs to the cockpit view, not
     // to the lobby, and aircraft whose cabin ships inside the airframe model still land here.
-    while (this.aircraft.loadingGltf) {
-      if (performance.now() > deadline) throw new Error('Startup assets timed out');
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (this.aircraft.loadingGltf) {
+      if (this.aircraft.ready && typeof this.aircraft.ready.then === 'function') {
+        let airframeTimeout;
+        try {
+          await Promise.race([
+            this.aircraft.ready,
+            new Promise((_, reject) => {
+              airframeTimeout = setTimeout(
+                () => reject(new Error('Startup assets timed out')),
+                Math.max(0, deadline - performance.now()),
+              );
+            }),
+          ]);
+        } finally {
+          clearTimeout(airframeTimeout);
+        }
+      }
+      while (this.aircraft.loadingGltf) {
+        if (performance.now() > deadline) throw new Error('Startup assets timed out');
+        await new Promise(resolve => setTimeout(resolve, 25));
+      }
     }
-    await startupDetail('startup.detail.effects');
-    this.prepareCrashVisuals();
-    this.warmExplosionShaders();
-    let timeout;
-    try {
-      await Promise.race([
-        Promise.all([this.aircraft.cockpit?.shaderWarmup, this.crashShaderWarmup, this.explosionShaderWarmup]),
-        new Promise((_, reject) => {
-          timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
-        }),
-      ]);
-    } finally {
-      clearTimeout(timeout);
+    if (this.aircraft.cockpit?.shaderWarmup) {
+      let timeout;
+      try {
+        await Promise.race([
+          this.aircraft.cockpit.shaderWarmup,
+          new Promise((_, reject) => {
+            timeout = setTimeout(() => reject(new Error('Startup shaders timed out')), Math.max(0, deadline - performance.now()));
+          }),
+        ]);
+      } finally {
+        clearTimeout(timeout);
+      }
     }
     await startupStage(6, 'startup.ready');
     this.startupReady = true;
@@ -1206,6 +1205,30 @@ class FlightSimulator {
     this.clock.getDelta();
     inputLatency?.mark('startup-complete');
     startupProgress.finish();
+
+    // Hydrate non-blocking environmental/effect/catalog assets after the lobby is interactive.
+    this.sky?.loadEnvironmentHdr?.();
+    this.loadLobbyMapCatalog?.();
+    this.lobbyScreen?.enableMapTiles?.();
+    setTimeout(() => {
+      if (this.activeAirport === 'coastal' && this.ships) this.ships.loadAssets();
+    }, 0);
+    setTimeout(() => {
+      Promise.all(['fire', 'smoke', 'water', 'tire'].map(
+        kind => requestProceduralAsset('effect-atlas', { kind }),
+      ))
+        .then(([fire, smoke, water, tire]) => {
+          const buffers = { fire, smoke, water, tire };
+          this.explosionSystem?.applyAtlasBuffers?.(buffers);
+          this.tireSmokeSystem?.applyAtlasBuffers?.(buffers);
+        })
+        .catch(() => {})
+        .finally(() => {
+          this.prepareCrashVisuals();
+          this.warmExplosionShaders();
+        });
+    }, 0);
+
     // Paint the usable lobby before preparing optional aircraft. Each subsequent
     // model gets its own task so background work cannot delay overlay removal.
     const remaining = LOBBY_AIRCRAFT_IDS.filter(id => id !== this.currentAircraftId);
@@ -1217,8 +1240,10 @@ class FlightSimulator {
     };
     setTimeout(preloadNext, 1000);
     setTimeout(() => {
-      if (this.activeAirport === 'coastal') this.ships.loadAssets();
-    }, 0);
+      if (this.activeAirport === 'incheon' || this.activeAirport === 'jeju') {
+        this.ensureUnifiedRegions?.();
+      }
+    }, 500);
   }
 
   setAircraft(aircraftId = 'B738', pilotPreparation = false) {
@@ -1448,11 +1473,8 @@ class FlightSimulator {
           pixelRatio: this.renderer.getPixelRatio(), width: this.renderer.domElement.width,
           height: this.renderer.domElement.height, isMultiplayer: Boolean(this.multiplayer?.active) } : null);
     const frameDelta = this.startupReady ? clampFrameDelta(elapsed) : 0;
-    // Also covers model swaps. Preparation precedes physics so the first impact
-    // after loading can reuse the fragments.
-    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-start');
-    this.prepareCrashVisuals();
-    if (!this.hasRenderedFirstFrame) inputLatency?.mark('startup-crash-end');
+    // Also covers model swaps. Deferred past first frame so boot never blocks on breakup prep.
+    if (this.startupReady) this.prepareCrashVisuals();
     this.replayPanel?.refresh();
     this.totalSimTime += frameDelta;
     if (!this.gameFlow.isPhysicsFrozen()) this.devRunner.updatePreparation(frameDelta);
@@ -1478,6 +1500,11 @@ class FlightSimulator {
       onRunway: Boolean(this.currentAirport?.isOnRunway?.(this.position.x, this.position.z)),
       destinationCode: this.destinationAirport,
     });
+    if (this.startupReady && this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight) {
+      this.updateUnifiedRegionStreaming();
+    }
+
+    this.updateRegionMounting?.();
 
     // Keep the lobby backdrop alive: re-arm the demo after it ends.
     this.gameFlow.update(frameDelta);
@@ -1541,7 +1568,7 @@ class FlightSimulator {
     // 3. Update Environment Animations & Explosion Particles
     if (this.activeAirport !== 'lukla') {
       this.water.update(frameDelta, this.camera ? this.camera.position : this.position);
-      if (this.activeAirport === 'coastal') this.ships.update(frameDelta, this.totalSimTime);
+      if (this.activeAirport === 'coastal') this.ships?.update(frameDelta, this.totalSimTime);
     }
     if (this.currentAirport) {
       this.currentAirport.update(frameDelta, this.position, this.totalSimTime, {
@@ -1553,11 +1580,13 @@ class FlightSimulator {
       });
     }
     this.sky.updateSun(this.position, this.camera.position);
-    updateOpenWorldTerrain(this);
-    updateGeographicBuildings(this, frameDelta);
-    updateGeographicRoads(this, frameDelta);
-    updateGeographicGreenSpace(this);
-    updateGeographicLandmarks(this);
+    if (this._geoLayers) {
+      this._geoLayers.updateOpenWorldTerrain(this);
+      this._geoLayers.updateGeographicBuildings(this, frameDelta);
+      this._geoLayers.updateGeographicRoads(this, frameDelta);
+      this._geoLayers.updateGeographicGreenSpace(this);
+      this._geoLayers.updateGeographicLandmarks(this);
+    }
     this.currentAirport?.nightLighting?.update(this.sky.sunPosition.y);
     if (!this.gameFlow.isPhysicsFrozen()) {
       if (!this.replayDirector.roomEffects) this.explosionSystem.update(frameDelta);
@@ -1618,6 +1647,7 @@ class FlightSimulator {
       targetFov = Math.min(100, Math.max(54, vFovRad * (180 / Math.PI)));
     }
     this.cameraSystem.applyBaseFov(targetFov);
+    this.mobileHeadTracking?.update(performance.now());
     this.cameraSystem.update(frameDelta, this.aircraft.group, this.telemetry, (x, z) => this.currentTerrain.getHeight(x, z));
     // Audio samples the camera after its motion for this frame, so the
     // listener displacement and frameDelta share one time base.
@@ -1629,7 +1659,7 @@ class FlightSimulator {
         camera: this.camera,
         timeScale: this.replayDirector?.active ? this.replayDirector.speed : 1,
       });
-    this.foliage.updateCityLod(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
+    this.foliage?.updateCityLod(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
 
     // 7. Update HTML HUD & Diagnostics Inspector & Touch Controls
     this.updateHUD();
@@ -1640,7 +1670,7 @@ class FlightSimulator {
     this.pilotPhysiologyFx?.update(this.cameraSystem?.mode, this.telemetry?.pilot);
     this.loadingPanel.update();
 
-    this.foliage.update(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
+    this.foliage?.update(this.world?.coastalLocalCamera(this.camera.position) ?? this.camera.position);
 
     this.multiplayer?.update();
 

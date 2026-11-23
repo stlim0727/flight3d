@@ -133,3 +133,45 @@ test('explicit installer rejection cannot commit a successful start', async () =
     await assert.rejects(start.start(), /installation was rejected/);
   }
 });
+
+test('map flight plan is captured before install and applies the resolved spawn', async () => {
+  await withStorage(async () => {
+    const { sim, events } = simulator();
+    sim.activeAirport = 'incheon';
+    sim.currentAircraftId = 'B738';
+    sim.lobby = {
+      airport: 'incheon', aircraft: 'B738', preset: 'approach', pilotMode: 'human',
+      mapPlan: { state: 'approach', airportCode: 'RKSS', runwayKey: 'rwy1:14R' },
+    };
+    sim.mapPlaces = {
+      airports: [{
+        code: 'RKSS', latitude: 37.5583, longitude: 126.791, elevationM: 18,
+        runways: [{
+          id: 'rwy1', widthM: 60, lengthM: 3200,
+          ends: [
+            { ident: '14R', headingDegT: 140, displacedThresholdM: 0,
+              physical: { latitude: 37.568, longitude: 126.776, elevationM: 18 },
+              threshold: { latitude: 37.568, longitude: 126.776, elevationM: 18 } },
+            { ident: '32L', headingDegT: 320, displacedThresholdM: 0,
+              physical: { latitude: 37.548, longitude: 126.801, elevationM: 20 },
+              threshold: { latitude: 37.548, longitude: 126.801, elevationM: 20 } },
+          ],
+        }],
+      }],
+      points: [],
+    };
+    const gyroRestores = [];
+    sim.touchControls = { gyroRequested: true, gyroActive: false, restoreGyroSettings: options => gyroRestores.push(options) };
+    let applied;
+    sim.setPreset = preset => events.push(preset);
+    sim.applyMapSpawn = (spawn, state) => {
+      applied = { spawn, state };
+      events.push(`map:${state}`);
+    };
+    await createSimulatorScenarioStart(sim).start();
+    assert.deepEqual(events.slice(0, 2), ['approach', 'map:approach']);
+    assert.equal(applied.state, 'approach');
+    assert.ok(Number.isFinite(applied.spawn.x) && Number.isFinite(applied.spawn.yaw));
+    assert.deepEqual(gyroRestores, [{ userGesture: true }]);
+  });
+});
