@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { airportSpawnPlan } from '../src/config/airportSpawnPlan.js';
+import { isExternalDestination } from '../src/config/externalDestinations.js';
 import { applyAirportOverrides } from '../src/config/airportOverrides.js';
 import { resolveMapFlightPlan } from '../src/config/mapFlightPlan.js';
 import { jejuSpawn } from '../src/geospatial/JejuFlightSurface.js';
@@ -86,7 +87,7 @@ test('Jeju preset start streams RKPC and aligns the pose with the common surface
   const calls = [];
   const sim = {
     lobby: { airport: 'jeju', aircraft: 'B738', preset: 'runway', pilotMode: 'human' },
-    activeAirport: 'jeju',
+    destinationAirport: 'none',
     currentAircraftId: 'B738',
     sky: { timeOfDay: 12 },
     gear: { cgGroundHeightM: CLEARANCE_M },
@@ -101,6 +102,7 @@ test('Jeju preset start streams RKPC and aligns the pose with the common surface
     airportStreamer: {
       releaseGroundHold() { calls.push(['release']); },
       ensure(code) { calls.push(['ensure', code]); },
+      setHome(code) { calls.push(['home', code]); },
       statusFor(code) { return { state: 'ready', code }; },
       update() { calls.push(['update']); },
     },
@@ -108,6 +110,12 @@ test('Jeju preset start streams RKPC and aligns the pose with the common surface
   await createSimulatorScenarioStart(sim).start();
   assert.ok(calls.some(call => call[0] === 'ensure' && call[1] === 'RKPC'),
     'Jeju preset must load the indexed RKPC airport');
-  assert.equal(sim.destinationAirport, 'RKPC', 'streamed region must survive the render-loop destination update');
+  assert.ok(calls.some(call => call[0] === 'home' && call[1] === 'RKPC'),
+    'spawn airport must be held by the streamer, not by navigation state');
+  assert.equal(sim.destinationAirport, 'none', 'the chosen destination must be preserved');
   assert.equal(sim.position.y, 43, 'runway pose must be aligned to the common contact surface');
 }));
+
+test('RKPC remains a streamable destination without the map catalog', () => {
+  assert.equal(isExternalDestination('RKPC'), true);
+});

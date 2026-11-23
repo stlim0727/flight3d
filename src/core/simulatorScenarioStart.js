@@ -48,7 +48,7 @@ export function createSimulatorScenarioStart(sim) {
             groundClearanceM: sim.gear?.cgGroundHeightM ?? 3.5,
             aircraftId: request.aircraft,
           });
-          sim.destinationAirport = 'RKPC';
+          sim.airportStreamer?.setHome?.('RKPC');
           await waitForStreamedAirport(sim, 'RKPC');
           alignMapSpawnToContact(sim, spawn);
         }
