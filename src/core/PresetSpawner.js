@@ -783,6 +783,16 @@ class PresetSpawnerMethods {
   }
 
   /** Mount/unmount visuals with separate approach and retreat distances. */
+  /** Restore legacy runway meshes whenever their common region unmounts. */
+  syncLegacyRunwayHandoff() {
+    for (const [code, objects] of Object.entries(this._handedOffRunways ?? {})) {
+      const mounted = Boolean(this.airportStreamer?.regionFor?.(code));
+      for (const object of objects) {
+        if (object) object.visible = !mounted;
+      }
+    }
+  }
+
   updateRegionMounting() {
     const world = this.world;
     if (!world || !this.scene || this.currentTerrain !== world) return false;
@@ -796,6 +806,7 @@ class PresetSpawnerMethods {
     const x = this.position?.x ?? 0;
     const z = this.position?.z ?? 0;
     let changed = false;
+    this.syncLegacyRunwayHandoff();
     for (const id of WORLD_REGIONS) {
       const region = world.regions.get(id);
       if (!region) continue;
@@ -960,10 +971,16 @@ class PresetSpawnerMethods {
     const fallback = new CorridorFlightSurface({ activeOrigin: config.origin });
     this.jejuSurface = new OpenWorldRegionSurface({ ...config, fallback });
     const streamer = this.airportStreamer;
-    const streamedAirport = () => streamer?.regionFor?.('RKPC')?.airport ?? null;
+    const streamedRunway = (x, z, method) => {
+      const region = streamer?.regionFor?.('RKPC');
+      if (!region) return false;
+      const [lx, lz] = this.world.local('RKPC', x, z);
+      return Boolean(region.airport?.[method]?.(lx, lz));
+    };
     this.jejuAirportFacade = {
-      isOnRunway: (x, z) => Boolean(streamedAirport()?.isOnRunway?.(...this.world.local('RKPC', x, z))),
-      isRunwaySafetyArea: (x, z) => Boolean(streamedAirport()?.isRunwaySafetyArea?.(...this.world.local('RKPC', x, z))),
+      isOnRunway: (x, z) => streamedRunway(x, z, 'isOnRunway') || Boolean(fallback.isOnRunway?.(x, z)),
+      isRunwaySafetyArea: (x, z) => streamedRunway(x, z, 'isRunwaySafetyArea')
+        || Boolean(fallback.isRunwaySafetyArea?.(x, z)),
       hasModeledBuilding: () => false,
       update() {},
     };

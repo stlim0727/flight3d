@@ -134,3 +134,15 @@ test('mount updates leave a mission-owned terrain and collision environment alon
   assert.equal(world.regions.get('valley').group.visible, before);
   assert.equal(world.isMounted('valley'), false);
 });
+
+test('handed-off runway visibility follows the common region mount state', () => {
+  const spawner = new Spawner();
+  const legacy = { visible: true };
+  spawner._handedOffRunways = { VNLK: [legacy] };
+  spawner.airportStreamer = { regionFor: () => null };
+  spawner.syncLegacyRunwayHandoff();
+  assert.equal(legacy.visible, true, 'legacy runway returns when common region unmounts');
+  spawner.airportStreamer.regionFor = () => ({ airport: {} });
+  spawner.syncLegacyRunwayHandoff();
+  assert.equal(legacy.visible, false, 'legacy runway hides when common region is back');
+});

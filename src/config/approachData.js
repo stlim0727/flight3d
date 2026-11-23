@@ -18,7 +18,7 @@ export const APPROACH_DATA = {
     return {
       threshold: { x: spawn.frame.threshold.x, z: spawn.frame.threshold.z },
       end: spawn.frame.end,
-      gsAngleDeg: spawn.glideslopeDeg,
+      headingDeg: spawn.frame.headingDeg,
       elevationFt: Math.round(spawn.frame.elevationM * 3.28084),
     };
   })(),

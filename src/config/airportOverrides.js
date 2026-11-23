@@ -173,6 +173,9 @@ export const AIRPORT_OVERRIDES = {
   RKSI: {
     ident: 'RKSI',
     elevationM: 7.0,
+    // 16R/34L is indexed but not authored in IncheonFlightSurface; exposing it
+    // would render pavement without matching contact height.
+    hideRunways: ['346105'],
     // Surveyed 15R/33L and 15L/33R endpoints from incheonAirfield.json, kept
     // so common descriptors reproduce the legacy runway world positions.
     runways: [
@@ -290,38 +293,8 @@ export const AIRPORT_OVERRIDES = {
         ],
       },
     ],
-    facilities: [
-      {
-        id: 'terminal',
-        name: 'Lukla Terminal',
-        kind: 'terminal',
-        position: [76.3, 2844.0, 8.9],
-        size: [44, 24, 24],
-        rotationY: 32 * Math.PI / 180,
-        collision: { type: 'box', halfX: 22, halfZ: 12, maxAltitudeM: 2870 },
-      },
-      {
-        id: 'tower',
-        name: 'Lukla Control Tower',
-        kind: 'tower',
-        position: [83.1, 2855.0, 4.7],
-        height: 16,
-        radius: 4.5,
-        cabHeight: 6,
-        cabRadius: 4.5,
-        shaftRadius: 3.5,
-        collision: { type: 'cylinder', radius: 4.5, maxAltitudeM: 2877 },
-      },
-      {
-        id: 'rw24-wall',
-        name: 'Runway 24 Retaining Wall',
-        kind: 'wall',
-        position: [224.6, 2867.0, -140.4],
-        size: [45, 6, 3.5],
-        rotationY: 58 * Math.PI / 180,
-        collision: { type: 'box', halfX: 22.5, halfZ: 1.75, maxAltitudeM: 2873 },
-      },
-    ],
+    // Facilities remain in LuklaAirport until its dedicated visuals are retired;
+    // the common region must not create duplicates during runway handoff.
     spawn: {
       poses: {
         runway: {

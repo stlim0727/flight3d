@@ -50,6 +50,7 @@ export class OpenWorldRegionSurface {
   get airportGeometry() { return this.geometry; }
 
   getHeight(x, z) {
+    if (this.fallback?.isOnRunway?.(x, z)) return this.fallback.getHeight(x, z);
     const streamed = this.openWorld?.sampleRaw?.(x, z) ?? this.openWorld?.sample?.(x, z)?.height;
     if (Number.isFinite(streamed)) return streamed;
     return this.fallback?.getHeight(x, z) ?? 0;
