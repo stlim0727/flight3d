@@ -81,6 +81,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   let mapFocus = null;
   let mapZoom = 0;
   let mapTileSignature = '';
+  let mapTilesEnabled = false;
   let suppressClickUntil = 0;
   let mapSelectionBusy = false;
   let customPoint = null;
@@ -298,8 +299,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const point = cursor.matrixTransform(transform.inverse());
     return { x: point.x, y: point.y };
   };
+  function enableMapTiles() {
+    if (mapTilesEnabled) return;
+    mapTilesEnabled = true;
+    renderMapTiles();
+  }
   function renderMapTiles() {
-    if (!mapTiles || typeof mapTiles.replaceChildren !== 'function') return;
+    if (!mapTilesEnabled || !mapTiles || typeof mapTiles.replaceChildren !== 'function') return;
     const tiles = tilesForViewBox(mapViewBox());
     const signature = tiles
       .map(tile => `${tile.url}:${tile.x.toFixed(1)},${tile.y.toFixed(1)},${tile.width.toFixed(1)},${tile.height.toFixed(1)}`)
@@ -558,13 +564,18 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const longitude = coordinates.longitude.toFixed(5);
     selectMapPlace({ ...coordinates, kind: 'point', id: `map:${latitude},${longitude}`, label: `${latitude}, ${longitude}` });
   });
-  mapOverview?.addEventListener('click', () => setMapView(mapFocus, 0));
-  mapZoomIn?.addEventListener('click', () => setMapView(currentMapFocus(), Math.min(12, mapZoom + 1)));
-  mapZoomOut?.addEventListener('click', () => setMapView(currentMapFocus(), Math.max(0, mapZoom - 1)));
+  mapOverview?.addEventListener('click', () => { enableMapTiles(); setMapView(mapFocus, 0); });
+  mapZoomIn?.addEventListener('click', () => { enableMapTiles(); setMapView(currentMapFocus(), Math.min(12, mapZoom + 1)); });
+  mapZoomOut?.addEventListener('click', () => { enableMapTiles(); setMapView(currentMapFocus(), Math.max(0, mapZoom - 1)); });
+  mapSearchInput?.addEventListener('focus', enableMapTiles, { once: true });
+  document.getElementById('lobby-place-picker')?.addEventListener('toggle', event => {
+    if (event.target?.open) enableMapTiles();
+  });
   const activePointers = new Map();
   let dragStart = null;
   let pinchStart = null;
   mapSvg?.addEventListener?.('pointerdown', event => {
+    enableMapTiles();
     if (typeof event.pointerId !== 'number') return;
     activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     if (activePointers.size === 1) {
@@ -641,6 +652,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   mapSvg?.addEventListener?.('pointerup', finishPointer);
   mapSvg?.addEventListener?.('pointercancel', finishPointer);
   mapSvg?.addEventListener?.('wheel', event => {
+    enableMapTiles();
     if (typeof event.preventDefault === 'function') event.preventDefault();
     const box = svgViewBox();
     const width = Math.max(1, Math.min(MAP_WIDTH, box.width * (event.deltaY > 0 ? 1.25 : 0.8)));
@@ -1175,5 +1187,5 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   refresh();
-  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded, setMapPlaces, setMapSearchState, requestAirportSearchIndex };
+  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded, setMapPlaces, setMapSearchState, requestAirportSearchIndex, enableMapTiles };
 }

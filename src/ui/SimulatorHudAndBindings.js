@@ -722,6 +722,7 @@ class SimulatorHudAndBindingsMethods {
       },
     });
     this.loadLobbyMapCatalog = () => {
+      this.lobbyScreen?.enableMapTiles?.();
       if (this._mapPlacesPromise) return this._mapPlacesPromise;
       this._mapPlacesPromise = loadMapFlightPlaces()
         .then(places => {
@@ -736,9 +737,9 @@ class SimulatorHudAndBindingsMethods {
         });
       return this._mapPlacesPromise;
     };
-    document.getElementById('lobby-map-search')?.addEventListener('focus', () => this.loadLobbyMapCatalog(), { once: true });
-    document.getElementById('lobby-map-airport')?.addEventListener('focus', () => this.loadLobbyMapCatalog(), { once: true });
-    document.getElementById('lobby-map-airport')?.addEventListener('pointerdown', () => this.loadLobbyMapCatalog(), { once: true });
+    document.getElementById('lobby-map-search')?.addEventListener('focus', () => { this.loadLobbyMapCatalog(); this.lobbyScreen?.enableMapTiles?.(); }, { once: true });
+    document.getElementById('lobby-map-airport')?.addEventListener('focus', () => { this.loadLobbyMapCatalog(); this.lobbyScreen?.enableMapTiles?.(); }, { once: true });
+    document.getElementById('lobby-map-airport')?.addEventListener('pointerdown', () => { this.loadLobbyMapCatalog(); this.lobbyScreen?.enableMapTiles?.(); }, { once: true });
     this.renderDiagnosticsPanel = new RenderDiagnosticsPanel(this);
     this.replayPanel = new ReplayPanel(this);
     this.replayDirector.onChange = () => this.replayPanel.refresh();
