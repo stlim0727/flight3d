@@ -18,7 +18,7 @@ import { defaultScenarioForRegion, requiredAircraft } from '../config/scenarioRe
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
-import { BusanChart } from './BusanChart.js';
+import { SoutheastAtlas } from './SoutheastAtlas.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -237,7 +237,7 @@ class SimulatorHudAndBindingsMethods {
       }
       this.setPilotageLayout(layout);
       if (available && map.open) {
-        this.busanChart ??= new BusanChart(map);
+        this.busanChart ??= new SoutheastAtlas(map);
         this.busanChart.update(this.position, this.quaternion);
       }
     }

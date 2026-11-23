@@ -5,16 +5,16 @@ import { localToWgs84, tileToWgs84, tilesForBbox, wgs84ToLocal } from './TileCoo
 const origin = REGIONAL_CRUISES.busan;
 export const CHART_ZOOM = 13;
 
-function project({ latitude, longitude }) {
+export function chartPoint({ latitude, longitude }) {
   return wgs84ToLocal(latitude, longitude, origin);
 }
 
 export function chartAircraft({ x, z }, forward, previousHeading) {
-  const point = project(localToWgs84(x, z, INCHEON_PATCH.origin));
+  const point = chartPoint(localToWgs84(x, z, INCHEON_PATCH.origin));
   const length = Math.hypot(forward.x, forward.z);
   let heading = previousHeading;
   if (length > 1e-5) {
-    const ahead = project(localToWgs84(x + 10 * forward.x / length,
+    const ahead = chartPoint(localToWgs84(x + 10 * forward.x / length,
       z + 10 * forward.z / length, INCHEON_PATCH.origin));
     heading = Math.atan2(ahead[0] - point[0], point[1] - ahead[1]);
   }
@@ -22,7 +22,7 @@ export function chartAircraft({ x, z }, forward, previousHeading) {
 }
 
 export function chartTilePoint(tx, ty) {
-  return project(tileToWgs84(tx, ty, CHART_ZOOM));
+  return chartPoint(tileToWgs84(tx, ty, CHART_ZOOM));
 }
 
 // DOMMatrix-compatible transform from chart metres (east, south) to CSS pixels.
