@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(demo):** add the F-16 Incheon → Gimpo sortie demo
+  - Selecting the F-16 at Incheon now offers a second cinematic demo: runway takeoff, a heading-led transit to the streamed RKSS airport, RW14R interception, a 3° final and a braked rollout with manual handover on the runway.
+  - The demo owns its destination: it mounts and reads the streamed Gimpo runway before releasing the takeoff, so no lobby destination choice is required. Stage captions are available in English and Korean.
+  - Registered in the demo sweep route table and covered by `tests/f16GimpoDemo.test.js`; the hardware-GPU sweep verifies staged flight, landing and parked handoff.
 - **feat(camera):** add opt-in webcam head look for mobile and desktop
   - A new head-tracking panel requests the front camera on click, detects a face with locally hosted MediaPipe assets, and drives a dedicated yaw/pitch channel in cockpit, wing and gear views.
   - Explicit mouse/touch look keeps precedence over head look, and the tracking assets load only when the feature is enabled. Reset zeroes at the current head position; Calibrate uses recent head movement as the full look range.

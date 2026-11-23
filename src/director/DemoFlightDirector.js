@@ -13,6 +13,7 @@ import { CessnaProximityScenario } from './scenarios/CessnaProximityScenario.js'
 import { resolveDemoProfile } from './demoProfiles.js';
 import { CoastalDemoScenario } from './scenarios/CoastalDemoScenario.js';
 import { NeonDepartureScenario } from './scenarios/NeonDepartureScenario.js';
+import { F16GimpoScenario } from './scenarios/F16GimpoScenario.js';
 
 /**
  * Autonomous Cinematic Demo Flight Director
@@ -65,6 +66,7 @@ export class DemoFlightDirector {
     this.cessnaScenario = new CessnaDemoScenario(this, simulator);
     this.cessnaProximityScenario = new CessnaProximityScenario(this, simulator);
     this.neonDepartureScenario = new NeonDepartureScenario(this, simulator);
+    this.f16GimpoScenario = new F16GimpoScenario(this, simulator);
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
     this.profile = 'classic';
 
@@ -100,6 +102,7 @@ export class DemoFlightDirector {
   }
 
   getActiveScenario() {
+    if(this.activeDemoAirport==='incheon' && this.profile==='gimpo-sortie')return this.f16GimpoScenario;
     if(this.activeDemoAirport==='incheon' && this.profile==='sihwa-tour')return this.sihwaTourScenario;
     if (this.activeDemoAircraft === 'F16') {
       return this.profile === 'canyon-slalom' ? this.f16SlalomScenario
@@ -329,9 +332,13 @@ export class DemoFlightDirector {
     this.closeRestartConfirm?.();
     // The bridge flight is flown by hand; a demo may only take over another airport.
     if (this.sim.bridgeFlight?.active && (!targetAirport || targetAirport === this.sim.activeAirport)) return false;
-    const sihwa=(targetAirport || this.sim.activeAirport)==='incheon' && resolveDemoProfile(this.sim.currentAircraftId,'incheon',requestedProfile).id==='sihwa-tour';
-    if (!sihwa && (targetAirport || this.sim.activeAirport) === 'incheon' && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
-    if (!sihwa && this.sim.currentAircraftId === 'F16' && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
+    const incheon = (targetAirport || this.sim.activeAirport) === 'incheon';
+    const resolved = incheon ? resolveDemoProfile(this.sim.currentAircraftId, 'incheon', requestedProfile).id : null;
+    const sihwa = resolved === 'sihwa-tour';
+    const gimpo = resolved === 'gimpo-sortie';
+    if (!sihwa && !gimpo && incheon && !['B738', 'C172'].includes(this.sim.currentAircraftId)) return false;
+    if (!sihwa && !gimpo && this.sim.currentAircraftId === 'F16'
+      && (targetAirport || this.sim.activeAirport) !== 'lukla') return false;
     this.sim.devRunner?.stop();
     if (this.isActive) this.stop();
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
@@ -423,7 +430,9 @@ export class DemoFlightDirector {
       this.audioInitiated = true;
     }
 
-    if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
+    if (this.profile==='gimpo-sortie' && this.activeDemoAirport==='incheon') {
+      this.setStage(F16GimpoScenario.STAGES.PREPARE);
+    } else if (this.profile==='sihwa-tour' && this.activeDemoAirport==='incheon') {
       this.setStage(SihwaTourScenario.STAGES.COAST);
     } else if (this.activeDemoAircraft === 'F16') {
       if (this.profile === 'canyon-slalom') {

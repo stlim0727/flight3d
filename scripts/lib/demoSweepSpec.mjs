@@ -32,6 +32,7 @@ import { F16CanyonSlalomScenario } from '../../src/director/scenarios/F16CanyonS
 import { F16CanyonChaseScenario } from '../../src/director/scenarios/F16CanyonChaseScenario.js';
 import { SihwaTourScenario } from '../../src/director/scenarios/SihwaTourScenario.js';
 import { NeonDepartureScenario } from '../../src/director/scenarios/NeonDepartureScenario.js';
+import { F16GimpoScenario } from '../../src/director/scenarios/F16GimpoScenario.js';
 import { demoProfiles } from '../../src/director/demoProfiles.js';
 import { AIRCRAFT_REGISTRY } from '../../src/config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS } from '../../src/config/scenarioRegistry.js';
@@ -48,6 +49,7 @@ export const SCENARIO_STAGES = {
   f16Canyon: F16CanyonChaseScenario.STAGES,
   sihwa: SihwaTourScenario.STAGES,
   neonDeparture: NeonDepartureScenario.STAGES,
+  f16Gimpo: F16GimpoScenario.STAGES,
 };
 
 /** Derived from the app's own registries so the sweep cannot quietly fall behind. */
@@ -238,6 +240,14 @@ export const ROUTES = [
     groundStages: [], lands: false, handoff: 'airborne', budgetSimSeconds: 700,
     clearanceIntentM: 100, allowedWarnings: ['gear', 'flaps'], shotStage: 'BEACH',
     expectLandmarks: 4,
+  },
+  {
+    id: 'f16-incheon-gimpo-sortie', aircraft: 'F16', airport: 'incheon', profile: 'gimpo-sortie',
+    tier: 'full', scenario: 'f16Gimpo',
+    stages: ['PREPARE', 'TAKEOFF', 'CLIMB', 'ENROUTE', 'INTERCEPT', 'FINAL', 'FLARE', 'ROLLOUT', 'COMPLETED'],
+    groundStages: ['PREPARE', 'TAKEOFF', 'ROLLOUT'], lands: true, handoff: 'parked', budgetSimSeconds: 400,
+    clearanceIntentM: 0, rolloutDevices: ['spoilers'],
+    allowedWarnings: ['stall', 'overspeed', 'gear', 'flaps', 'sink-rate'], shotStage: 'INTERCEPT',
   },
 ];
 
