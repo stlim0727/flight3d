@@ -8,6 +8,7 @@ import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospat
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN, CHUJA_EMERGENCY_STRIP } from '../geospatial/CorridorCoordinateSystem.js';
+import { getInsetsForRegion } from '../config/terrainInsets.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 import { EARTH_RADIUS_M } from './AerialPerspective.js';
 import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
@@ -506,9 +507,10 @@ function heightOnTriangle(positions, x, z, a, b, c, heights) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
+  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
+    this.insets = insets;
     this.localSurface = localSurface;
     this.world = world;
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
@@ -540,7 +542,10 @@ export class OpenWorldTerrain {
     this.pendingWater = null;
     this.project = (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
     if (localSurface) {
-      this.localImagery = projectLocalImagery([localSurface.geometry, localSurface.localTerraceGeometry],
+      const sources = Array.isArray(localSurface.geometries)
+        ? localSurface.geometries
+        : [localSurface.geometry, localSurface.localTerraceGeometry].filter(Boolean);
+      this.localImagery = projectLocalImagery(sources,
         (x, z) => this.coordinate(x, z));
     }
   }
@@ -841,8 +846,9 @@ export class OpenWorldTerrain {
       const visible = [];
       const wanted = new Map();
       for (const [key, entry] of this.tiles) {
+        const targetMesh = (entry.localMesh?.geometry?.boundingSphere || entry.localMesh?.geometry) ? entry.localMesh : entry.mesh;
         const pixels = entry.localMesh || entry.mesh.geometry.index?.count
-          ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
+          ? projectedTilePixels(targetMesh, camera, viewportHeight) : 0;
         entry.imageryPriority = pixels;
         const previous = this.detailWanted.get(key);
         if (previous) {
@@ -893,6 +899,33 @@ export class OpenWorldTerrain {
         entry.detailLastVisibleAt = now;
         if (level >= 13 && !(previous >= 13)) highDetailCount++;
         if (level >= 14 && !(previous >= 14)) ultraDetailCount++;
+      }
+      if (this.insets?.length > 0 && camera?.position) {
+        const camX = camera.position.x;
+        const camZ = camera.position.z;
+        for (const inset of this.insets) {
+          const [minX, minZ, maxX, maxZ] = inset.bounds;
+          const distToInset = Math.hypot(
+            camX < minX ? minX - camX : camX > maxX ? camX - maxX : 0,
+            camZ < minZ ? minZ - camZ : camZ > maxZ ? camZ - maxZ : 0
+          );
+          const approachDist = inset.approachDistanceM ?? 8000;
+          if (distToInset <= approachDist) {
+            for (const [key, entry] of this.tiles) {
+              const b = entry.bounds;
+              if (b && b[0] < maxX && b[2] > minX && b[1] < maxZ && b[3] > minZ) {
+                const targetLevel = distToInset <= approachDist * 0.5
+                  ? (inset.maxDetailLevel ?? 14)
+                  : (inset.minDetailLevel ?? 13);
+                const current = wanted.get(key) ?? zoom;
+                if (current < targetLevel && wanted.size < budget.detailTileLimit) {
+                  wanted.set(key, targetLevel);
+                  entry.detailLastVisibleAt = now;
+                }
+              }
+            }
+          }
+        }
       }
       this.detailWanted = wanted;
     }
@@ -1092,10 +1125,13 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom };
-      if (local) {
-        const [west, north, eastEdge, southEdge] = projectedBounds(x, y, this.project);
-        if (west < half && eastEdge > -half && north < half && southEdge > -half) {
+      const bounds = projectedBounds(x, y, this.project);
+      entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
+      if (this.localImagery) {
+        const [west, north, eastEdge, southEdge] = bounds;
+        const extent = local?.extent ?? (half > 0 ? { minX: -half, maxX: half, minZ: -half, maxZ: half } : null);
+        const overlaps = !extent || (west < extent.maxX && eastEdge > extent.minX && north < extent.maxZ && southEdge > extent.minZ);
+        if (overlaps) {
           const localGeometry = buildLocalImageryGeometry(this.localImagery, x, y);
           if (localGeometry) {
             entry.localMesh = new THREE.Mesh(localGeometry, material);
@@ -1199,7 +1235,7 @@ const frames = {
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [
     [-3200, -1500, 3200, 1500],
     [chuja[0] - 2500, chuja[1] - 2500, chuja[0] + 2500, chuja[1] + 2500],
-  ] },
+  ], insets: getInsetsForRegion('jeju') },
 };
 
 function setCorridorStreamersVisible(surface, visible) {
@@ -1229,10 +1265,24 @@ export function updateOpenWorldTerrain(sim) {
   }
   if (frame && surface?.mesh && (sim.activeAirport !== 'lukla' || surface.isLoaded)) {
     if (!surface.openWorld) {
-      const half = surface.size / 2;
-      surface.openWorld = new OpenWorldTerrain(sim.activeAirport === 'lukla'
-        ? { ...frame, protectedAreas: [[-half, -half, half, half]], localSurface: surface, world: sim.world }
-        : { ...frame, world: sim.world });
+      let localSurface = null;
+      let protectedAreas = frame.protectedAreas;
+      if (sim.activeAirport === 'lukla') {
+        const half = surface.size / 2;
+        protectedAreas = [[-half, -half, half, half]];
+        localSurface = surface;
+      } else if (surface.airportMesh?.geometry) {
+        localSurface = {
+          geometry: surface.airportMesh.geometry,
+          extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
+        };
+      }
+      surface.openWorld = new OpenWorldTerrain({
+        ...frame,
+        protectedAreas,
+        localSurface,
+        world: sim.world,
+      });
       surface.mesh.add(surface.openWorld.group);
     }
     if (surface.openWorld && !surface.openWorld.world && sim.world) {

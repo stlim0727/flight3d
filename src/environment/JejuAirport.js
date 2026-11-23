@@ -272,6 +272,9 @@ export async function loadJejuAirport(base = '', options = {}) {
       if (terrainMesh) {
         const hasDEM = Boolean(activeTerrain.openWorld?.tiles.size || options.hasOpenWorld);
         terrainMesh.visible = !hasDEM;
+        if (airportMesh && activeTerrain.openWorld?.localImagery) {
+          airportMesh.visible = !hasDEM;
+        }
       }
       if (corridorStreamer && position && !activeTerrain.openWorld && !options.hasOpenWorld && corridorStreamer.group.visible) {
         let headingDeg = options.headingDeg ?? options.trackDeg;
