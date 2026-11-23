@@ -18,6 +18,7 @@ import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js
 import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
 import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
+import { castFarSunShadow } from '../environment/FarSunShadow.js';
 import { RENDER_QUALITY } from '../config/renderQuality.js';
 import { APPROACH_DATA } from '../config/approachData.js';
 import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
@@ -915,10 +916,15 @@ class PresetSpawnerMethods {
   async ensureLuklaRegion() {
     if (this.luklaTerrain && this.luklaAirport) return this.luklaAirport;
     this._luklaLoad ??= Promise.all([
-      import('../environment/LuklaTerrain.js'),
+      import('../environment/RasterRegionSurface.js'),
+      import('../environment/luklaSurfaceMaterial.js'),
       import('../environment/LuklaAirport.js'),
-    ]).then(([{ LuklaTerrain }, { LuklaAirport }]) => {
-      this.luklaTerrain = new LuklaTerrain();
+    ]).then(([{ RasterRegionSurface }, { luklaSurfaceMaterial }, { LuklaAirport }]) => {
+      const config = REGION_SURFACES.lukla;
+      this.luklaTerrain = new RasterRegionSurface(config, {
+        createMaterial: texture => luklaSurfaceMaterial(texture),
+        castShadow: mesh => castFarSunShadow(mesh),
+      });
       this.luklaAirport = new LuklaAirport();
       this.luklaTerrain.mesh.visible = false;
       this.luklaAirport.group.visible = false;
