@@ -19,6 +19,8 @@ import {
   MARKING_LIFT_M,
 } from '../src/geospatial/externalAirportSurface.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { CollisionDetector } from '../src/physics/CollisionDetector.js';
+import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
 // Real-world RKPC record from public/data/airports/
 const RKPC_RECORD = {
@@ -454,6 +456,96 @@ test('displaced threshold separates green threshold lights and red runway end li
   const avgGreenZ = greenThresholdZ.reduce((a, b) => a + b, 0) / greenThresholdZ.length;
   const avgRedZ = redPhysicalZ.reduce((a, b) => a + b, 0) / redPhysicalZ.length;
   assert.ok(Math.abs(avgGreenZ - avgRedZ) > 200, 'Green threshold and red end lights must be separated by displacement');
+
+  lighting.dispose();
+});
+
+test('dynamically registered airport facilities are checked by CollisionDetector via airportRegions getter', () => {
+  const world = {
+    regions: new Map(),
+    offsets: new Map(),
+    isOnRunway: () => false,
+    isRunwaySafetyArea: () => false,
+    nightLightingUpdate: () => {},
+  };
+  const facade = createWorldAirportFacade(world);
+  const detector = new CollisionDetector(null, null, null, null, null);
+  detector.airport = facade;
+
+  // Stream/register dynamic RKPC airport
+  const rkpcRegion = createExternalAirportRegion({ airport: RKPC_RECORD });
+  world.regions.set('RKPC', rkpcRegion);
+  world.offsets.set('RKPC', [5000, 10000]);
+
+  // Tower is at [-80, 36.0, 260], height 49m -> top at 85m
+  // World position: [5000 - 80, 50, 10000 + 260] = [4920, 50, 10260]
+  const towerProbe = [{ pos: new THREE.Vector3(4920, 50, 10260), radius: 1, desc: 'cockpit' }];
+  const hit = detector.checkAirportBuildings(null, towerProbe);
+  assert.ok(hit, 'Collision detector must hit tower in dynamically registered airport');
+  assert.equal(hit.point.x, 4920);
+  assert.equal(hit.point.z, 10260);
+
+  rkpcRegion.dispose();
+});
+
+test('airportFacade.update updates PAPI using cameraPosition when provided', () => {
+  const region = createExternalAirportRegion({ airport: RKPC_RECORD });
+  const papi07 = region.airport.nightLighting.papiSystems.find(p => p.endIdent === '07');
+  assert.ok(papi07, 'PAPI 07 system must exist');
+
+  const aircraftPos = new THREE.Vector3(0, 0, 0);
+  const dir = papi07.approachDir;
+  const highAlt = papi07.center.y + 2000 * Math.tan(THREE.MathUtils.degToRad(3.8));
+  const cameraHigh = new THREE.Vector3(
+    papi07.center.x + dir.x * 2000,
+    highAlt,
+    papi07.center.z + dir.z * 2000
+  );
+
+  region.airport.update(0.016, aircraftPos, 0, { sunHeight: 0, cameraPosition: cameraHigh });
+
+  const whiteCount = papi07.units.filter(u => u.lensMat.color.getHex() === 0xffffff).length;
+  assert.equal(whiteCount, 4, 'High camera position must produce 4 white lights on PAPI');
+
+  region.dispose();
+});
+
+test('facility ground contact height matches floor elevation without gaps under outsideHeight 0', () => {
+  const surface = new ExternalAirportSurface({ airport: RKPC_RECORD, outsideHeight: () => 0 });
+
+  // Tower center at [-80, 260]
+  const towerH = surface.getHeight(-80, 260);
+  assert.equal(towerH, 36.0, 'Tower center ground height must match base elevation 36.0');
+
+  // Terminal center at [150, 320]
+  const termH = surface.getHeight(150, 320);
+  assert.equal(termH, 36.0, 'Terminal center ground height must match base elevation 36.0');
+
+  // Terminal footprint point at [250, 350]
+  const termFootprintH = surface.getHeight(250, 350);
+  assert.equal(termFootprintH, 36.0, 'Terminal footprint ground height must remain 36.0');
+});
+
+test('apron lamps create spotlights aimed at target and adjust intensity with sunHeight', () => {
+  const override = getAirportOverride('RKPC');
+  const descriptors = buildExternalRunwayDescriptors(RKPC_RECORD, override);
+  const lighting = createExternalAirportLighting(descriptors, { apronLamps: override.lighting.apronLamps });
+
+  assert.equal(lighting.lamps.length, 2, 'Must create 2 apron lamp fixtures');
+  const lamp0 = lighting.lamps[0];
+  assert.ok(lamp0.light.isSpotLight, 'Lamp light must be a THREE.SpotLight');
+  assert.equal(lamp0.light.target.position.x, 50);
+  assert.equal(lamp0.light.target.position.z, 180);
+
+  // Daytime: sunHeight = 1.0 -> dusk level = 0
+  lighting.update(1.0);
+  assert.equal(lamp0.light.intensity, 0, 'Daytime light intensity must be 0');
+  assert.equal(lamp0.head.material.emissiveIntensity, 0, 'Daytime head emissive must be 0');
+
+  // Nighttime: sunHeight = -0.5 -> dusk level = 1
+  lighting.update(-0.5);
+  assert.ok(lamp0.light.intensity > 1000, 'Nighttime light intensity must be active');
+  assert.ok(lamp0.head.material.emissiveIntensity > 1, 'Nighttime head emissive must be active');
 
   lighting.dispose();
 });

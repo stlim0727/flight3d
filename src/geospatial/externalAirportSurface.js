@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { projectToLocal } from './incheon.js';
 import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
+import { nightLightLevel } from '../environment/AirportNightLighting.js';
 
 const BLEND_START_M = 40;
 const BLEND_END_M = 240;
@@ -163,6 +164,7 @@ export function buildExternalFacilityDescriptors(facilities, fallbackElevation =
     height: fac.height ?? 20,
     radius: fac.radius ?? 10,
     size: fac.size ?? [30, 20, 30],
+    rotationY: fac.rotationY ?? 0,
     cabHeight: fac.cabHeight ?? 8,
     cabRadius: fac.cabRadius ?? 11,
     shaftRadius: fac.shaftRadius ?? 8,
@@ -246,6 +248,25 @@ export class ExternalAirportSurface {
         maxZ = Math.max(maxZ, point.z);
       }
     }
+    for (const twy of this.taxiways) {
+      for (const pt of twy.points) {
+        minX = Math.min(minX, pt[0]);
+        maxX = Math.max(maxX, pt[0]);
+        minZ = Math.min(minZ, pt[1]);
+        maxZ = Math.max(maxZ, pt[1]);
+      }
+    }
+    for (const fac of this.facilities) {
+      const fx = fac.position[0];
+      const fz = fac.position[2];
+      const r = fac.kind === 'tower'
+        ? Math.max(fac.radius ?? 10, fac.cabRadius ?? 10)
+        : Math.hypot(fac.size?.[0] ?? 30, fac.size?.[2] ?? 30) * 0.5;
+      minX = Math.min(minX, fx - r);
+      maxX = Math.max(maxX, fx + r);
+      minZ = Math.min(minZ, fz - r);
+      maxZ = Math.max(maxZ, fz + r);
+    }
     if (!Number.isFinite(minX)) {
       minX = maxX = minZ = maxZ = 0;
     }
@@ -286,19 +307,65 @@ export class ExternalAirportSurface {
     return best;
   }
 
+  nearestFacility(x, z) {
+    if (!Array.isArray(this.facilities) || this.facilities.length === 0) return null;
+    let best = null;
+    for (const fac of this.facilities) {
+      const fx = fac.position[0];
+      const fz = fac.position[2];
+      const baseElev = fac.position[1] ?? this.elevationM;
+      let dist = Infinity;
+      if (fac.kind === 'tower') {
+        const radius = Math.max(fac.radius ?? 10, fac.shaftRadius ?? 8, fac.cabRadius ?? 10);
+        const centerDist = Math.hypot(x - fx, z - fz);
+        dist = Math.max(0, centerDist - radius);
+      } else {
+        const halfW = fac.collision?.halfX ?? ((fac.size?.[0] ?? 30) * 0.5);
+        const halfD = fac.collision?.halfZ ?? ((fac.size?.[2] ?? 30) * 0.5);
+        const rot = fac.rotationY ?? 0;
+        let qx = 0;
+        let qz = 0;
+        if (rot !== 0) {
+          const cos = Math.cos(-rot);
+          const sin = Math.sin(-rot);
+          const dx = x - fx;
+          const dz = z - fz;
+          const lx = Math.abs(dx * cos - dz * sin);
+          const lz = Math.abs(dx * sin + dz * cos);
+          qx = Math.max(0, lx - halfW);
+          qz = Math.max(0, lz - halfD);
+        } else {
+          qx = Math.max(0, Math.abs(x - fx) - halfW);
+          qz = Math.max(0, Math.abs(z - fz) - halfD);
+        }
+        dist = Math.hypot(qx, qz);
+      }
+      if (!best || dist < best.distance) {
+        best = { distance: dist, elevationM: baseElev };
+      }
+    }
+    return best;
+  }
+
   getHeight(x, z) {
     if (!finite(x) || !finite(z)) return 0;
     const nearestRunway = this.nearest(x, z);
     const nearestTwy = this.nearestTaxiway(x, z);
+    const nearestFac = this.nearestFacility(x, z);
 
-    let nearest = nearestRunway;
-    if (nearestTwy && (!nearest || nearestTwy.hit.distance < nearest.hit.distance)) {
-      nearest = nearestTwy;
+    let nearest = nearestRunway
+      ? { distance: nearestRunway.hit.distance, elevationM: nearestRunway.hit.elevationM }
+      : null;
+    if (nearestTwy && (!nearest || nearestTwy.hit.distance < nearest.distance)) {
+      nearest = { distance: nearestTwy.hit.distance, elevationM: nearestTwy.hit.elevationM };
+    }
+    if (nearestFac && (!nearest || nearestFac.distance < nearest.distance)) {
+      nearest = nearestFac;
     }
 
     if (!nearest) return this.outside(x, z, 0);
-    const elevation = nearest.hit.elevationM;
-    const blend = smoothstep((nearest.hit.distance - BLEND_START_M) / (BLEND_END_M - BLEND_START_M));
+    const elevation = nearest.elevationM;
+    const blend = smoothstep((nearest.distance - BLEND_START_M) / (BLEND_END_M - BLEND_START_M));
     if (blend <= 0) return elevation;
     if (blend >= 1) return this.outside(x, z, elevation);
     const surrounding = this.outside(x, z, elevation, { unblended: true });
@@ -1028,21 +1095,39 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
   }
 
   // Apron Lamps
+  const lamps = [];
   for (const lamp of apronLamps) {
+    const x = lamp.x ?? 0;
+    const y = lamp.y ?? 0;
+    const z = lamp.z ?? 0;
     const height = lamp.height ?? 20;
     const pole = new THREE.Mesh(
       new THREE.CylinderGeometry(0.15, 0.3, height, 8),
       new THREE.MeshStandardMaterial({ color: 0x596574, roughness: 0.8 })
     );
-    pole.position.set(lamp.x, (lamp.y ?? 0) + height / 2, lamp.z);
-    group.add(pole);
+    pole.position.set(x, y + height / 2, z);
 
     const head = new THREE.Mesh(
       new THREE.BoxGeometry(2.0, 0.3, 1.2),
-      new THREE.MeshStandardMaterial({ color: 0xe4ddc9, emissive: 0xffd69a, emissiveIntensity: 0.8 })
+      new THREE.MeshStandardMaterial({ color: 0xe4ddc9, emissive: 0xffd69a, emissiveIntensity: 0 })
     );
-    head.position.set(lamp.x, (lamp.y ?? 0) + height, lamp.z);
-    group.add(head);
+    head.position.set(x, y + height, z);
+
+    const targetPos = lamp.target
+      ? (Array.isArray(lamp.target) ? lamp.target : [lamp.target.x ?? x, lamp.target.y ?? y, lamp.target.z ?? z])
+      : [x, y, z];
+
+    const light = new THREE.SpotLight(0xffdfb0, 0, height * 6, Math.PI / 3, 0.7, 2);
+    light.position.copy(head.position);
+    light.target.position.fromArray(targetPos);
+
+    group.add(pole, head, light, light.target);
+    lamps.push({ light, head, maximum: height * height * 16 });
+    sources.push({
+      position: [x, y + height, z],
+      color: [1.0, 0.87, 0.69],
+      intensity: 1.5,
+    });
   }
 
   let pointsMesh = null;
@@ -1108,9 +1193,13 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
   }
 
   const update = (sunHeight = 0, cameraPos = null) => {
-    const dusk = 1 - THREE.MathUtils.smoothstep(sunHeight, -0.10, 0.08);
+    const dusk = nightLightLevel(sunHeight);
     if (material) {
       material.uniforms.brightness.value = Math.max(0.15, dusk);
+    }
+    for (const { light, head, maximum } of lamps) {
+      light.intensity = maximum * dusk;
+      head.material.emissiveIntensity = dusk * 2;
     }
 
     if (cameraPos && papiSystems.length > 0) {
@@ -1140,6 +1229,7 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
   return {
     group,
     papiSystems,
+    lamps,
     update,
     dispose: () => disposeGroup(group),
   };
@@ -1185,7 +1275,7 @@ export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outs
     isOnTaxiway: (x, z) => terrain.isOnTaxiway(x, z),
     isRunwaySafetyArea: (x, z) => terrain.isRunwaySafetyArea(x, z),
     update(dt, position, time, options = {}) {
-      lightingResult.update(options?.sunHeight ?? 0, position);
+      lightingResult.update(options?.sunHeight ?? 0, options?.cameraPosition ?? position);
     },
     nightLighting: lightingResult,
     getGazeTargets() {
