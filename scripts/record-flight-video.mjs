@@ -42,6 +42,11 @@ export function rolloutReason(groundSpeedKnots, elapsedSeconds) {
   return null;
 }
 
+/** F-16-style rollout: lower the nose target gradually after touchdown. */
+export function nextRolloutPitch(pitchDeg, dtSeconds) {
+  return Math.max(6.7, pitchDeg - 3 * dtSeconds);
+}
+
 /** Concat durations in ms. Dividing by speed here is the whole playback change. */
 export function playbackDurations(frameTimesMs, speed = 1) {
   if (!(speed > 0)) throw new RangeError('speed must be positive');
@@ -97,6 +102,7 @@ export function buildControllerSource() {
     const approachPhase = ${approachPhase.toString()};
     const decelerationThrottle = ${decelerationThrottle.toString()};
     const rolloutReason = ${rolloutReason.toString()};
+    const nextRolloutPitch = ${nextRolloutPitch.toString()};
     return (async () => {
       const [
         { flyBank, flyVerticalPath },
@@ -148,7 +154,7 @@ export function buildControllerSource() {
         return cmd;
       };
       let apEngaged = false, gearDown = false, flapsDown = false, interceptCaptured = false;
-      let lastLog = -1, ticks = 0, rolloutStart = 0;
+      let lastLog = -1, ticks = 0, rolloutStart = 0, rolloutPitchDeg = 10;
       const log = force => {
         const t = Math.floor(s.totalSimTime);
         if (!force && t === lastLog) return;
@@ -262,12 +268,14 @@ export function buildControllerSource() {
         s.controls.setVirtualInput('brakes', 0);
         s.aero.spoilers = 0.4;
         flyVerticalPath(s, -0.4, 130, s.telemetry, 0, 10);
-        if (s.telemetry.onGround) state.phase = 'rollout';
+        if (s.telemetry.onGround) { state.phase = 'rollout'; rolloutPitchDeg = 10; }
       };
       const rollout = () => {
         s.autopilot.disengage();
         if (s.telemetry.groundSpeedKnots > 30) steerRunway();
         else s.controls.setVirtualInput('aileron', 0);
+        rolloutPitchDeg = nextRolloutPitch(rolloutPitchDeg, 0.05);
+        flyVerticalPath(s, 0, 0, s.telemetry, 0, rolloutPitchDeg);
         s.controls.setVirtualInput('throttle', 0);
         s.controls.setVirtualInput('brakes', 1);
         s.aero.spoilers = 1;

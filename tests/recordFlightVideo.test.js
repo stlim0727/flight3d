@@ -5,6 +5,7 @@ import {
   decelerationThrottle,
   playbackDurations,
   rolloutReason,
+  nextRolloutPitch,
 } from '../scripts/record-flight-video.mjs';
 
 describe('recorded sortie guards', () => {
@@ -44,5 +45,11 @@ describe('recorded sortie guards', () => {
     assert.equal(rolloutReason(100, 42), 'rollout-timeout');
     assert.equal(rolloutReason(5, 42), 'landed');
     assert.equal(rolloutReason(100, 10), null);
+  });
+
+  it('lowers rollout pitch target each tick instead of freezing flare input', () => {
+    assert.equal(nextRolloutPitch(10, 0.05), 9.85);
+    assert.equal(nextRolloutPitch(6.8, 0.05), 6.7);
+    assert.equal(nextRolloutPitch(6.7, 0.05), 6.7);
   });
 });
