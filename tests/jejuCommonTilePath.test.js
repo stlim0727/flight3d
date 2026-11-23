@@ -6,6 +6,7 @@ import { OpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { loadJejuAirport } from '../src/environment/JejuAirport.js';
 import { JEJU_ORIGIN } from '../src/geospatial/CorridorCoordinateSystem.js';
 import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
+import { UnifiedWorld } from '../src/world/UnifiedWorld.js';
 
 test('TERRAIN_INSETS defines declarative high-resolution data for RKPC', () => {
   const insets = getInsetsForRegion('jeju');
@@ -18,6 +19,21 @@ test('TERRAIN_INSETS defines declarative high-resolution data for RKPC', () => {
   assert.equal(rkpc.minDetailLevel, 13, 'RKPC min detail zoom level must be 13');
   assert.equal(rkpc.maxDetailLevel, 14, 'RKPC max detail zoom level must be 14');
   assert.equal(rkpc.approachDistanceM, 8000, 'RKPC approach distance must be 8000m');
+});
+
+test('UnifiedWorld forwards airportMesh from active anchorTerrain', async () => {
+  const airport = await loadJejuAirport('', { loadSatellite: false });
+  const world = new UnifiedWorld('jeju');
+  world.register('jeju', {
+    terrain: airport.terrain,
+    airport,
+    group: airport.group,
+    mesh: airport.terrain.mesh,
+    extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
+  });
+
+  assert.ok(world.airportMesh, 'UnifiedWorld must forward airportMesh from anchor terrain');
+  assert.equal(world.airportMesh, airport.terrain.airportMesh, 'Must point to active airportMesh');
 });
 
 test('OpenWorldTerrain creates localMesh for RKPC airport precinct sharing common tile material', async () => {
@@ -87,7 +103,6 @@ test('updateImageryDetail promotes RKPC inset tiles to detail levels 13 and 14 u
   camera.position.set(0, 3000, 15000);
   camera.lookAt(0, 0, 0);
   openWorld.updateImageryDetail(camera, 768, 1000);
-  // At 15km, inset approach condition is not triggered
   assert.ok((openWorld.detailWanted.get('1743/821') ?? 11) < 13, 'Must remain low-detail at 15km distance');
 
   // 2. Initial approach (within 8000m): Camera at 6000m south
@@ -107,13 +122,84 @@ test('updateImageryDetail promotes RKPC inset tiles to detail levels 13 and 14 u
   openWorld.dispose();
 });
 
+test('updateImageryDetail respects imageryBudget limits during inset promotion', () => {
+  const rkpcInsets = getInsetsForRegion('jeju');
+  // Configure budget with 0 ultra-detail tiles (performance preset)
+  const openWorld = new OpenWorldTerrain({
+    origin: JEJU_ORIGIN,
+    protectedAreas: [[-3200, -1500, 3200, 1500]],
+    insets: rkpcInsets,
+    imageryBudget: {
+      detailTileLimit: 4,
+      highDetailTileLimit: 2,
+      ultraDetailTileLimit: 0, // No zoom 14 allowed
+    },
+    imageryCache: { getTileImage: async () => null, dispose: () => {} },
+  });
+
+  const mockMesh = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial());
+  mockMesh.geometry.computeBoundingSphere();
+  const entry = {
+    mesh: mockMesh,
+    bounds: [-4000, -2000, 4000, 2000],
+    detail: { map: { value: null }, blend: { value: 0 } },
+    detailLevel: 11,
+    baseMap: new THREE.Texture(),
+  };
+  openWorld.tiles.set('1743/821', entry);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 10, 50000);
+  camera.position.set(0, 200, 500); // Very close approach (< 4000m)
+  camera.lookAt(0, 0, 0);
+
+  openWorld.updateImageryDetail(camera, 768, 1000);
+
+  // When ultraDetailTileLimit is 0, zoom 14 must be capped at 13
+  assert.equal(openWorld.detailWanted.get('1743/821'), 13, 'Must cap zoom 14 at 13 when ultraDetailTileLimit is 0');
+
+  openWorld.dispose();
+});
+
+test('updateImageryDetail measures both surrounding DEM mesh and localMesh', () => {
+  const openWorld = new OpenWorldTerrain({
+    origin: JEJU_ORIGIN,
+    imageryCache: { getTileImage: async () => null, dispose: () => {} },
+  });
+
+  const demMesh = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), new THREE.MeshBasicMaterial());
+  demMesh.position.set(0, 0, 0);
+  demMesh.geometry.computeBoundingSphere();
+
+  const localMesh = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshBasicMaterial());
+  localMesh.position.set(0, 0, -200);
+  localMesh.geometry.computeBoundingSphere();
+
+  const entry = {
+    mesh: demMesh,
+    localMesh,
+    bounds: [-500, -500, 500, 500],
+    detail: { map: { value: null }, blend: { value: 0 } },
+    detailLevel: 11,
+    baseMap: new THREE.Texture(),
+  };
+  openWorld.tiles.set('test/tile', entry);
+
+  const camera = new THREE.PerspectiveCamera(60, 1, 10, 50000);
+  camera.position.set(0, 100, 300);
+  camera.lookAt(0, 0, 0);
+
+  openWorld.updateImageryDetail(camera, 768, 1000);
+  assert.ok(entry.imageryPriority > 0, 'Must compute valid imageryPriority using max of DEM and localMesh');
+
+  openWorld.dispose();
+});
+
 test('loadImageryDetail retains parent tile baseMap when detail sub-tiles fail on restricted network', async () => {
   let callCount = 0;
   const dummyImageryCache = {
     getTileImage: async () => {
       callCount++;
-      // Return null to simulate a network timeout / tile failure
-      return null;
+      return null; // Simulate network error
     },
     dispose: () => {},
   };
@@ -139,11 +225,8 @@ test('loadImageryDetail retains parent tile baseMap when detail sub-tiles fail o
   openWorld.tiles.set('1743/821', entry);
   openWorld.detailWanted.set('1743/821', 13);
 
-  // Attempt to load detail level 13 (which requires 4 sub-tiles)
   await openWorld.loadImageryDetail('1743/821', entry, 13);
 
-  // Verification: sub-tiles were requested, but because they returned null,
-  // the parent baseMap is completely preserved without being overwritten or dropped
   assert.ok(callCount > 0, 'Sub-tiles must have been requested');
   assert.equal(entry.detailMap, null, 'detailMap must remain null on failure');
   assert.equal(entry.detailLevel, 11, 'detailLevel must remain at parent zoom 11');
@@ -153,24 +236,31 @@ test('loadImageryDetail retains parent tile baseMap when detail sub-tiles fail o
   openWorld.dispose();
 });
 
-test('JejuAirport hides airportMesh when OpenWorldTerrain localImagery is active and restores when unloaded', async () => {
+test('JejuAirport keeps airportMesh visible until replacement localMesh is rendered with imagery', async () => {
   const airport = await loadJejuAirport('', { loadSatellite: false });
   const islandMesh = airport.terrain.islandMesh;
   const airportMesh = airport.terrain.airportMesh;
 
   assert.ok(islandMesh && airportMesh);
 
-  // Case 1: OpenWorld active with localImagery and loaded DEM tiles
+  // Case 1: DEM tiles loaded, localImagery configured, but localMesh not yet visible (imagery loading)
   airport.terrain.openWorld = {
     tiles: new Map([['1743/821', {}]]),
     localImagery: {},
+    hasVisibleLocalMesh: () => false,
   };
   airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
   assert.equal(islandMesh.visible, false, 'Island mesh must be hidden when DEM tiles are active');
-  assert.equal(airportMesh.visible, false, 'Airport precinct mesh must be hidden when OpenWorld localImagery is active');
+  assert.equal(airportMesh.visible, true, 'Airport precinct fallback must remain visible while replacement imagery is pending');
 
-  // Case 2: OpenWorld unloaded (cold cache / offline fallback)
+  // Case 2: Replacement localMesh imagery succeeds and becomes visible
+  airport.terrain.openWorld.hasVisibleLocalMesh = () => true;
+  airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
+  assert.equal(airportMesh.visible, false, 'Airport precinct fallback hides once replacement localMesh is visible');
+
+  // Case 3: OpenWorld unloaded (cold cache / offline fallback)
   airport.terrain.openWorld.tiles.clear();
+  airport.terrain.openWorld.hasVisibleLocalMesh = () => false;
   airport.update(0.1, { x: 0, y: 1000, z: 0 }, 0);
   assert.equal(islandMesh.visible, true, 'Island mesh must reappear as fallback');
   assert.equal(airportMesh.visible, true, 'Airport precinct mesh must reappear as fallback');

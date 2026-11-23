@@ -846,9 +846,11 @@ export class OpenWorldTerrain {
       const visible = [];
       const wanted = new Map();
       for (const [key, entry] of this.tiles) {
-        const targetMesh = (entry.localMesh?.geometry?.boundingSphere || entry.localMesh?.geometry) ? entry.localMesh : entry.mesh;
-        const pixels = entry.localMesh || entry.mesh.geometry.index?.count
-          ? projectedTilePixels(targetMesh, camera, viewportHeight) : 0;
+        const demPixels = entry.mesh.geometry.index?.count
+          ? projectedTilePixels(entry.mesh, camera, viewportHeight) : 0;
+        const localPixels = entry.localMesh
+          ? projectedTilePixels(entry.localMesh, camera, viewportHeight) : 0;
+        const pixels = Math.max(demPixels, localPixels);
         entry.imageryPriority = pixels;
         const previous = this.detailWanted.get(key);
         if (previous) {
@@ -914,13 +916,22 @@ export class OpenWorldTerrain {
             for (const [key, entry] of this.tiles) {
               const b = entry.bounds;
               if (b && b[0] < maxX && b[2] > minX && b[1] < maxZ && b[3] > minZ) {
-                const targetLevel = distToInset <= approachDist * 0.5
+                let targetLevel = distToInset <= approachDist * 0.5
                   ? (inset.maxDetailLevel ?? 14)
                   : (inset.minDetailLevel ?? 13);
+                if (targetLevel >= 14 && (budget.ultraDetailTileLimit <= 0 || ultraDetailCount >= budget.ultraDetailTileLimit)) {
+                  targetLevel = 13;
+                }
+                if (targetLevel >= 13 && (budget.highDetailTileLimit <= 0 || highDetailCount >= budget.highDetailTileLimit)) {
+                  targetLevel = 12;
+                }
+                if (budget.detailTileLimit <= 0) targetLevel = zoom;
                 const current = wanted.get(key) ?? zoom;
-                if (current < targetLevel && wanted.size < budget.detailTileLimit) {
+                if (current < targetLevel && (wanted.has(key) || wanted.size < budget.detailTileLimit)) {
                   wanted.set(key, targetLevel);
                   entry.detailLastVisibleAt = now;
+                  if (targetLevel >= 13 && !(current >= 13)) highDetailCount++;
+                  if (targetLevel >= 14 && !(current >= 14)) ultraDetailCount++;
                 }
               }
             }
@@ -1216,6 +1227,13 @@ export class OpenWorldTerrain {
     mesh.material.dispose();
   }
 
+  hasVisibleLocalMesh() {
+    for (const entry of this.tiles.values()) {
+      if (entry.localMesh?.visible) return true;
+    }
+    return false;
+  }
+
   dispose() {
     for (const controller of this.pending.values()) controller.abort();
     for (const [key, entry] of this.tiles) this.release(key, entry);
@@ -1267,13 +1285,14 @@ export function updateOpenWorldTerrain(sim) {
     if (!surface.openWorld) {
       let localSurface = null;
       let protectedAreas = frame.protectedAreas;
+      const airportMesh = surface.airportMesh ?? surface.anchorTerrain?.airportMesh;
       if (sim.activeAirport === 'lukla') {
         const half = surface.size / 2;
         protectedAreas = [[-half, -half, half, half]];
         localSurface = surface;
-      } else if (surface.airportMesh?.geometry) {
+      } else if (airportMesh?.geometry) {
         localSurface = {
-          geometry: surface.airportMesh.geometry,
+          geometry: airportMesh.geometry,
           extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
         };
       }
