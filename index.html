@@ -38,7 +38,7 @@
   <div id="hud-overlay">
     <div id="landmark-pins" hidden aria-hidden="true"></div>
     <details id="pilotage-map" hidden>
-      <summary class="btn">
+      <summary class="btn" title="지도 펼치기 / 접기 (M)" data-i18n-title="ui.mapShortcut">
         <span class="map-unfold" data-i18n="ui.unfoldMap">지도 펼치기</span>
         <span class="map-fold" data-i18n="ui.foldMap">지도 접기</span>
       </summary>
@@ -588,7 +588,7 @@
       </label>
       <button id="btn-touch-toggle" class="btn btn-preset btn-touch-toggle" title="모바일 / 온스크린 터치 조작 토글" data-i18n-title="toggle.mobile.on.screen.touch.controls"><span data-i18n="touch.controls">📱 터치 조작</span></button>
       <button id="btn-gaze-reset" class="btn btn-preset btn-gaze-reset" aria-pressed="true" title="드래그/햇 스위치 후 시선을 점진적으로 기본 위치로 되돌립니다" data-i18n-title="gaze.reset.auto.title"><span data-i18n="gaze.reset.auto">👁 자동 시선 복귀</span></button>
-      <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="소리 켜기 / 끄기 (M)" data-i18n-title="sound.toggle.m"><span data-i18n="sound.100">🔊 소리: 100%</span></button>
+      <button id="btn-sound" class="btn btn-preset btn-sound-toggle" title="소리 켜기 / 끄기 (Shift+M)" data-i18n-title="sound.toggle.m"><span data-i18n="sound.100">🔊 소리: 100%</span></button>
       <label class="language-control engine-volume-control" for="engine-volume">
         <span data-i18n="engine.volume.label">엔진음</span>
         <input id="engine-volume" type="range" min="0" max="100" step="5" value="100" data-engine-volume>
@@ -679,7 +679,8 @@
               <tr><td><kbd><span data-i18n="double.click">더블클릭</span></kbd> / <kbd>O</kbd></td><td><span data-i18n="center.camera.view">카메라 시선 정면 초기화 (Center View)</span></td></tr>
               <tr><td><kbd><span data-i18n="middle.mouse.button">마우스 휠 클릭</span></kbd></td><td><span data-i18n="toggle.pointer.lock.for.free.look">자유 시선 포인터 고정 모드 토글 (Pointer Lock)</span></td></tr>
               <tr><td><kbd>[</kbd> / <kbd>]</kbd></td><td><span data-i18n="change.time.dawn.noon.sunset.dusk.night">시간대 변경 (새벽, 정오, 석양, 황혼, 야경)</span></td></tr>
-              <tr><td><kbd>M</kbd></td><td><span data-i18n="toggle.sound.muted">소리 켜기 / 끄기 (M)</span></td></tr>
+              <tr><td><kbd>M</kbd></td><td><span data-i18n="toggle.pilotage.map">지도 펼치기 / 접기 (부산 C172 비행)</span></td></tr>
+              <tr><td><kbd>Shift</kbd> + <kbd>M</kbd></td><td><span data-i18n="toggle.sound.muted">소리 켜기 / 끄기 (Shift+M)</span></td></tr>
               <tr><td><kbd>F8</kbd></td><td><span data-i18n="report.issue.shortcut">이상 신고 (현재 비행 로그 첨부)</span></td></tr>
             </table>
           </div>

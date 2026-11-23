@@ -46,6 +46,7 @@ export class FlightControls extends FlightControlLaws {
     this.onToggleLights = null;
     this.onCycleTimeOfDay = null;
     this.onToggleAudio = null;
+    this.onToggleMap = null;
     this.onToggleParkingBrake = null;
     this.onResetPosition = null;
     this.onUserInteract = null;
@@ -117,7 +118,7 @@ export class FlightControls extends FlightControlLaws {
           if (this.onCycleTimeOfDay) this.onCycleTimeOfDay(1.5);
           break;
         case 'KeyM':
-          if (this.onToggleAudio) this.onToggleAudio();
+          this.handleMapOrSoundKey(e);
           break;
       }
       return;
@@ -167,7 +168,7 @@ export class FlightControls extends FlightControlLaws {
         if (this.onCycleTimeOfDay) this.onCycleTimeOfDay(1.5);
         break;
       case 'KeyM':
-        if (this.onToggleAudio) this.onToggleAudio();
+        this.handleMapOrSoundKey(e);
         break;
       case 'KeyZ':
         this.throttle = 0.0; // Idle
@@ -180,6 +181,14 @@ export class FlightControls extends FlightControlLaws {
         else this.setParkingBrake(!this.parkingBrake);
         break;
     }
+  }
+
+  /** M opens or folds the chart; Shift+M toggles sound. */
+  handleMapOrSoundKey(e) {
+    if (e.repeat || e.ctrlKey || e.altKey || e.metaKey ||
+        e.target?.isContentEditable || e.target?.closest?.('input, textarea, select')) return;
+    if (e.shiftKey) this.onToggleAudio?.();
+    else this.onToggleMap?.();
   }
 
   handleKeyUp(e) {
