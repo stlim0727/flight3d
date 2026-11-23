@@ -121,11 +121,11 @@ function usableFrame(frame) {
 
 export function takeoffSpawnPlan({
   frame, baseOffset = [0, 0], anchorBase = [0, 0], groundClearanceM,
-  aircraftId = 'B738',
+  aircraftId = 'B738', distanceM = TAKEOFF_DISTANCE_M,
 } = {}) {
   if (!usableFrame(frame)) return null;
-  const x = frame.threshold.x + frame.direction.x * TAKEOFF_DISTANCE_M;
-  const z = frame.threshold.z + frame.direction.z * TAKEOFF_DISTANCE_M;
+  const x = frame.threshold.x + frame.direction.x * distanceM;
+  const z = frame.threshold.z + frame.direction.z * distanceM;
   const world = worldXZ(x, z, baseOffset, anchorBase);
   const surface = worldXZ(frame.threshold.x, frame.threshold.z, baseOffset, anchorBase);
   const headingDeg = frame.headingDeg;

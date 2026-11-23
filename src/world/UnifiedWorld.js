@@ -231,7 +231,12 @@ export class UnifiedWorld {
   }
 
   regionAt(x, z) {
-    for (const [id, region] of this.regions) {
+    // Streamed airports own their pavement: they are small and more precise
+    // than the coarse base region covering the same ground.
+    const ids = [...this.dynamicOffsets.keys(), ...Object.keys(BASE_OFFSETS)];
+    for (const id of ids) {
+      const region = this.regions.get(id);
+      if (!region) continue;
       const [lx, lz] = this.local(id, x, z);
       const e = region.extent;
       if (lx >= e.minX && lx <= e.maxX && lz >= e.minZ && lz <= e.maxZ) {

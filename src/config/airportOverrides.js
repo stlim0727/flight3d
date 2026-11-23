@@ -16,6 +16,23 @@ export const AIRPORT_OVERRIDES = {
         ident: '07/25',
         widthM: 45.0,
         lengthM: 3180,
+        // Legacy RKPC survey used by the Jeju preset. Index coordinates place
+        // runway 07 about 800 m away and 8° off, so keep the validated local
+        // geometry as a declarative correction for both render and physics.
+        ends: [
+          {
+            ident: '07',
+            physical: { latitude: 33.505697338000054, longitude: 126.47724821520636, elevationM: 36.0 },
+            threshold: { latitude: 33.505697338000054, longitude: 126.47724821520636, elevationM: 36.0 },
+            displacedThresholdM: 0,
+          },
+          {
+            ident: '25',
+            physical: { latitude: 33.516900653878146, longitude: 126.50875381490887, elevationM: 36.0 },
+            threshold: { latitude: 33.516900653878146, longitude: 126.50875381490887, elevationM: 36.0 },
+            displacedThresholdM: 0,
+          },
+        ],
         lighting: {
           papi: [
             {
@@ -127,8 +144,64 @@ export const AIRPORT_OVERRIDES = {
         { x: 250, y: 36.0, z: 240, height: 20, target: [250, 39.0, 180] },
       ],
     },
+    // Scenario poses in the Jeju region frame (same numbers the legacy
+    // JejuFlightSurface used, now owned by shared declarative airport data).
+    spawn: {
+      runwayId: '07/25',
+      endId: '07',
+      frame: {
+        threshold: { x: -1463.6, z: 621.3 },
+        end: { x: 1463.6, z: -621.3 },
+        elevationM: 36.0,
+        headingDeg: 67,
+      },
+      takeoffDistanceM: 100,
+      approachDistanceM: 5556,
+      glideslopeDeg: 3.0,
+      cruise: {
+        x: 3741.4, z: 7500, y: 3048, headingDeg: 180,
+        speedMps: { B738: 108, C172: 48, F16: 180 },
+      },
+      challenge: {
+        x: -18300, z: -65000, y: 2400, headingDeg: 180, vy: -2.8,
+        speedMps: { B738: 110, C172: 45, F16: 160 },
+      },
+    },
   },
 };
+
+const finiteOverride = Number.isFinite;
+
+/**
+ * Merge declarative precision corrections into an indexed airport record.
+ * Both the map planner and the streamed surface consume this record so
+ * rendering and contact geometry cannot diverge.
+ */
+export function applyAirportOverrides(airport) {
+  if (!airport || !Array.isArray(airport.runways)) return airport;
+  const code = airport.ident ?? airport.icao ?? airport.code;
+  const overrides = getAirportOverride(code);
+  if (!overrides) return airport;
+  return {
+    ...airport,
+    elevationM: finiteOverride(overrides.elevationM) ? overrides.elevationM : airport.elevationM,
+    runways: airport.runways.map(runway => {
+      const endIdents = (runway.ends ?? []).map(end => String(end?.ident));
+      const runwayOverride = overrides.runways?.find(entry =>
+        String(entry.ident ?? '').split('/').some(ident => endIdents.includes(ident)));
+      if (!runwayOverride) return runway;
+      return {
+        ...runway,
+        widthM: finiteOverride(runwayOverride.widthM) ? runwayOverride.widthM : runway.widthM,
+        lengthM: finiteOverride(runwayOverride.lengthM) ? runwayOverride.lengthM : runway.lengthM,
+        ends: (runway.ends ?? []).map(end => {
+          const corrected = runwayOverride.ends?.find(entry => entry.ident === end?.ident);
+          return corrected ? { ...end, ...corrected } : end;
+        }),
+      };
+    }),
+  };
+}
 
 /**
  * Retrieve override config for a given airport code.
