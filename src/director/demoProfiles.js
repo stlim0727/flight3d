@@ -1,7 +1,10 @@
 /** Demo choices are separate from manual spawn presets. */
 export function demoProfiles(aircraftId = 'B738', airport = 'coastal') {
   const sihwa={id:'sihwa-tour',labelKey:'demo.sihwa.name',briefingKey:'demo.sihwa.briefing'};
-  if(airport==='incheon' && aircraftId==='F16')return [sihwa];
+  if(airport==='incheon' && aircraftId==='F16')return [
+    sihwa,
+    { id: 'gimpo-sortie', labelKey: 'demo.f16.gimpo.name', briefingKey: 'demo.f16.gimpo.briefing' },
+  ];
   if (aircraftId === 'F16') return airport === 'lukla'
     ? [
         { id: 'low-pass', labelKey: 'demo.f16.lukla', briefingKey: 'demo.f16.lukla.briefing' },
