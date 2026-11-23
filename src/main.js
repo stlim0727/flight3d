@@ -826,6 +826,7 @@ class FlightSimulator {
       demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
       ...(this.activeMapPlace?.label ? { placeLabel: this.activeMapPlace.label } : {}),
       ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}),
+      ...(this.activeMapPlace?.tileId ? { airportTileId: this.activeMapPlace.tileId } : {}),
       ...(customOrigin ? { customOrigin: { latitude: customOrigin.latitude, longitude: customOrigin.longitude } } : {}) };
     this.flightRecorder?.start(sortie);
     this.replayRecorder?.start(sortie);

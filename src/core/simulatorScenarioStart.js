@@ -42,7 +42,11 @@ export function createSimulatorScenarioStart(sim) {
       async preset(request) {
         sim.setCustomWorldOrigin?.(request.mapPlan?.origin ?? null);
         sim.activeMapPlace = request.mapPlan
-          ? { label: request.mapPlan.placeLabel ?? null, code: request.mapPlan.placeCode ?? request.mapPlan.airportCode ?? null }
+          ? {
+            label: request.mapPlan.placeLabel ?? null,
+            code: request.mapPlan.placeCode ?? request.mapPlan.airportCode ?? null,
+            tileId: request.mapPlan.placeTileId ?? null,
+          }
           : null;
         const result = sim.setPreset(request.scenario);
         if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
@@ -90,6 +94,7 @@ export function createSimulatorScenarioStart(sim) {
           if (sim.airportStreamer?.regionFor?.('RKSI')) registerHandoff('RKSI', incheonRunwayMeshes());
         }
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
+          sim.airportStreamer?.setHome?.(request.mapPlan.airportCode);
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
           alignMapSpawnToContact(sim, request.mapPlan.spawn);
         }
@@ -167,6 +172,7 @@ function resolveLobbyMapPlan(sim) {
     origin,
     placeLabel: mapPlanLabel(choice, catalog),
     placeCode: airport?.code ?? null,
+    placeTileId: choice.tileId ?? airport?.tileId ?? null,
   };
 }
 
