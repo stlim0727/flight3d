@@ -95,8 +95,10 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
         if (!corrected) return end;
         return {
           ...end,
-          physical: localPoint(corrected.physical, origin, fallbackElevation, hasElevOverride),
-          threshold: localPoint(corrected.threshold, origin, fallbackElevation, hasElevOverride),
+          // Corrected ends may intentionally declare different elevations
+          // (e.g. Lukla's sloped runway), so do not flatten them.
+          physical: localPoint(corrected.physical, origin, fallbackElevation, false),
+          threshold: localPoint(corrected.threshold, origin, fallbackElevation, false),
           displacedThresholdM: finite(corrected.displacedThresholdM)
             ? Math.max(0, corrected.displacedThresholdM) : 0,
         };
