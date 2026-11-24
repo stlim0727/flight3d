@@ -345,7 +345,8 @@ export class DemoFlightDirector {
     this.sim.activeMapPlace = null;
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
-    const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
+    const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaTerrain ? 'lukla' : 'coastal');
+    if (airport === 'lukla') this._prepareLuklaStream();
     const airportSwitch = (this.sim.setAirport && this.sim.activeAirport !== airport)
       ? this.sim.setAirport(airport)
       : null;
@@ -387,7 +388,11 @@ export class DemoFlightDirector {
     // Keep the constructor's auto-start request alive while the asynchronous
     // region or DEM loads. isActive lets Esc, presets and airport changes cancel it.
     const waitingForAirportSwitch = Boolean(this.sim.setAirport && this.sim.activeAirport !== airport);
-    this.waitingForTerrain = waitingForAirportSwitch || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
+    const streamer = this.sim.airportStreamer;
+    const waitingForStreamedAirport = airport === 'lukla' && Boolean(streamer)
+      && !streamer.regionFor?.('VNLK');
+    this.waitingForTerrain = waitingForAirportSwitch || waitingForStreamedAirport
+      || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
     if (this.waitingForTerrain) {
       // Discard the previous airport's pose once the destination airport is active.
       // Cancellation must leave a safe runway spawn rather than sea-level flight.
@@ -469,6 +474,22 @@ export class DemoFlightDirector {
     }
   }
 
+
+  _prepareLuklaStream() {
+    const streamer = this.sim.airportStreamer;
+    if (!streamer || this._luklaStreamHeld) return;
+    streamer.setHome?.('VNLK');
+    streamer.holdDestination?.('VNLK');
+    streamer.releaseGroundHold?.();
+    streamer.ensure?.('VNLK');
+    this._luklaStreamHeld = true;
+  }
+
+  _releaseLuklaStream() {
+    if (!this._luklaStreamHeld) return;
+    this._luklaStreamHeld = false;
+    this.sim.airportStreamer?.releaseDestinationHold?.();
+  }
   stopForCrash(crashResult) {
     if (!this.isActive) return;
     this.getActiveScenario().recordFailure?.(crashResult);
@@ -485,6 +506,7 @@ export class DemoFlightDirector {
         ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
     }
+    this._releaseLuklaStream();
     this.waitingForTerrain = false;
     this.isActive = false;
     if (this.sim?.controls) {
@@ -599,7 +621,11 @@ export class DemoFlightDirector {
         this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
-      if (this.sim.currentTerrain?.isLoaded !== false) this.start(this.activeDemoAirport, this.profile);
+      const streamReady = this.activeDemoAirport !== 'lukla' || !this.sim.airportStreamer
+        || Boolean(this.sim.airportStreamer.regionFor?.('VNLK'));
+      if (this.sim.currentTerrain?.isLoaded !== false && streamReady) {
+        this.start(this.activeDemoAirport, this.profile);
+      }
       return;
     }
 

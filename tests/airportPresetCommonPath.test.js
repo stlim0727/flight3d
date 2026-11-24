@@ -166,9 +166,8 @@ test('RKSI and VNLK presets keep their validated poses', () => {
   }
 });
 
-test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => withStorage(async () => {
+test('Lukla preset streams VNLK without a dedicated runway handoff', () => withStorage(async () => {
   const calls = [];
-  const legacyRunway = { visible: true };
   const sim = {
     lobby: { airport: 'lukla', aircraft: 'B738', preset: 'runway', pilotMode: 'human' },
     destinationAirport: 'none',
@@ -177,7 +176,6 @@ test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => wi
     gear: { cgGroundHeightM: CLEARANCE_M },
     position: { x: 0, y: 0, z: 0 },
     currentTerrain: { getHeight: () => 2862 },
-    luklaAirport: { runwayGroup: legacyRunway },
     devRunner: { stop() {} }, shadowDemo: { stop() {} }, replayDirector: { stop() {} },
     demoDirector: { userTimeOfDayOverridden: true },
     gameFlow: new GameFlowController(),
@@ -203,7 +201,7 @@ test('Lukla preset streams VNLK and hides the duplicate legacy runway', () => wi
   assert.ok(calls.some(call => call[0] === 'ensure' && call[1] === 'VNLK'),
     'Lukla preset must load the indexed VNLK airport');
   assert.ok(calls.some(call => call[0] === 'home' && call[1] === 'VNLK'));
-  assert.equal(legacyRunway.visible, false, 'common runway replaces the legacy mesh');
+  assert.deepEqual(sim._handedOffRunways, {}, 'no legacy Lukla runway may be handed off');
   assert.equal(sim.destinationAirport, 'none', 'chosen destination must be preserved');
 }));
 

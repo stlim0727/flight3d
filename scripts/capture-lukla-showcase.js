@@ -85,6 +85,22 @@ async function main() {
       return res?.result?.value;
     };
 
+    // Screenshots now capture the common streamed VNLK surface instead of the
+    // retired LuklaAirport class; wait until that region is actually mounted.
+    const waitForVnlkRegion = async () => {
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const ready = await evalJs(`(() => {
+          const sim = window.simulator;
+          const region = sim.airportStreamer?.regionFor?.('VNLK');
+          return Boolean(sim.activeAirport === 'lukla' && sim.luklaTerrain?.isLoaded &&
+            region?.airport?.isLoaded && region?.airport?.terrain?.runways?.length);
+        })()`);
+        if (ready) return;
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      throw new Error('VNLK streamed airport region never became ready');
+    };
+
     const takeScreenshot = async (filename) => {
       const shot = await send('Page.captureScreenshot', { format: 'png' });
       const buf = Buffer.from(shot.data, 'base64');
@@ -120,6 +136,7 @@ async function main() {
       window.simulator.cameraSystem.lookYaw = 0.08;
     `);
     await new Promise(r => setTimeout(r, 2000));
+    await waitForVnlkRegion();
     await takeScreenshot('lukla_runway06_cockpit.png');
 
     // 2. Tower View

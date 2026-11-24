@@ -1,6 +1,4 @@
-import { readFileSync } from 'node:fs';
-import { LuklaTerrain } from '../../src/environment/LuklaTerrain.js';
-import { LuklaAirport } from '../../src/environment/LuklaAirport.js';
+import { createLuklaFixture } from './luklaFixture.js';
 import { ValleyMissionAdapter } from '../../src/arena/ValleyMissionAdapter.js';
 import { ValleyMission } from '../../src/arena/ValleyMission.js';
 import { PilotPerception } from '../../src/pilot/PilotPerception.js';
@@ -8,9 +6,8 @@ import { createBriefing, validateCommand } from '../../src/pilot/PilotProtocol.j
 import { createPilotMissionSimulation } from './pilotMissionFlight.js';
 
 export function createValleySimulation() {
-  const bytes = readFileSync(new URL('../../public/terrain/lukla_dem.bin', import.meta.url));
-  const terrain = new LuklaTerrain(undefined, 16, new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4));
-  return createPilotMissionSimulation({ aircraftId: 'F16', airportId: 'lukla', terrain, airport: new LuklaAirport() });
+  const { terrain, airport } = createLuklaFixture();
+  return createPilotMissionSimulation({ aircraftId: 'F16', airportId: 'lukla', terrain, airport });
 }
 
 /** The same observation and physics path as live play, with rendering omitted. */

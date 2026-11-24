@@ -8,10 +8,17 @@ const artifacts = 'review-artifacts/runway-wear';
 fs.mkdirSync(baseline, { recursive: true });
 fs.mkdirSync(artifacts, { recursive: true });
 const base = process.env.BASE_REV || 'origin/main';
-for (const name of ['Airport', 'LuklaAirport', 'IncheonPavement', 'Pavement']) {
+// Historical before/after evidence only: LuklaAirport.js is read from the git
+// snapshot so the old render can be compared. The review page's 'after' scene
+// uses the common streamed VNLK surface and never imports retired src classes.
+const baselineModules = new Set(['Airport', 'LuklaAirport', 'IncheonPavement', 'Pavement']);
+for (const name of baselineModules) {
   const source = execFileSync('git', ['show', `${base}:src/environment/${name}.js`], { encoding: 'utf8' })
-    .replaceAll("'./AirportBuildings.js'", "'/src/environment/AirportBuildings.js'")
-    .replaceAll("'./RunwayMarkings.js'", "'/src/environment/RunwayMarkings.js'");
+    // Keep imports between extracted baseline modules on the baseline copy;
+    // only unrelated modules resolve to the current source tree.
+    .replaceAll(/from '\.\/([^']+)'/g, (match, imported) => (
+      baselineModules.has(imported) ? match : `from '/src/environment/${imported}'`
+    ));
   fs.writeFileSync(`${baseline}/${name}.js`, source);
 }
 const server = await createServer({
@@ -28,7 +35,7 @@ const server = await createServer({
           if (body.length > 12_000_000) throw new Error('Evidence too large');
         }
         const { name, data } = JSON.parse(body);
-        if (!/^(?:(?:before|after)-(?:Airport|LuklaAirport|Incheon)-(?:overview|close|night)\.png|results\.json)$/.test(name)) {
+        if (!/^(?:(?:before|after)-(?:Airport|VNLK|Incheon)-(?:overview|close|night)\.png|results\.json)$/.test(name)) {
           throw new Error('Invalid evidence name');
         }
         fs.writeFileSync(`${artifacts}/${name}`, name.endsWith('.png') ? Buffer.from(data, 'base64') : data);

@@ -293,8 +293,68 @@ export const AIRPORT_OVERRIDES = {
         ],
       },
     ],
-    // Facilities remain in LuklaAirport until its dedicated visuals are retired;
-    // the common region must not create duplicates during runway handoff.
+    facilities: [
+      {
+        id: 'terminal',
+        name: 'Lukla Terminal',
+        kind: 'terminal',
+        model: 'vnlk-terminal',
+        position: [76.42, 2844, 1.11],
+        size: [44, 18, 24],
+        rotationY: 0.5585053606,
+        collision: { type: 'box', halfX: 22, halfZ: 12, maxAltitudeM: 2862 },
+      },
+      {
+        id: 'tower',
+        name: 'Lukla Control Tower',
+        kind: 'tower',
+        model: 'vnlk-tower',
+        position: [83.22, 2855, -3.09],
+        height: 16,
+        radius: 4.5,
+        cabHeight: 4.5,
+        cabRadius: 4.2,
+        shaftRadius: 3.8,
+        collision: { type: 'cylinder', radius: 4.5, maxAltitudeM: 2871 },
+      },
+      {
+        id: 'apron',
+        name: 'Lukla Apron',
+        kind: 'apron',
+        model: 'vnlk-apron',
+        position: [68.52, 2843.5, -11.89],
+        rotationY: -1.0122909664,
+        pitchRad: 0.1172,
+      },
+      {
+        id: 'windsock',
+        name: 'Lukla Windsock',
+        kind: 'beacon',
+        model: 'vnlk-windsock',
+        position: [28.12, 2842, 2.21],
+      },
+      {
+        id: 'upper-wall',
+        name: 'Runway 24 Retaining Wall',
+        kind: 'wall',
+        model: 'vnlk-wall',
+        position: [224.85, 2867, -148.22],
+        size: [45, 6, 3],
+        rotationY: -1.0122909664,
+        collision: { type: 'box', halfX: 22.5, halfZ: 1.75, maxAltitudeM: 2873 },
+      },
+    ],
+    lighting: {
+      apronLamps: [
+        { x: 83.09, y: 2846.77, z: -41.04, height: 9, target: [91.95, 2848.26, -26.53] },
+        { x: 101.11, y: 2846.77, z: -12.21, height: 9, target: [91.95, 2848.26, -26.53] },
+        { x: 59.51, y: 2843.5, z: -26.31, height: 9, target: [68.37, 2844.99, -11.8] },
+        { x: 77.53, y: 2843.5, z: 2.53, height: 9, target: [68.37, 2844.99, -11.8] },
+        { x: 35.93, y: 2840.23, z: -11.57, height: 9, target: [44.79, 2841.72, 2.94] },
+        { x: 53.95, y: 2840.23, z: 17.26, height: 9, target: [44.79, 2841.72, 2.94] },
+      ],
+    },
+
     spawn: {
       poses: {
         runway: {

@@ -9,7 +9,7 @@ import { LandingGear } from '../src/physics/LandingGear.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 
 const STAGES = LuklaCircuitScenario.STAGES;
-function setup({ cockpitModelLoading = false } = {}) {
+function setup({ cockpitModelLoading = false, streamer = null } = {}) {
   const inputs = {};
   const modes = [];
   const cockpit = { cockpitModelLoading };
@@ -25,6 +25,7 @@ function setup({ cockpitModelLoading = false } = {}) {
     cockpitInteriorStatus: () => (cockpit.cockpitModelLoading ? 'loading' : 'ready'),
     cameraSystem: { setMode(m) { modes.push(m); }, userLookOverridden: false },
     sky: { setTimeOfDay() {} }, showToast() {},
+    airportStreamer: streamer,
     setPreset() { this.presetCalls = (this.presetCalls || 0) + 1; }
   };
   const director = new DemoFlightDirector(sim);
@@ -118,6 +119,33 @@ describe('Lukla continuous circuit and truthful completion', () => {
     director.update(0.1);
     assert.equal(sim.presetCalls, 3, 'Loading completion must not repeatedly reset the flight');
     assert.equal(sim.controls.parkingBrake, false);
+  });
+
+  it('waits for the streamed VNLK region it explicitly requested before starting the demo', () => {
+    let region = null;
+    let held = false;
+    const calls = [];
+    const { sim, director, scenario } = setup({ streamer: {
+      regionFor: code => (code === 'VNLK' ? region : null),
+      setHome: code => calls.push(['home', code]),
+      holdDestination: code => { held = true; calls.push(['hold', code]); },
+      ensure: code => calls.push(['ensure', code]),
+      releaseDestinationHold: () => { held = false; calls.push(['release']); },
+      releaseGroundHold: () => calls.push(['release-ground']),
+    } });
+    assert.ok(calls.some(([action, code]) => action === 'ensure' && code === 'VNLK'));
+    assert.ok(calls.some(([action, code]) => action === 'hold' && code === 'VNLK'));
+    assert.ok(calls.some(([action]) => action === 'release-ground'), 'a stale ground hold must not block VNLK');
+    assert.equal(director.waitingForTerrain, true);
+    director.update(0.1);
+    assert.equal(scenario.result.status, 'pending', 'no runway exists until the region streams in');
+    region = { airport: { isLoaded: true } };
+    director.update(0.1);
+    assert.equal(director.waitingForTerrain, false);
+    assert.equal(scenario.result.status, 'running');
+    assert.equal(held, true, 'VNLK stays pinned for the whole circuit');
+    director.stop();
+    assert.equal(held, false, 'the hold is released when the demo stops');
   });
 
   it('does not resurrect a cancelled pending demo when the terrain finishes loading', () => {

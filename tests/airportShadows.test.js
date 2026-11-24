@@ -19,11 +19,47 @@ if (typeof document === 'undefined') {
 }
 
 import { Airport } from '../src/environment/Airport.js';
-import { LuklaAirport } from '../src/environment/LuklaAirport.js';
+import { getAirportOverride } from '../src/config/airportOverrides.js';
+import { buildExternalRunwayDescriptors, createExternalAirportMesh, EXTERNAL_MESH_LIFT_M, MARKING_LIFT_M } from '../src/geospatial/externalAirportSurface.js';
 import { Boeing737 } from '../src/aircraft/Boeing737.js';
 import { PFDCanvas } from '../src/aircraft/PFDCanvas.js';
 import { NDCanvas } from '../src/aircraft/NDCanvas.js';
 import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
+
+function createVnlkRunwayMesh() {
+  const overrides = getAirportOverride('VNLK');
+  const runwayOverride = overrides.runways[0];
+  // Use the indexed ARP, not a runway end, so the runway keeps its declared facilities frame.
+  const airport = {
+    ident: 'VNLK',
+    latitude: 27.686768,
+    longitude: 86.729479,
+    elevationM: overrides.elevationM,
+    runways: [{
+      id: '06/24',
+      surface: 'ASP',
+      widthM: runwayOverride.widthM,
+      lengthM: runwayOverride.lengthM,
+      ends: runwayOverride.ends,
+    }],
+  };
+  return createExternalAirportMesh(buildExternalRunwayDescriptors(airport, overrides));
+}
+
+function ribbonSpan(mesh) {
+  const position = mesh.geometry.getAttribute('position');
+  const point = (index) => new THREE.Vector3().fromBufferAttribute(position, index);
+  const start = point(0).add(point(1)).multiplyScalar(0.5);
+  const end = point(2).add(point(3)).multiplyScalar(0.5);
+  return { width: point(0).distanceTo(point(1)), length: Math.hypot(end.x - start.x, end.z - start.z) };
+}
+
+function minimumY(mesh) {
+  const position = mesh.geometry.getAttribute('position');
+  let minimum = Infinity;
+  for (let i = 0; i < position.count; i++) minimum = Math.min(minimum, position.getY(i));
+  return minimum;
+}
 
 class KitAirport extends Airport {
   loadBuildings() { return Promise.resolve(false); }
@@ -94,37 +130,35 @@ describe('Airport & Aircraft Runway Shadow System', () => {
     assert.equal(airport.beaconLights.length, 1);
   });
 
-  it('should verify Lukla Airport runway markings receive shadows without depth buffer occlusion', () => {
-    const luklaAirport = new LuklaAirport();
-    let rwyMesh = null;
-    let markMesh = null;
+  it('should verify VNLK runway markings receive shadows with ordered depth tiers', () => {
+    const group = createVnlkRunwayMesh();
+    const rwyMesh = group.children.find(child => child.userData?.runwayId && !child.userData?.kind);
+    const markMesh = group.children.find(child => child.userData?.kind === 'markings');
 
-    luklaAirport.group.traverse((child) => {
-      if (child.isMesh && child.geometry instanceof THREE.PlaneGeometry) {
-        const { width, height } = child.geometry.parameters;
-        if (width === 30 && height === 527) {
-          if (child.material?.map) {
-            markMesh = child;
-          } else {
-            rwyMesh = child;
-          }
-        }
-      }
-    });
+    assert.ok(rwyMesh, 'VNLK runway ribbon must exist');
+    const span = ribbonSpan(rwyMesh);
+    assert.ok(Math.abs(span.width - 30) < 0.01, 'VNLK runway must remain 30 m wide');
+    assert.ok(Math.abs(span.length - 527) < 0.1, 'VNLK runway must remain 527 m long');
+    assert.strictEqual(rwyMesh.receiveShadow, true, 'VNLK runway must receive shadows');
+    assert.strictEqual(rwyMesh.material.metalness, 0);
+    assert.strictEqual(rwyMesh.material.map, null);
+    assert.strictEqual(rwyMesh.material.color.getHex(), 0x4b4b4b, 'asphalt surface colour');
+    assert.ok(rwyMesh.material.polygonOffsetFactor < 0, 'runway surface must keep a negative polygon offset');
+    assert.equal(rwyMesh.material.userData.logDepthOffsetUnits, 1);
 
-    assert.ok(rwyMesh, 'Lukla runway mesh must exist');
-    assert.strictEqual(rwyMesh.receiveShadow, true, 'Lukla runway must receive shadows');
-
-    assert.ok(markMesh, 'Lukla runway markings mesh must exist');
+    assert.ok(markMesh, 'VNLK runway markings mesh must exist');
     assert.notStrictEqual(markMesh.geometry, rwyMesh.geometry,
       'Pavement tiling must not change the shared marking overlay');
-    const markingUVs = markMesh.geometry.getAttribute('uv');
-    for (let i = 0; i < markingUVs.count; i++) {
-      assert.ok(markingUVs.getX(i) >= 0 && markingUVs.getX(i) <= 1);
-      assert.ok(markingUVs.getY(i) >= 0 && markingUVs.getY(i) <= 1);
-    }
-    assert.strictEqual(markMesh.receiveShadow, true, 'Lukla runway markings must receive shadows');
-    assert.strictEqual(markMesh.material.depthWrite, false, 'Markings must not write depth to avoid transparent z-fighting');
+    assert.ok(Math.abs((minimumY(markMesh) - minimumY(rwyMesh)) - MARKING_LIFT_M) < 1e-4,
+      'markings must stay 50 mm above the ribbon');
+    assert.ok(Math.abs(minimumY(rwyMesh) - (2805 + EXTERNAL_MESH_LIFT_M)) < 1e-3,
+      'runway ribbon must keep the 15 mm surface lift');
+    assert.strictEqual(markMesh.receiveShadow, true, 'VNLK runway markings must receive shadows');
+    assert.strictEqual(markMesh.material.color.getHex(), 0xf0f0e8, 'white marking colour');
+    assert.strictEqual(markMesh.material.metalness, 0);
+    assert.strictEqual(markMesh.material.polygonOffset, true);
+    assert.equal(markMesh.material.polygonOffsetFactor, -2, 'markings use the second logarithmic depth tier');
+    assert.equal(markMesh.material.userData.logDepthOffsetUnits, 2);
     assert.ok(markMesh.material instanceof THREE.MeshStandardMaterial, 'Markings must use MeshStandardMaterial to respond to light/shadow');
   });
 

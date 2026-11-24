@@ -4,22 +4,14 @@
  */
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import fs from 'node:fs';
+import { createLuklaTerrainFixture } from '../tests/helpers/luklaFixture.js';
 import { DemoFlightDirector } from '../src/director/DemoFlightDirector.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
 import { Atmosphere } from '../src/physics/Atmosphere.js';
 import { F16_FALCON } from '../src/config/aircraftConfigs.js';
-import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
-
-const data = fs.readFileSync(new URL('../public/terrain/lukla_dem.bin', import.meta.url));
-const terrain = Object.assign(Object.create(LuklaTerrain.prototype), {
-  size: 44000, gridSize: 1025, shiftX: 0, shiftZ: 0,
-  runwayLength: 527, runwayWidth: 30, runwayGradient: 0.1176,
-  midElevation: 2836, isLoaded: true,
-  elevations: new Float32Array(data.buffer, data.byteOffset, data.byteLength / 4),
-});
+const terrain = createLuklaTerrainFixture();
 const input = {};
 const sim = {
   activeAirport: 'lukla', currentAircraftId: 'F16', scene: new THREE.Scene(),

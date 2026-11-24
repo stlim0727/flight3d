@@ -38,8 +38,41 @@ try {
     expression: `(${async function verify() {
       const THREE = await import('/node_modules/three/build/three.module.js');
       const { Airport } = await import('/src/environment/Airport.js');
-      const { LuklaAirport } = await import('/src/environment/LuklaAirport.js');
-      const { createRunwayMarkingMaterial } = await import('/src/environment/RunwayMarkings.js');
+      const { getAirportOverride } = await import('/src/config/airportOverrides.js');
+      const { buildExternalRunwayDescriptors, createExternalAirportMesh, MARKING_LIFT_M } = await import('/src/geospatial/externalAirportSurface.js');
+      function createVnlkFixture() {
+        const overrides = getAirportOverride('VNLK');
+        const runwayOverride = overrides.runways[0];
+        // Use the indexed ARP, not a runway end, so markings keep their declared offsets.
+        const airport = {
+          ident: 'VNLK',
+          latitude: 27.686768,
+          longitude: 86.729479,
+          elevationM: overrides.elevationM,
+          runways: [{
+            id: '06/24',
+            surface: 'ASP',
+            widthM: runwayOverride.widthM,
+            lengthM: runwayOverride.lengthM,
+            ends: runwayOverride.ends,
+          }],
+        };
+        const group = createExternalAirportMesh(buildExternalRunwayDescriptors(airport, overrides));
+        const runway = group.children.find(child => child.userData?.runwayId && !child.userData?.kind);
+        const markings = group.children.find(child => child.userData?.kind === 'markings');
+        if (!runway || !markings) throw Error('vnlk: missing production runway or markings');
+        const position = runway.geometry.getAttribute('position');
+        const point = index => new THREE.Vector3().fromBufferAttribute(position, index);
+        const start = point(0).add(point(1)).multiplyScalar(0.5);
+        const end = point(2).add(point(3)).multiplyScalar(0.5);
+        const heading = Math.atan2(end.x - start.x, -(end.z - start.z));
+        const pitch = Math.asin((end.y - start.y) / start.distanceTo(end));
+        const plane = new THREE.Object3D();
+        plane.position.copy(start).add(end).multiplyScalar(0.5);
+        plane.rotation.set(pitch, -heading, 0, 'YXZ');
+        group.add(plane);
+        return { group, runway, markings, plane };
+      }
       class Coastal extends Airport { async loadBuildings() { return false; } }
       const width = 618, height = 1140;
       const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true, preserveDrawingBuffer: true });
@@ -55,12 +88,13 @@ try {
       };
       const white = (pixels, i) => pixels[i] > 200 && pixels[i + 1] > 200 && pixels[i + 2] > 200;
       const green = (pixels, i) => pixels[i] < 60 && pixels[i + 1] > 100 && pixels[i + 2] < 60;
-      for (const [name, Class] of [['coastal', Coastal], ['lukla', LuklaAirport]]) {
-        const airport = new Class(), scene = new THREE.Scene();
+      for (const name of ['coastal', 'lukla']) {
+        const airport = name === 'coastal' ? new Coastal() : createVnlkFixture();
+        const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x243040);
         scene.add(new THREE.AmbientLight(0xffffff, 3), airport.group);
-        const runway = airport.group.getObjectByName('runway-pavement');
-        const markings = airport.group.getObjectByName('runway-markings');
+        const runway = airport.runway ?? airport.group.getObjectByName('runway-pavement');
+        const markings = airport.markings ?? airport.group.getObjectByName('runway-markings');
         if (!runway || !markings) throw Error(name + ': missing production runway or markings');
         const markingMeshes = new Set();
         markings.traverse(o => { if (o.isMesh) markingMeshes.add(o); });
@@ -70,7 +104,7 @@ try {
         });
         const materials = new Map();
         for (const mesh of markingMeshes) materials.set(mesh.material, mesh.material.onBeforeCompile);
-        const plane = runway.parent;
+        const plane = airport.plane ?? runway.parent;
         const cube = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.8, 5), new THREE.MeshBasicMaterial({ color: 0x00aa00 }));
         cube.position.set(name === 'coastal' ? -1320 : 0, name === 'coastal' ? airport.elevation + 0.46 : 0.4, name === 'coastal' ? 0 : 170);
         plane.add(cube);
@@ -83,7 +117,7 @@ try {
         for (const stress of [false, true]) {
           // Worst-case separation loss: coincident planes, no native polygon
           // offset. This is an explicit stress case, not an Android GPU claim.
-          markings.position.y = stress ? runway.position.y : originalY;
+          markings.position.y = stress ? (name === 'lukla' ? -MARKING_LIFT_M : runway.position.y) : originalY;
           runway.material.polygonOffset = !stress;
           for (const material of materials.keys()) material.polygonOffset = !stress;
           for (let frame = 0; frame < 8; frame++) {

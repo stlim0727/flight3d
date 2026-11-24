@@ -7,6 +7,7 @@ import { wgs84ToLocal } from './TileCoordinateSystem.js';
 import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { nightLightLevel } from '../environment/AirportNightLighting.js';
+import { createAirportFacilityModel } from '../environment/airportFacilityModels.js';
 
 const BLEND_START_M = 40;
 const BLEND_END_M = 240;
@@ -191,6 +192,9 @@ export function buildExternalFacilityDescriptors(facilities, fallbackElevation =
     cabRadius: fac.cabRadius ?? 11,
     shaftRadius: fac.shaftRadius ?? 8,
     collision: fac.collision ?? null,
+    model: fac.model ?? null,
+    beacon: fac.beacon ?? null,
+    pitchRad: fac.pitchRad ?? null,
   }));
 }
 
@@ -685,6 +689,7 @@ export function createExternalAirportMesh(descriptors) {
     const ribbon = new THREE.Mesh(geometry, material);
     ribbon.name = `runway-${descriptor.id}`;
     ribbon.userData = { runwayId: descriptor.id, surface: descriptor.surface };
+    ribbon.receiveShadow = true;
     group.add(ribbon);
     const markingGeometry = runwayMarkingsGeometry(descriptor);
     if (markingGeometry) {
@@ -698,6 +703,7 @@ export function createExternalAirportMesh(descriptors) {
       const markings = new THREE.Mesh(markingGeometry, markingMaterial);
       markings.name = `runway-markings-${descriptor.id}`;
       markings.userData = { runwayId: descriptor.id, kind: 'markings' };
+      markings.receiveShadow = true;
       group.add(markings);
     }
 
@@ -725,6 +731,7 @@ export function createExternalAirportMesh(descriptors) {
         end.threshold.z,
       );
       bar.rotation.y = Math.atan2(dx, dz);
+      bar.receiveShadow = true;
       group.add(bar);
     }
   }
@@ -780,6 +787,7 @@ export function createExternalTaxiwayMesh(descriptors) {
       applyLogDepthOffset(mat, 1);
       const mesh = new THREE.Mesh(geo, mat);
       mesh.name = `taxiway-${twy.id}`;
+      mesh.receiveShadow = true;
       group.add(mesh);
     }
   }
@@ -793,12 +801,34 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
 
   const gazeTargets = [];
   const colliders = [];
+  const updates = [];
 
   for (const fac of descriptors) {
     const pos = fac.position;
     const baseElevation = pos[1] ?? fallbackElevation;
+    const modelResult = typeof fac.model === 'string' && fac.model.length > 0
+      ? createAirportFacilityModel(fac)
+      : null;
 
-    if (fac.kind === 'tower') {
+    if (modelResult) {
+      const modelGroup = modelResult.group;
+      modelGroup.position.set(pos[0], baseElevation, pos[2]);
+      if (fac.rotationY) modelGroup.rotation.y = fac.rotationY;
+      group.add(modelGroup);
+
+      const gaze = modelResult.gazeTarget;
+      if (gaze) {
+        gazeTargets.push(gaze.object
+          ? { ...gaze, name: gaze.name ?? fac.name }
+          : { object: gaze, kind: fac.kind, name: fac.name });
+      } else {
+        gazeTargets.push({ object: modelGroup, kind: fac.kind, name: fac.name });
+      }
+      if (typeof modelResult.update === 'function') updates.push(modelResult.update);
+      if (Array.isArray(modelResult.colliders) && modelResult.colliders.length > 0) {
+        colliders.push(...modelResult.colliders);
+      }
+    } else if (fac.kind === 'tower') {
       const towerGroup = new THREE.Group();
       towerGroup.name = `tower-${fac.id}`;
 
@@ -825,18 +855,6 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
 
       group.add(towerGroup);
       gazeTargets.push({ object: towerGroup, kind: 'tower', name: fac.name });
-
-      const col = fac.collision;
-      const radius = col?.radius ?? fac.radius;
-      const maxAlt = col?.maxAltitudeM ?? (baseElevation + totalH + 6);
-      const minAlt = col?.minAltitudeM ?? baseElevation;
-      colliders.push({
-        id: fac.id,
-        kind: 'tower',
-        inside: (x, z, r = 0) => Math.hypot(x - pos[0], z - pos[2]) <= radius + r,
-        minAltitudeM: minAlt,
-        maxAltitudeM: maxAlt,
-      });
     } else {
       const size = fac.size;
       const width = size[0];
@@ -859,31 +877,53 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
       group.add(mesh);
 
       gazeTargets.push({ object: mesh, kind: fac.kind, name: fac.name });
+    }
 
+    const modelHasColliders = modelResult && Array.isArray(modelResult.colliders)
+      && modelResult.colliders.length > 0;
+    // Model descriptors without collision data (apron, windsock) stay walkable.
+    if (!modelHasColliders && (!modelResult || fac.collision)) {
       const col = fac.collision;
-      const halfX = col?.halfX ?? width / 2;
-      const halfZ = col?.halfZ ?? depth / 2;
-      const maxAlt = col?.maxAltitudeM ?? (baseElevation + height + 3);
-      const minAlt = col?.minAltitudeM ?? baseElevation;
-      colliders.push({
-        id: fac.id,
-        kind: fac.kind,
-        inside: (x, z, r = 0) => {
-          let dx = x - pos[0];
-          let dz = z - pos[2];
-          if (rotY !== 0) {
-            const cos = Math.cos(rotY);
-            const sin = Math.sin(rotY);
-            const lx = dx * cos - dz * sin;
-            const lz = dx * sin + dz * cos;
-            dx = lx;
-            dz = lz;
-          }
-          return Math.abs(dx) <= halfX + r && Math.abs(dz) <= halfZ + r;
-        },
-        minAltitudeM: minAlt,
-        maxAltitudeM: maxAlt,
-      });
+      if (fac.kind === 'tower') {
+        const radius = col?.radius ?? fac.radius;
+        const maxAlt = col?.maxAltitudeM ?? (baseElevation + fac.height + 6);
+        const minAlt = col?.minAltitudeM ?? baseElevation;
+        colliders.push({
+          id: fac.id,
+          kind: 'tower',
+          inside: (x, z, r = 0) => Math.hypot(x - pos[0], z - pos[2]) <= radius + r,
+          minAltitudeM: minAlt,
+          maxAltitudeM: maxAlt,
+        });
+      } else {
+        const width = fac.size[0];
+        const height = fac.size[1];
+        const depth = fac.size[2];
+        const rotY = fac.rotationY ?? 0;
+        const halfX = col?.halfX ?? width / 2;
+        const halfZ = col?.halfZ ?? depth / 2;
+        const maxAlt = col?.maxAltitudeM ?? (baseElevation + height + 3);
+        const minAlt = col?.minAltitudeM ?? baseElevation;
+        colliders.push({
+          id: fac.id,
+          kind: fac.kind,
+          inside: (x, z, r = 0) => {
+            let dx = x - pos[0];
+            let dz = z - pos[2];
+            if (rotY !== 0) {
+              const cos = Math.cos(rotY);
+              const sin = Math.sin(rotY);
+              const lx = dx * cos - dz * sin;
+              const lz = dx * sin + dz * cos;
+              dx = lx;
+              dz = lz;
+            }
+            return Math.abs(dx) <= halfX + r && Math.abs(dz) <= halfZ + r;
+          },
+          minAltitudeM: minAlt,
+          maxAltitudeM: maxAlt,
+        });
+      }
     }
   }
 
@@ -911,6 +951,9 @@ export function createExternalAirportFacilities(descriptors, fallbackElevation =
     gazeTargets,
     hasModeledBuilding,
     checkCollision,
+    update(time) {
+      for (const update of updates) update(time);
+    },
     dispose: () => disposeGroup(group),
   };
 }
@@ -1328,6 +1371,7 @@ export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outs
     isOnTaxiway: (x, z) => terrain.isOnTaxiway(x, z),
     isRunwaySafetyArea: (x, z) => terrain.isRunwaySafetyArea(x, z),
     update(dt, position, time, options = {}) {
+      facilitiesResult.update(time ?? 0);
       lightingResult.update(options?.sunHeight ?? 0, options?.cameraPosition ?? position);
     },
     nightLighting: lightingResult,
@@ -1342,6 +1386,35 @@ export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outs
     },
     updateRenderLights() {},
   };
+
+  // The dedicated Lukla stack exposed these fields to physics and the tower
+  // camera; streamed airports publish the equivalent data from their facilities.
+  const facilities = terrain.facilities ?? [];
+  const towerFacility = facilities.find(f => f.model && f.kind === 'tower');
+  const terminalFacility = facilities.find(f => f.model && f.kind === 'terminal');
+  const wallFacility = facilities.find(f => f.model && (f.kind === 'wall' || f.id === 'upper-wall'));
+  const originOf = f => ({ x: f.position[0], y: f.position[1], z: f.position[2] });
+  const boundsOf = f => ({
+    width: f.collision?.halfX != null ? f.collision.halfX * 2 : f.size[0],
+    height: f.size[1],
+    depth: f.collision?.halfZ != null ? f.collision.halfZ * 2 : f.size[2],
+    localWidth: f.size[0],
+    localDepth: f.size[2],
+    rotationY: f.rotationY ?? 0,
+  });
+  if (towerFacility && !airportFacade.controlTowerData) {
+    airportFacade.controlTowerData = {
+      ...originOf(towerFacility),
+      radius: towerFacility.radius,
+      height: towerFacility.height,
+    };
+  }
+  if (terminalFacility && !airportFacade.terminalData) {
+    airportFacade.terminalData = { ...originOf(terminalFacility), ...boundsOf(terminalFacility) };
+  }
+  if (wallFacility && !airportFacade.retainingWallData) {
+    airportFacade.retainingWallData = { ...originOf(wallFacility), ...boundsOf(wallFacility) };
+  }
 
   return {
     terrain,

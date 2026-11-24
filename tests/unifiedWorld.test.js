@@ -170,6 +170,20 @@ test('airport facade updates every region in its own local frame', () => {
   assert.equal(facade.controlTowerData.x, 1);
 });
 
+test('world airport facade translates spawn airport metadata into world coordinates', () => {
+  const world = new UnifiedWorld('incheon');
+  const airport = { controlTowerData: { x: 10, y: 20, z: 30, radius: 4, height: 16 } };
+  world.register('jeju', {
+    terrain: { getHeight: () => 0 },
+    airport,
+    extent: REGION_EXTENTS.jeju,
+  });
+  const facade = createWorldAirportFacade(world, airport);
+  const [ox, oz] = world.offsets.get('jeju');
+  assert.equal(facade.controlTowerData.x, 10 + ox);
+  assert.equal(facade.controlTowerData.z, 30 + oz);
+});
+
 test('surface contract forwards mesh, region and streaming layers to the anchor', () => {
   const world = new UnifiedWorld('incheon');
   const mesh = { add() {} };

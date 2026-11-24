@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { applyFarSunShadow } from './FarSunShadow.js';
 
 const DEG = Math.PI / 180;
 const clamp = THREE.MathUtils.clamp;
@@ -6,6 +7,59 @@ const smoothFade = (distance, width) => {
   const t = clamp(distance / width, 0, 1);
   return 1 - t * t * (3 - 2 * t);
 };
+
+/** Purely visual metre-scale detail; DEM heights and imagery UVs stay untouched. */
+export function createRasterSurfaceMaterial(map = null) {
+  const material = new THREE.MeshStandardMaterial({
+    map, color: map ? 0xffffff : 0x5a6358, roughness: 0.94,
+    metalness: 0, side: THREE.DoubleSide,
+  });
+  material.onBeforeCompile = shader => {
+    shader.vertexShader = shader.vertexShader.replace('#include <common>', `#include <common>
+      varying vec3 vRasterPosition;
+      varying vec3 vRasterNormal;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vRasterPosition = position;
+        vRasterNormal = normal;`);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vRasterPosition;
+      varying vec3 vRasterNormal;
+      float surfaceHash(vec3 p) {
+        p = fract(p * 0.1031);
+        p += dot(p, p.yzx + 33.33);
+        return fract((p.x + p.y) * p.z);
+      }
+      float surfaceNoise(vec3 p) {
+        vec3 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(surfaceHash(i), surfaceHash(i+vec3(1,0,0)), f.x),
+                       mix(surfaceHash(i+vec3(0,1,0)), surfaceHash(i+vec3(1,1,0)), f.x), f.y),
+                   mix(mix(surfaceHash(i+vec3(0,0,1)), surfaceHash(i+vec3(1,0,1)), f.x),
+                       mix(surfaceHash(i+vec3(0,1,1)), surfaceHash(i+vec3(1,1,1)), f.x), f.y), f.z);
+      }`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        float detailDistance = length(vViewPosition);
+        float detailFade = 1.0 - smoothstep(250.0, 2200.0, detailDistance);
+        float rock = smoothstep(0.2, 0.65, 1.0 - abs(normalize(vRasterNormal).y));
+        float grain = 0.5, strata = 0.5, patches = 0.5;
+        if (detailFade > 0.0) {
+          grain = surfaceNoise(vRasterPosition * 0.8);
+          strata = surfaceNoise(vRasterPosition * vec3(0.14, 1.5, 0.14));
+          patches = surfaceNoise(vRasterPosition * 0.06);
+        }
+        vec3 tint = mix(vec3(0.88, 0.98, 0.82), vec3(1.03, 0.94, 0.83), rock);
+        diffuseColor.rgb *= mix(vec3(1.0), tint * (0.78 + 0.25 * grain + 0.18 * patches + 0.12 * strata * rock), detailFade);`)
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        // Surface-gradient bump from world-space noise: no UV stretching on cliffs.
+        float relief = (grain * 0.10 + strata * rock * 0.16) * detailFade;
+        vec3 dpdx = dFdx(-vViewPosition), dpdy = dFdy(-vViewPosition);
+        vec3 rx = cross(dpdy, normal), ry = cross(normal, dpdx);
+        float det = dot(dpdx, rx);
+        normal = normalize(abs(det) * normal - sign(det) * (dFdx(relief) * rx + dFdy(relief) * ry));`);
+  };
+  material.customProgramCacheKey = () => 'raster-surface-v1';
+  return applyFarSunShadow(material);
+}
 
 /**
  * DEM-backed anchor surface driven entirely by declarative region data.
@@ -56,6 +110,11 @@ export class RasterRegionSurface {
       depressionM: terrace.depressionM ?? 0.5,
       coarseDepressionM: terrace.coarseDepressionM ?? 10,
     };
+    const contact = config.contact ?? {};
+    this.contact = {
+      apron: contact.apron ?? null,
+      departureCorridor: contact.departureCorridor ?? null,
+    };
     const angle = this.runway.headingDeg * DEG;
     this.sin = Math.sin(angle);
     this.cos = Math.cos(angle);
@@ -69,7 +128,7 @@ export class RasterRegionSurface {
       this.isLoaded = false;
     }
     this.onLoaded = null;
-    this.loadError = null;
+    this.imageryLoaded = false;
     this.openWorld = null;
 
     this.geometry = new THREE.PlaneGeometry(size, size, segments, segments);
@@ -86,7 +145,7 @@ export class RasterRegionSurface {
     }
     this.updateGeometryElevations();
 
-    const createMaterial = options.createMaterial ?? (() => new THREE.MeshStandardMaterial({ color: 0xb8c3a5 }));
+    const createMaterial = options.createMaterial ?? createRasterSurfaceMaterial;
     this.material = createMaterial(options.imagery ?? null);
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.receiveShadow = true;
@@ -100,22 +159,37 @@ export class RasterRegionSurface {
 
   async loadAssets(fetchImpl = globalThis.fetch) {
     this.loadError = null;
-    try {
-      if (typeof window === 'undefined' || !fetchImpl || !this.demUrl) return;
-      const baseUrl = import.meta.env?.BASE_URL ?? '/';
-      const response = await fetchImpl(`${baseUrl}${this.demUrl}`);
-      if (!response.ok) throw new Error(`DEM request failed (HTTP ${response.status})`);
-      const data = new Float32Array(await response.arrayBuffer());
-      if (data.length !== this.gridSize * this.gridSize || !data.every(Number.isFinite)) {
-        throw new Error(`Invalid DEM grid: ${this.demUrl}`);
+    if (typeof window !== 'undefined' && fetchImpl && this.demUrl) {
+      try {
+        const baseUrl = import.meta.env?.BASE_URL ?? '/';
+        const response = await fetchImpl(`${baseUrl}${this.demUrl}`);
+        if (!response.ok) throw new Error(`DEM request failed (HTTP ${response.status})`);
+        const data = new Float32Array(await response.arrayBuffer());
+        if (data.length !== this.gridSize * this.gridSize || !data.every(Number.isFinite)) {
+          throw new Error(`Invalid DEM grid: ${this.demUrl}`);
+        }
+        this.elevations = data;
+        this.isLoaded = true;
+        this.updateGeometryElevations();
+        this.onLoaded?.();
+      } catch (error) {
+        if (!this.isLoaded) this.loadError = error.message ?? String(error);
+        console.warn(`Could not load ${this.demUrl}, using fallback:`, error);
       }
-      this.elevations = data;
-      this.isLoaded = true;
-      this.updateGeometryElevations();
-      this.onLoaded?.();
-    } catch (error) {
-      if (!this.isLoaded) this.loadError = error.message ?? String(error);
-      console.warn(`Could not load ${this.demUrl}, using fallback:`, error);
+    }
+    if (typeof window !== 'undefined' && this.imageryUrl && this.material) {
+      try {
+        const baseUrl = import.meta.env?.BASE_URL ?? '/';
+        const texture = await new THREE.TextureLoader().loadAsync(`${baseUrl}${this.imageryUrl}`);
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.anisotropy = 8;
+        this.material.map = texture;
+        this.material.color.setHex(0xffffff);
+        this.material.needsUpdate = true;
+        this.imageryLoaded = true;
+      } catch (error) {
+        console.warn(`Could not load ${this.imageryUrl}, using fallback:`, error);
+      }
     }
   }
 
@@ -196,14 +270,25 @@ export class RasterRegionSurface {
   isOnRunway(x, z) {
     const s = x * this.sin - z * this.cos;
     const w = x * this.cos + z * this.sin;
-    return Math.abs(s) <= this.runway.lengthM / 2 && Math.abs(w) <= this.runway.widthM / 2;
+    if (Math.abs(s) <= this.runway.lengthM / 2 && Math.abs(w) <= this.runway.widthM / 2) return true;
+    const apron = this.contact.apron;
+    if (apron && s >= apron.s[0] && s <= apron.s[1] && w >= apron.w[0] && w <= apron.w[1]) return true;
+    const corridor = this.contact.departureCorridor;
+    return Boolean(corridor && s >= corridor.s[0] && s <= corridor.s[1]
+      && Math.abs(w) <= corridor.halfWidthM);
   }
 
   isRunwaySafetyArea(x, z) {
     const s = x * this.sin - z * this.cos;
     const w = x * this.cos + z * this.sin;
-    return Math.abs(s) <= this.runway.lengthM / 2 + this.grading.runwayFadeM
-      && Math.abs(w) <= this.runway.widthM / 2 + this.grading.widthFadeM;
+    if (Math.abs(s) <= this.runway.lengthM / 2 + this.grading.runwayFadeM
+      && Math.abs(w) <= this.runway.widthM / 2 + this.grading.widthFadeM) return true;
+    const apron = this.contact.apron;
+    if (apron && s >= apron.safetyS[0] && s <= apron.safetyS[1]
+      && w >= apron.safetyW[0] && w <= apron.safetyW[1]) return true;
+    const corridor = this.contact.departureCorridor;
+    return Boolean(corridor && s >= corridor.s[0] && s <= corridor.s[1]
+      && Math.abs(w) <= corridor.safetyHalfWidthM);
   }
 
   getWaterLevel() { return 0; }

@@ -82,10 +82,6 @@ export function createSimulatorScenarioStart(sim) {
           && ['runway', 'cliff', 'approach'].includes(request.scenario)) {
           sim.airportStreamer?.setHome?.('VNLK');
           await waitForStreamedAirport(sim, 'VNLK');
-          if (sim.airportStreamer?.regionFor?.('VNLK')) {
-            registerHandoff('VNLK', [sim.luklaAirport?.runwayGroup
-              ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway')]);
-          }
         }
         if (!request.mapPlan && request.airport === 'incheon'
           && ['runway', 'approach', 'challenge'].includes(request.scenario)) {
@@ -101,9 +97,13 @@ export function createSimulatorScenarioStart(sim) {
         if (!regionalCruise(request.scenario) && !(request.mapPlan?.scenario === 'cruise' && request.mapPlan?.origin)) return result;
         return waitForRegionalTerrain(sim);
       },
-      demo(request) {
+      async demo(request) {
         sim.setCustomWorldOrigin?.(null);
         sim.activeMapPlace = null;
+        if (request.airport === 'lukla') {
+          sim.airportStreamer?.setHome?.('VNLK');
+          await waitForStreamedAirport(sim, 'VNLK');
+        }
         if (sim.demoDirector.start(null, request.demoProfile) === false) {
           throw new Error('Demo scenario could not start.');
         }

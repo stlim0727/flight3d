@@ -12,6 +12,8 @@
 <script type="module">
 import * as THREE from 'three';
 import field from '../src/config/incheonAirfield.json';
+const { getAirportOverride } = await import('/src/config/airportOverrides.js');
+const { createExternalAirportRegion, EXTERNAL_MESH_LIFT_M, MARKING_LIFT_M } = await import('/src/geospatial/externalAirportSurface.js');
 const errors = [];
 window.addEventListener('error', e => errors.push(e.message));
 window.addEventListener('unhandledrejection', e => errors.push(String(e.reason)));
@@ -24,17 +26,76 @@ async function save(name, data) {
   if (!response.ok) throw new Error(await response.text());
 }
 try {
-  for (const airportName of ['Incheon', 'Airport', 'LuklaAirport']) {
+  for (const airportName of ['Incheon', 'Airport', 'VNLK']) {
     const shots = {};
     const pixels = {};
     for (const version of ['before', 'after']) {
-      const prefix = version === 'before' ? '/.cache/pavement-baseline' : '/src/environment';
-      const module = await import(`${prefix}/${airportName === 'Incheon' ? 'IncheonPavement' : airportName}.js`);
-      const AirportClass = airportName === 'Incheon' ? class {
-        constructor() { this.group = module.createIncheonPavement(field); }
-      } : module[airportName];
-      class ControlledAirport extends AirportClass { async loadBuildings() { return false; } }
-      const airport = new ControlledAirport();
+      let airport, frame, runwayMesh;
+      if (airportName === 'Incheon') {
+        const prefix = version === 'before' ? '/.cache/pavement-baseline' : '/src/environment';
+        const module = await import(`${prefix}/IncheonPavement.js`);
+        airport = { group: module.createIncheonPavement(field) };
+      } else if (airportName === 'Airport') {
+        const prefix = version === 'before' ? '/.cache/pavement-baseline' : '/src/environment';
+        const module = await import(`${prefix}/Airport.js`);
+        class ControlledAirport extends module.Airport { async loadBuildings() { return false; } }
+        airport = new ControlledAirport();
+        frame = airport.group.getObjectByName('runway-pavement');
+      } else if (version === 'before') {
+        // Historical git-snapshot baseline only; 'after' uses the common VNLK surface.
+        const module = await import('/.cache/pavement-baseline/LuklaAirport.js');
+        class ControlledAirport extends module.LuklaAirport { async loadBuildings() { return false; } }
+        airport = new ControlledAirport();
+        frame = airport.group.getObjectByName('runway-pavement');
+      } else {
+        const overrides = getAirportOverride('VNLK');
+        const runwayOverride = overrides.runways[0];
+        // Use the indexed ARP, not a runway end, so facilities keep their declared offsets.
+        const record = {
+          ident: 'VNLK',
+          latitude: 27.686768,
+          longitude: 86.729479,
+          elevationM: overrides.elevationM,
+          runways: [{
+            id: '06/24',
+            surface: 'ASP',
+            widthM: runwayOverride.widthM,
+            lengthM: runwayOverride.lengthM,
+            ends: runwayOverride.ends,
+            lighted: true,
+          }],
+        };
+        const region = createExternalAirportRegion({ airport: record, overrides });
+        runwayMesh = region.group.children.find(child => child.userData?.runwayId && !child.userData?.kind);
+        const markingsMesh = region.group.children.find(child => child.userData?.kind === 'markings');
+        const position = runwayMesh.geometry.getAttribute('position');
+        const point = index => new THREE.Vector3().fromBufferAttribute(position, index);
+        const start = point(0).add(point(1)).multiplyScalar(0.5);
+        const end = point(2).add(point(3)).multiplyScalar(0.5);
+        frame = new THREE.Object3D();
+        frame.position.copy(start).add(end).multiplyScalar(0.5);
+        frame.rotation.set(
+          Math.asin((end.y - start.y) / start.distanceTo(end)),
+          -Math.atan2(end.x - start.x, -(end.z - start.z)),
+          0,
+          'YXZ',
+        );
+        region.group.add(frame);
+        airport = {
+          group: region.group,
+          elevation: overrides.elevationM,
+          runwayWidth: runwayOverride.widthM,
+          runwayLength: runwayOverride.lengthM,
+          runwayMesh,
+          markingsMesh,
+          update: (dt, cameraPosition, time, options) => region.airport.update(dt, cameraPosition, time, {
+            ...options,
+            sunHeight: options?.sunHeight ?? time,
+            cameraPosition: options?.cameraPosition ?? cameraPosition,
+          }),
+          dispose: () => region.dispose(),
+        };
+      }
       const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true, logarithmicDepthBuffer:true});
       renderer.setSize(1200,800);
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -72,22 +133,48 @@ try {
       }
       const runway = airport.group.getObjectByName('runway-pavement');
       if (version === 'after') {
-        const wear = airport.group.getObjectByName('runway-surface-wear');
-        if (!wear) throw new Error(`${airportName}: missing weathering`);
-        if (airportName !== 'Incheon' && (wear.geometry.parameters.width !== airport.runwayWidth ||
-            wear.geometry.parameters.height !== airport.runwayLength || wear.material.depthWrite)) {
-          throw new Error(`${airportName}: invalid weathering dimensions`);
-        }
-        const ctx = wear.material.map.image.getContext('2d');
-        const {width,height} = ctx.canvas;
-        for (const [x,y,w,h] of [[0,0,width,1],[0,height-1,width,1],[0,0,1,height],[width-1,0,1,height]]) {
-          const edge = ctx.getImageData(x,y,w,h).data;
-          for (let i=3;i<edge.length;i+=4) if (edge[i]) throw new Error('Nontransparent decal edge');
-        }
-        const expected = new THREE.Vector3(0,0.004,0);
-        runway?.localToWorld(expected);
-        if (runway && wear.getWorldPosition(new THREE.Vector3()).distanceTo(expected)>0.0001) {
-          throw new Error(`${airportName}: weathering lost runway transform`);
+        if (airportName === 'VNLK') {
+          // The generic surface has no canvas weathering decal; its depth policy
+          // is the baked 15/50 mm lift plus ordered logarithmic depth tiers.
+          const surface = airport.runwayMesh;
+          const markings = airport.markingsMesh;
+          const position = surface.geometry.getAttribute('position');
+          const point = index => new THREE.Vector3().fromBufferAttribute(position, index);
+          const width = point(0).distanceTo(point(1));
+          const start = point(0).add(point(1)).multiplyScalar(0.5);
+          const end = point(2).add(point(3)).multiplyScalar(0.5);
+          const length = Math.hypot(end.x-start.x, end.z-start.z);
+          if (Math.abs(width - 30) > 0.01 || Math.abs(length - 527) > 0.1)
+            throw new Error(`${airportName}: runway dimensions changed`);
+          if (!surface.receiveShadow || surface.material.metalness !== 0 || !surface.material.polygonOffset ||
+              surface.material.map || surface.material.color.getHex() !== 0x4b4b4b)
+            throw new Error(`${airportName}: invalid runway surface`);
+          if (Math.abs(position.getY(0) - (2805 + EXTERNAL_MESH_LIFT_M)) > 0.001)
+            throw new Error(`${airportName}: runway lost surface lift`);
+          if (!markings.receiveShadow || markings.material.color.getHex() !== 0xf0f0e8 ||
+              markings.material.polygonOffsetFactor !== -2)
+            throw new Error(`${airportName}: invalid marking depth policy`);
+          const markingPosition = markings.geometry.getAttribute('position');
+          if (Math.abs(markingPosition.getY(0) - (position.getY(0) + MARKING_LIFT_M)) > 0.001)
+            throw new Error(`${airportName}: markings lost lift`);
+        } else {
+          const wear = airport.group.getObjectByName('runway-surface-wear');
+          if (!wear) throw new Error(`${airportName}: missing weathering`);
+          if (airportName !== 'Incheon' && (wear.geometry.parameters.width !== airport.runwayWidth ||
+              wear.geometry.parameters.height !== airport.runwayLength || wear.material.depthWrite)) {
+            throw new Error(`${airportName}: invalid weathering dimensions`);
+          }
+          const ctx = wear.material.map.image.getContext('2d');
+          const {width,height} = ctx.canvas;
+          for (const [x,y,w,h] of [[0,0,width,1],[0,height-1,width,1],[0,0,1,height],[width-1,0,1,height]]) {
+            const edge = ctx.getImageData(x,y,w,h).data;
+            for (let i=3;i<edge.length;i+=4) if (edge[i]) throw new Error('Nontransparent decal edge');
+          }
+          const expected = new THREE.Vector3(0,0.004,0);
+          runway?.localToWorld(expected);
+          if (runway && wear.getWorldPosition(new THREE.Vector3()).distanceTo(expected)>0.0001) {
+            throw new Error(`${airportName}: weathering lost runway transform`);
+          }
         }
       }
       const camera = new THREE.PerspectiveCamera(55,1.5,0.1,30000);
@@ -109,8 +196,8 @@ try {
           camera.position.fromArray(position); camera.lookAt(...target);
         } else {
           [position,target] = view === 'close' ? [[8,3,210],[0,0,150]] : [[65,75,310],[0,0,140]];
-          camera.position.copy(runway.localToWorld(new THREE.Vector3(...position)));
-          camera.lookAt(runway.localToWorld(new THREE.Vector3(...target)));
+          camera.position.copy(frame.localToWorld(new THREE.Vector3(...position)));
+          camera.lookAt(frame.localToWorld(new THREE.Vector3(...target)));
         }
         hemi.intensity = view === 'night' ? 0.35 : 2;
         sun.intensity = view === 'night' ? 0.03 : 3;
@@ -129,6 +216,7 @@ try {
           triangles:renderer.info.render.triangles,textures:renderer.info.memory.textures,
           shaderPrograms:renderer.info.programs.length,gpu,probePixel:[...pixel]});
       }
+      airport.dispose?.();
       renderer.dispose();
     }
     for (const view of ['overview','close','night']) {
