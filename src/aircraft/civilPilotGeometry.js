@@ -30,6 +30,7 @@ export const CIVIL_SEAT_RECLINE_RAD = 0.18;
 const UPPER_ARM = 0.30;
 const FOREARM = 0.26;
 const THIGH = 0.44;
+const AIRLINE_THIGH = 0.56;
 const SHIN = 0.43;
 const GRIP_FROM_WRIST = 0.065;
 // Limbs may lengthen this much to reach a cockpit control that sits beyond a nominal reach.
@@ -96,8 +97,8 @@ export function createCessnaMaterials() {
 }
 
 export const CIVIL_PILOT_STYLES = Object.freeze({
-  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD },
-  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD },
+  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH },
+  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH },
   // Sits up and leans towards the Cessna's deep-set yoke.
   cessna: { outfit: 'cessna', recline: 0.02 },
 });
@@ -370,7 +371,14 @@ function addHand(hand, mats, outfit, side) {
   const glove = outfit === 'cessna' ? mats.gloves : mats.skin;
   // Fist closed around a control horn; built along +Y from the wrist.
   hand.add(mesh(ellipsoid([0.04, 0.052, 0.03]), glove, v(0, 0.05, 0.0)));
-  hand.add(mesh(ellipsoid([0.013, 0.03, 0.013], 8), glove, v(-side * 0.03, 0.045, -0.02), { z: side * 0.5 }));
+  if (outfit === 'airline') {
+    // Thumb rises from the back of the fist so it reads as an upturned grip in the yoke hand.
+    const thumb = ellipsoid([0.013, 0.03, 0.013], 8);
+    thumb.rotateX(Math.PI / 2);
+    hand.add(mesh(thumb, glove, v(-side * 0.03, 0.045, 0.018)));
+  } else {
+    hand.add(mesh(ellipsoid([0.013, 0.03, 0.013], 8), glove, v(-side * 0.03, 0.045, -0.02), { z: side * 0.5 }));
+  }
   if (outfit === 'cessna') {
     // Gauntlet cuff flaring over the jacket cuff.
     hand.add(mesh(new THREE.CylinderGeometry(0.044, 0.05, 0.05, 12), mats.gloves, v(0, -0.002, 0.0)));
@@ -422,10 +430,11 @@ function createLeg(mats, style, side) {
   const foot = new THREE.Group();
   foot.name = `${leg.name}_Foot`;
   leg.add(thigh, shin, foot);
+  const thighLength = style.thighLength ?? THIGH;
 
-  thigh.add(mesh(segmentGeometry(THIGH, 0.088, 0.064), mats.trousers));
+  thigh.add(mesh(segmentGeometry(thighLength, 0.088, 0.064), mats.trousers));
   thigh.add(mesh(new THREE.SphereGeometry(0.09, 12, 9), mats.trousers));
-  thigh.add(mesh(new THREE.SphereGeometry(0.064, 12, 9), mats.trousers, v(0, THIGH, 0)));
+  thigh.add(mesh(new THREE.SphereGeometry(0.064, 12, 9), mats.trousers, v(0, thighLength, 0)));
   shin.add(mesh(segmentGeometry(SHIN, 0.061, 0.048), mats.trousers));
   const shoe = style.outfit === 'cessna' ? mats.boots : mats.shoes;
   if (style.outfit === 'cessna') {
@@ -436,7 +445,7 @@ function createLeg(mats, style, side) {
   foot.add(mesh(new THREE.BoxGeometry(0.1, 0.075, 0.27), shoe, v(0, -0.035, -0.07)));
   foot.add(mesh(new THREE.SphereGeometry(0.05, 10, 8), shoe, v(0, -0.01, 0.0)));
   for (const segment of [thigh, shin, foot]) mergeByMaterial(segment, segment.name);
-  return { leg, thigh, shin, foot };
+  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN };
 }
 
 /** Builds the civil pilot hierarchy (no seat: the cockpit models provide their own). */
@@ -559,9 +568,11 @@ export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLIN
 export function poseCivilLeg(limb, side, ankleTarget, toeDirection) {
   hip.set(side * HIP_JOINT.x, HIP_JOINT.y, HIP_JOINT.z);
   pole.set(side * 0.12, 1, -0.7);
-  const stretch = solveTwoBone(hip, ankleTarget, THIGH, SHIN, pole, joint, end);
-  aimSegment(limb.thigh, hip, joint, THIGH);
-  aimSegment(limb.shin, joint, end, SHIN);
+  const thighLength = limb.thighLength ?? THIGH;
+  const shinLength = limb.shinLength ?? SHIN;
+  const stretch = solveTwoBone(hip, ankleTarget, thighLength, shinLength, pole, joint, end);
+  aimSegment(limb.thigh, hip, joint, thighLength);
+  aimSegment(limb.shin, joint, end, shinLength);
   limb.foot.position.copy(end);
   scratch.d.copy(toeDirection).normalize();
   limb.foot.quaternion.setFromUnitVectors(FORWARD, scratch.d);
@@ -574,7 +585,7 @@ export function civilRestGrip(side) {
 }
 
 /** Rebuilds the IK limb references from a cloned civil pilot GLB hierarchy. */
-function civilLimbsFromScene(scene) {
+function civilLimbsFromScene(scene, style) {
   const arms = [-1, 1].map(side => {
     const prefix = `Pilot_Arm_${side > 0 ? 'R' : 'L'}`;
     return {
@@ -584,6 +595,7 @@ function civilLimbsFromScene(scene) {
       hand: scene.getObjectByName(`${prefix}_Hand`),
     };
   });
+  const thighLength = style?.thighLength ?? THIGH;
   const legs = [-1, 1].map(side => {
     const prefix = `Pilot_Leg_${side > 0 ? 'R' : 'L'}`;
     return {
@@ -591,6 +603,8 @@ function civilLimbsFromScene(scene) {
       thigh: scene.getObjectByName(`${prefix}_Thigh`),
       shin: scene.getObjectByName(`${prefix}_Shin`),
       foot: scene.getObjectByName(`${prefix}_Foot`),
+      thighLength,
+      shinLength: SHIN,
     };
   });
   return { arms, legs };
@@ -607,7 +621,7 @@ export function applyCivilPilotGlb(pilot, template) {
   const head = scene.getObjectByName('Pilot_Head');
   const body = scene.getObjectByName('Pilot_Body');
   const seat = scene.getObjectByName('Pilot_Seat');
-  const limbs = civilLimbsFromScene(scene);
+  const limbs = civilLimbsFromScene(scene, pilot.userData.style);
   const complete = head && body && seat
     && limbs.arms.every(limb => limb.upper && limb.fore && limb.hand)
     && limbs.legs.every(limb => limb.thigh && limb.shin && limb.foot);
@@ -721,12 +735,12 @@ export function countPilotMeshes(pilot) {
   return count;
 }
 
-function seatedTargets({ grips, toes, scale }) {
+function seatedTargets({ grips, toes, scale, toeDirection = v(0, -0.35, -1) }) {
   // Ankle sits behind and above the ball of the foot on the pedal.
   return {
     grips: grips.map(p => v(...p)),
     ankles: toes.map(([x, y, z]) => v(x, y + 0.07 * scale, z + 0.14 * scale)),
-    toeDirection: v(0, -0.35, -1).normalize(),
+    toeDirection: toeDirection.clone().normalize(),
   };
 }
 
@@ -751,7 +765,8 @@ export function createB737Pilots() {
     targets: seatedTargets({
       scale: s,
       grips: [[-0.395, 0.655, -12.692], [-0.211, 0.655, -12.692]],
-      toes: [[-0.376, 0.37, -12.97], [-0.231, 0.37, -12.97]],
+      toes: [[-0.368, 0.37, -12.97], [-0.238, 0.37, -12.97]],
+      toeDirection: v(0, -0.12, -1),
     }),
   });
   const firstOfficer = createCivilPilot('airlineFirstOfficer', {
@@ -761,7 +776,8 @@ export function createB737Pilots() {
     targets: seatedTargets({
       scale: s,
       grips: [[0.162, 0.655, -12.692], [0.345, 0.655, -12.692]],
-      toes: [[0.188, 0.37, -12.97], [0.332, 0.37, -12.97]],
+      toes: [[0.195, 0.37, -12.97], [0.325, 0.37, -12.97]],
+      toeDirection: v(0, -0.12, -1),
     }),
   });
   return { captain, firstOfficer };
