@@ -661,3 +661,131 @@ test('room replay crashes sound once per impact crossing, not once per seek (#72
   assert.equal(sounds.length, 2, 'leaving the impact and crossing it again stages it again');
   f.director.stop();
 });
+
+test('replay load restores customOrigin and placeLabel metadata for distant map flights', async () => {
+  const sim = fakeSim();
+  const originCalls = [];
+  sim.setCustomWorldOrigin = origin => { originCalls.push(origin); };
+  sim.syncUnifiedWorld = () => {};
+  const director = new ReplayDirector(sim);
+  const chadOrigin = { latitude: 21.77655, longitude: 19.20233 };
+  const source = track(20);
+  source.metadata.airport = 'incheon';
+  source.metadata.scenario = 'cruise';
+  source.metadata.customOrigin = chadOrigin;
+  source.metadata.placeLabel = '21.78°N, 19.20°E';
+  assert.equal(await director.load(source), true);
+  assert.deepEqual(originCalls.at(-1), chadOrigin);
+  assert.deepEqual(sim.activeMapPlace, { label: '21.78°N, 19.20°E', code: null });
+  director.stop();
+
+  const regional = track(20);
+  regional.metadata.airport = 'incheon';
+  regional.metadata.scenario = 'runway';
+  assert.equal(await director.load(regional), true);
+  assert.equal(originCalls.at(-1), null);
+  assert.equal(sim.activeMapPlace, null);
+  director.stop();
+});
+
+test('replay load reloads and holds recorded external airport after restoring customOrigin', async () => {
+  const sim = fakeSim();
+  const events = [];
+  let loaded = false;
+  let loadingDuringEnsure = false;
+  const director = new ReplayDirector(sim);
+  sim.airportStreamer = {
+    resetForOriginChange() { events.push('reset'); loaded = false; },
+    setHome(code) { events.push(['setHome', code]); },
+    holdDestination(code) { events.push(['hold', code]); },
+    releaseDestinationHold() { events.push('releaseHold'); },
+    releaseGroundHold() { events.push('releaseGround'); },
+    ensure(code, opts) {
+      events.push(['ensure', code, opts?.tileId ?? null]);
+      return Promise.resolve().then(() => {
+        loadingDuringEnsure = director.loading === true;
+        loaded = true;
+        return true;
+      });
+    },
+  };
+  sim.setCustomWorldOrigin = origin => {
+    events.push(['origin', origin]);
+    sim.airportStreamer.resetForOriginChange();
+  };
+  sim.syncUnifiedWorld = () => { events.push('syncWorld'); };
+
+  const jfkOrigin = { latitude: 40.6398, longitude: -73.7789 };
+  const source = track(20);
+  source.metadata.airport = 'incheon';
+  source.metadata.scenario = 'runway';
+  source.metadata.customOrigin = jfkOrigin;
+  source.metadata.airportCode = 'KJFK';
+  source.metadata.airportTileId = '12-34';
+  source.metadata.placeLabel = 'KJFK · John F. Kennedy Intl';
+
+  assert.equal(await director.load(source), true);
+  assert.equal(loadingDuringEnsure, true, 'director.loading stays true while awaiting recorded airport load');
+  assert.equal(director.loading, false, 'director.loading clears once replay is armed');
+  assert.equal(loaded, true, 'recorded external airport finishes loading before replay starts');
+  assert.deepEqual(sim.activeMapPlace, {
+    label: 'KJFK · John F. Kennedy Intl',
+    code: 'KJFK',
+    tileId: '12-34',
+  });
+  const resetIdx = events.indexOf('reset');
+  const setHomeIdx = events.findIndex(e => Array.isArray(e) && e[0] === 'setHome' && e[1] === 'KJFK');
+  const holdIdx = events.findIndex(e => Array.isArray(e) && e[0] === 'hold' && e[1] === 'KJFK');
+  const ensureIdx = events.findIndex(e => Array.isArray(e) && e[0] === 'ensure' && e[1] === 'KJFK' && e[2] === '12-34');
+  assert.ok(resetIdx >= 0 && setHomeIdx > resetIdx, 'setHome runs after origin reset clears previous home');
+  assert.ok(holdIdx > resetIdx && ensureIdx > holdIdx, 'airport is held and ensured with tileId after reset');
+
+  director.stop();
+  assert.ok(events.includes('releaseHold'), 'stopping replay releases destination hold');
+});
+
+test('starting another flight during slow replay airport load cancels the pending replay load', async () => {
+  const sim = fakeSim();
+  let resolveEnsure;
+  let holdsReleased = 0;
+  sim.airportStreamer = {
+    resetForOriginChange() {},
+    setHome() {},
+    holdDestination() {},
+    releaseDestinationHold() { holdsReleased++; },
+    releaseGroundHold() {},
+    ensure() {
+      return new Promise(resolve => { resolveEnsure = resolve; });
+    },
+  };
+  sim.setCustomWorldOrigin = () => {};
+  sim.syncUnifiedWorld = () => {};
+
+  const director = new ReplayDirector(sim);
+  const source = track(20);
+  source.metadata.airport = 'incheon';
+  source.metadata.scenario = 'runway';
+  source.metadata.customOrigin = { latitude: 40.6398, longitude: -73.7789 };
+  source.metadata.airportCode = 'KJFK';
+  source.metadata.airportTileId = '12-34';
+
+  const loadPromise = director.load(source);
+  // Let sim.fly() finish so load() reaches _prepareReplayAirport().
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(director.loading, true, 'replay is awaiting recorded airport');
+
+  // Simulate user returning to lobby and starting a new live sortie before ensure() resolves.
+  director.stop();
+  sim.flightRecorder.active = true;
+  sim.replayRecorder.active = true;
+  sim.controls.setAircraftControlsDisabled(false);
+
+  const ok = await loadPromise;
+  resolveEnsure?.(true);
+  assert.equal(ok, false, 'cancelled replay load resolves to false immediately');
+  assert.equal(director.active, false, 'cancelled replay never activates');
+  assert.equal(director.loading, false, 'cancelled replay clears loading immediately');
+  assert.ok(holdsReleased >= 1, 'cancelled replay releases airport destination hold');
+  assert.equal(sim.flightRecorder.active, true, 'new live sortie recorder remains active');
+  assert.equal(sim.controls.aircraftControlsDisabled, false, 'new live sortie keeps aircraft controls enabled');
+});

@@ -6,6 +6,7 @@ import { createCompressedSortie, REPLAY_FILE_EXTENSION, REPLAY_MIME_TYPE } from 
 
 const airportKeys = { coastal: 'coastal.airport', incheon: 'incheon.airport', jeju: 'jeju.airport', lukla: 'lukla.vnlk',
   neon: 'neon.metropolis', valley: 'valley.region' };
+const locationLabel = metadata => metadata?.placeLabel || t(airportKeys[metadata?.airport] ?? 'coastal.airport');
 const number = value => Number.isFinite(value) ? Math.round(value).toLocaleString('en-US') : '—';
 const g = value => Number.isFinite(value) ? value.toFixed(2) : '—';
 const crashName = crash => crash.name ?? t('debrief.reason.crash');
@@ -35,7 +36,7 @@ export function reportText(report) {
   const contactG = touchdown && Number.isFinite(touchdown.contactG)
     ? Math.min(specs.ultimateLoad?.max ?? 3.75, Math.max(0, touchdown.contactG))
     : touchdown?.contactG;
-  return [`Flight3d / ${t(airportKeys[m.airport] ?? 'coastal.airport')}`,
+  return [`Flight3d / ${locationLabel(m)}`,
     `${AIRCRAFT_REGISTRY[m.aircraft]?.name ?? m.aircraft} · ${t(scenarioLabelKey(m.airport, m.scenario) ?? 'lobby.spawn')}`,
     `${t('debrief.duration')} ${flightDuration(report.durationSec)}`,
     `${t('debrief.altitude')} ${number(report.peaks.altitudeFt?.altitudeFt)} FT · ${t('debrief.speed')} ${number(report.peaks.iasKnots?.iasKnots)} KT`,
@@ -313,7 +314,7 @@ export class DebriefOverlay {
     bindText(this.el('crash-facts'), () => crash
       ? `${target ? `${t('debrief.impactTarget')}  ${crashTarget(crash)}\n` : ''}${t('debrief.impactSpeed')}  ${number(crash.speedKnots)} KT     ${t('debrief.impactTime')}  ${flightDuration(crash.timeSec)}` : '');
     bindText(this.el('identity'), () => enough
-      ? `${AIRCRAFT_REGISTRY[report.metadata.aircraft]?.name ?? report.metadata.aircraft} · ${t(airportKeys[report.metadata.airport] ?? 'coastal.airport')}\n${t(scenarioLabelKey(report.metadata.airport, report.metadata.scenario) ?? 'lobby.spawn')} · ${t(`debrief.reason.${report.reason}`)}`
+      ? `${AIRCRAFT_REGISTRY[report.metadata.aircraft]?.name ?? report.metadata.aircraft} · ${locationLabel(report.metadata)}\n${t(scenarioLabelKey(report.metadata.airport, report.metadata.scenario) ?? 'lobby.spawn')} · ${t(`debrief.reason.${report.reason}`)}`
       : t('debrief.emptyHint'));
     const specs = getAircraftSpecs(report.metadata?.aircraft);
     this.el('stat-duration').textContent = flightDuration(report.durationSec);

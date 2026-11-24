@@ -550,14 +550,21 @@ const frames = {
 };
 
 export function updateGeographicRoads(sim, elapsed) {
-  const origin = Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport];
+  const customOrigin = sim.world?.customOrigin ?? null;
+  const origin = customOrigin ?? (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport]);
   const terrain = sim.currentTerrain;
-  if (sim.geographicRoadLayer?.terrain !== terrain || !origin) {
+  const originChanged = Boolean(
+    sim.geographicRoadLayer?.origin && origin && (
+      Math.abs(sim.geographicRoadLayer.origin.latitude - origin.latitude) > 1e-6
+      || Math.abs(sim.geographicRoadLayer.origin.longitude - origin.longitude) > 1e-6
+    )
+  );
+  if (sim.geographicRoadLayer?.terrain !== terrain || !origin || originChanged) {
     sim.geographicRoadLayer?.dispose();
     sim.geographicRoadLayer = null;
   }
   if (origin && terrain?.mesh && !sim.geographicRoadLayer) {
-    const project = sim.activeAirport === 'incheon' ? projectToLocal
+    const project = (!customOrigin && sim.activeAirport === 'incheon') ? projectToLocal
       : (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin);
     const airport = sim.currentAirport;
     sim.geographicRoadLayer = new GeographicRoads({

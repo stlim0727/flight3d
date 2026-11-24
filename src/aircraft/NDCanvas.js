@@ -223,7 +223,17 @@ export class NDCanvas {
 
     let rwyStart, rwyEnd, extStart, extEnd, activeWpt, threshPos, vor1, vor2, fixes;
 
-    if (this.airportId === 'jeju') {
+    if (this.airportId === 'custom') {
+      threshPos = { x: 0, z: 0 };
+      rwyStart = null;
+      rwyEnd = null;
+      extStart = null;
+      extEnd = null;
+      vor1 = 'GLOBAL';
+      vor2 = 'GPS';
+      activeWpt = this.destination?.code || 'MAP';
+      fixes = [];
+    } else if (this.airportId === 'jeju') {
       const a = APPROACH_DATA.jeju, h = a.headingDeg * Math.PI / 180;
       const at = distance => ({ x: a.threshold.x + Math.sin(h) * distance, z: a.threshold.z - Math.cos(h) * distance });
       threshPos = a.threshold;
@@ -339,53 +349,59 @@ export class NDCanvas {
     }
 
     // Extended Runway Centerline (dashed line extending 5 NM with 1 NM cross ticks)
-    ctx.strokeStyle = '#38bdf8';
-    ctx.lineWidth = 1.8;
-    ctx.setLineDash([8, 8]);
-    ctx.beginPath();
-    ctx.moveTo(extStart.x, extStart.y);
-    ctx.lineTo(extEnd.x, extEnd.y);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 1 NM tick marks along final approach course
-    for (let nm = 1; nm <= 5; nm++) {
-      let tickPos;
-      if (this.airportId === 'jeju' || this.airportId === 'incheon') {
-        const a = APPROACH_DATA[this.airportId], h = a.headingDeg * Math.PI / 180;
-        tickPos = projectToScreen(a.threshold.x - Math.sin(h) * nm * 1852, a.threshold.z + Math.cos(h) * nm * 1852);
-      } else if (isLukla) {
-        const sTick = -263.5 - nm * 1852;
-        tickPos = projectToScreen(sTick * sin58, -sTick * cos58);
-      } else {
-        tickPos = projectToScreen(-1350 - nm * 1852, 0);
-      }
+    if (extStart && extEnd) {
       ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.8;
+      ctx.setLineDash([8, 8]);
       ctx.beginPath();
-      ctx.moveTo(tickPos.x, tickPos.y - 6);
-      ctx.lineTo(tickPos.x, tickPos.y + 6);
+      ctx.moveTo(extStart.x, extStart.y);
+      ctx.lineTo(extEnd.x, extEnd.y);
       ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 1 NM tick marks along final approach course
+      for (let nm = 1; nm <= 5; nm++) {
+        let tickPos;
+        if (this.airportId === 'jeju' || this.airportId === 'incheon') {
+          const a = APPROACH_DATA[this.airportId], h = a.headingDeg * Math.PI / 180;
+          tickPos = projectToScreen(a.threshold.x - Math.sin(h) * nm * 1852, a.threshold.z + Math.cos(h) * nm * 1852);
+        } else if (isLukla) {
+          const sTick = -263.5 - nm * 1852;
+          tickPos = projectToScreen(sTick * sin58, -sTick * cos58);
+        } else {
+          tickPos = projectToScreen(-1350 - nm * 1852, 0);
+        }
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(tickPos.x, tickPos.y - 6);
+        ctx.lineTo(tickPos.x, tickPos.y + 6);
+        ctx.stroke();
+      }
     }
 
     // Active Flight Plan Route (Vivid Magenta Line connecting fixes)
-    ctx.strokeStyle = '#f72585';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    fixes.forEach((f, idx) => {
-      const p = projectToScreen(f.x, f.z);
-      if (idx === 0) ctx.moveTo(p.x, p.y);
-      else ctx.lineTo(p.x, p.y);
-    });
-    ctx.stroke();
+    if (fixes.length > 1) {
+      ctx.strokeStyle = '#f72585';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      fixes.forEach((f, idx) => {
+        const p = projectToScreen(f.x, f.z);
+        if (idx === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      });
+      ctx.stroke();
+    }
 
     // Runway symbol (solid white outline rectangle on threshold)
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(rwyStart.x, rwyStart.y);
-    ctx.lineTo(rwyEnd.x, rwyEnd.y);
-    ctx.stroke();
+    if (rwyStart && rwyEnd) {
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(rwyStart.x, rwyStart.y);
+      ctx.lineTo(rwyEnd.x, rwyEnd.y);
+      ctx.stroke();
+    }
 
     // Waypoint symbols (Cyan stars / triangles with white labels)
     fixes.forEach(fix => {
@@ -470,7 +486,11 @@ export class NDCanvas {
       }
     }
     if (!activePos) {
-      activePos = { x: threshPos.x, z: threshPos.z ?? threshPos.y };
+      if (this.airportId === 'custom' && destination && Number.isFinite(destination.dx) && Number.isFinite(destination.dz)) {
+        activePos = { x: this.planePos.x + destination.dx, z: this.planePos.y + destination.dz };
+      } else {
+        activePos = { x: threshPos.x, z: threshPos.z ?? threshPos.y };
+      }
     }
 
     const distMeters = Math.hypot(this.planePos.x - activePos.x, this.planePos.y - activePos.z);

@@ -263,20 +263,28 @@ const frames = {
 };
 
 export function updateGeographicLandmarks(sim) {
-  const candidateOrigin = (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport])
+  const customOrigin = sim.world?.customOrigin ?? null;
+  const candidateOrigin = customOrigin
+    || (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport])
     || sim.currentTerrain?.origin
     || sim.currentTerrain?.wgs84Origin;
   const origin = Number.isFinite(candidateOrigin?.latitude) && Number.isFinite(candidateOrigin?.longitude)
     ? candidateOrigin
     : null;
   const terrain = sim.currentTerrain;
-  if (sim.geographicLandmarkLayer?.terrain !== terrain || sim.geographicLandmarkLayer?.map !== sim.activeAirport || !origin) {
+  const originChanged = Boolean(
+    sim.geographicLandmarkLayer?.origin && origin && (
+      Math.abs(sim.geographicLandmarkLayer.origin.latitude - origin.latitude) > 1e-6
+      || Math.abs(sim.geographicLandmarkLayer.origin.longitude - origin.longitude) > 1e-6
+    )
+  );
+  if (sim.geographicLandmarkLayer?.terrain !== terrain || sim.geographicLandmarkLayer?.map !== sim.activeAirport || !origin || originChanged) {
     sim.geographicLandmarkLayer?.dispose();
     sim.geographicLandmarkLayer = null;
   }
   if (origin && terrain?.mesh && !sim.geographicLandmarkLayer) {
-    const project = sim.activeAirport === 'incheon' ? projectToLocal
-      : (typeof terrain?.projectToLocal === 'function'
+    const project = (!customOrigin && sim.activeAirport === 'incheon') ? projectToLocal
+      : (!customOrigin && typeof terrain?.projectToLocal === 'function'
         ? (latitude, longitude) => terrain.projectToLocal(latitude, longitude)
         : (latitude, longitude) => wgs84ToLocal(latitude, longitude, origin));
     sim.geographicLandmarkLayer = new GeographicLandmarks({

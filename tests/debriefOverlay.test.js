@@ -213,3 +213,17 @@ test('DebriefOverlay guards async save completion by debrief generation and Repl
   assert.match(panelSource, /replayStore\.refresh\?\.\(\)/,
     'ReplayPanel.openLibrary must refresh metadata from IndexedDB when reopening the library');
 });
+
+test('reportText displays map-plan placeLabel instead of the fallback anchor airport', async () => {
+  const { reportText } = await import('../src/ui/DebriefOverlay.js');
+  const text = reportText({
+    metadata: { airport: 'incheon', aircraft: 'F16', scenario: 'cruise', placeLabel: '21.78°N, 19.20°E' },
+    reason: 'crash',
+    durationSec: 42.8,
+    peaks: { altitudeFt: { altitudeFt: 11483 }, iasKnots: { iasKnots: 390 }, gForce: { gForce: 10.0 } },
+    touchdowns: [],
+    crash: { type: 'TERRAIN', name: 'GEAR-UP BELLY CRASH', speedKnots: 216, timeSec: 42.8 },
+  });
+  assert.match(text, /21\.78°N, 19\.20°E/);
+  assert.doesNotMatch(text, /인천국제공항|Incheon/i);
+});

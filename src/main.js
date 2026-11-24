@@ -800,7 +800,7 @@ class FlightSimulator {
    * - In PAUSED: resumes flight.
    */
   toggleMainMenu() {
-    if (this.replayDirector.active) { this.replayPanel.exit(); return; }
+    if (this.replayDirector.active || this.replayDirector.loading) { this.replayPanel.exit(); return; }
     if (this.gameFlow.state === FLOW.DEBRIEF) return;
     if (this.gameFlow.state === FLOW.FLIGHT) {
       this.gameFlow.returnToLobby(true);
@@ -820,9 +820,14 @@ class FlightSimulator {
     this.crashDebriefRemaining = null;
     this.debriefReport = null;
     this.debriefReplay = null;
+    const customOrigin = this.world?.customOrigin;
     const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
-      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay };
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
+      ...(this.activeMapPlace?.label ? { placeLabel: this.activeMapPlace.label } : {}),
+      ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}),
+      ...(this.activeMapPlace?.tileId ? { airportTileId: this.activeMapPlace.tileId } : {}),
+      ...(customOrigin ? { customOrigin: { latitude: customOrigin.latitude, longitude: customOrigin.longitude } } : {}) };
     this.flightRecorder?.start(sortie);
     this.replayRecorder?.start(sortie);
   }
@@ -1486,7 +1491,7 @@ class FlightSimulator {
     if (poseDriver) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) poseDriver.update(frameDelta);
-    } else if (this.startingFlight || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
+    } else if (this.startingFlight || this.replayDirector?.loading || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);

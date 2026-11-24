@@ -224,7 +224,7 @@ function renderContext(overlay, snapshot) {
     rows.push([label, value]);
   };
   add('기체', snapshot.aircraft);
-  add('공항', snapshot.airport);
+  add('공항', snapshot.placeLabel || snapshot.airport);
   add('시나리오', snapshot.scenario);
   add('비행 시간', Number.isFinite(snapshot.flightDurationSec) ? formatClock(snapshot.flightDurationSec) : null);
   add('현재 G', formatNumber(snapshot.gForce, 2));

@@ -4,6 +4,7 @@ import { RemoteAircraft } from '../multiplayer/RemoteAircraft.js';
 import { ReplayCrashEffects, crashEvents } from '../replay/ReplayCrashEffects.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
 import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { isExternalDestination, registerExternalDestinations } from '../config/externalDestinations.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { FLOW } from '../ui/GameFlowController.js';
@@ -37,6 +38,10 @@ export class ReplayDirector {
     this.remotes = [];
     this.roomEffects = null;
     this._playbackHeld = false;
+    this._heldAirport = null;
+    this._loadToken = 0;
+    this._spawningHost = false;
+    this._cancelPendingLoad = null;
   }
 
   /**
@@ -64,26 +69,47 @@ export class ReplayDirector {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) return false;
     if (track.remotes?.some(pilot => !Object.hasOwn(AIRCRAFT_REGISTRY, pilot.aircraft)
       || !Array.isArray(pilot.samples) || pilot.samples.length !== track.samples.length)) return false;
-    const { airport, aircraft, scenario, demoProfile, timeOfDay, seed } = track.metadata || {};
+    const { airport, aircraft, scenario, demoProfile, timeOfDay, seed, customOrigin, placeLabel, airportCode, airportTileId } = track.metadata || {};
     const valley = scenario === 'valley';
     if (!Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) || !isScenarioAvailable(airport, scenario)
       || (valley && (!Number.isSafeInteger(seed) || seed < 0))) return false;
     const sim = this.sim;
     if (sim.multiplayer?.active || sim.startingFlight || sim.airportLoading || this.loading) return false;
     this.stop();
+    const loadToken = ++this._loadToken;
+    const cancelled = () => this._loadToken !== loadToken;
+    const abortCancelled = () => {
+      this._releaseReplayAirport();
+      this._disposeRoom();
+      this._scenarioAdapter?.release(); this._scenarioAdapter = null;
+      this._view = null;
+      return false;
+    };
     const view = this._captureView();
     Object.assign(sim.lobby, { airport, aircraft, preset: scenario, demoProfile });
-    // The swap holds `startingFlight`, so no frame can render the new aircraft inside old terrain.
+    if (sim.lobby.mapPlan) sim.lobby.mapPlan = null;
+    // Hold `loading` across the entire scene swap and airport preparation so
+    // live physics cannot advance before the first recorded pose is installed.
     this.loading = true;
     try {
       if (valley) {
         // Rebuild the recorded course without starting another judged arena attempt.
         sim.pilotArena?.stop('replay');
         const { SlalomMissionAdapter } = await import('../arena/SlalomMissionAdapter.js');
+        if (cancelled()) return abortCancelled();
         this._scenarioAdapter = new SlalomMissionAdapter(sim);
         await this._scenarioAdapter.prepare({ seed, pilotKind: 'human' });
+        if (cancelled()) return abortCancelled();
         sim.gameFlow.enterFlight();
-      } else await sim.fly();
+      } else {
+        this._spawningHost = true;
+        try {
+          await sim.fly();
+        } finally {
+          this._spawningHost = false;
+        }
+        if (cancelled()) return abortCancelled();
+      }
       if (track.remotes?.length && sim.gameFlow.state === FLOW.FLIGHT) {
         // Live respawns preserve wreckage. A replay starts a different timeline.
         sim.explosionSystem?.clear();
@@ -93,6 +119,7 @@ export class ReplayDirector {
           this.remotes.push({ visual, sample: {}, seek: {} });
         }
         await Promise.all(this.remotes.map(remote => remote.visual.ready));
+        if (cancelled()) return abortCancelled();
         this.remotes.forEach((remote, index) => {
           remote.events = crashEvents(track, index + 1);
           remote.effects = this.createEffects({ scene: sim.scene, aircraft: remote.visual.model,
@@ -102,18 +129,44 @@ export class ReplayDirector {
         this.roomEffects = this.createEffects({ scene: sim.scene, aircraft: sim.aircraft,
           terrain: sim.currentTerrain, breakup: sim.aircraftBreakup, explosions: sim.explosionSystem });
       }
+      sim.demoDirector?.stop();
+      sim.pilotArena?.stop('replay');
+      if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
+        sim.setCustomWorldOrigin?.(customOrigin);
+        sim.syncUnifiedWorld?.(sim.activeAirport);
+      } else {
+        sim.setCustomWorldOrigin?.(null);
+      }
+      sim.activeMapPlace = (placeLabel || airportCode)
+        ? { label: placeLabel ?? null, code: airportCode ?? null, ...(airportTileId ? { tileId: airportTileId } : {}) }
+        : null;
+      if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
+      if (sim.gameFlow.state !== FLOW.FLIGHT) {
+        this._view = null;
+        this._combat?.stop();
+        return false;
+      }
+      if (airportCode && sim.airportStreamer) {
+        const tileId = airportTileId ?? sim.mapPlaces?.airports?.find?.(entry => entry.code === airportCode)?.tileId;
+        registerExternalDestinations([{ code: airportCode, tileId }]);
+        if (isExternalDestination(airportCode)) {
+          await this._prepareReplayAirport(airportCode, tileId, loadToken);
+          if (cancelled()) return abortCancelled();
+          if (sim.gameFlow.state !== FLOW.FLIGHT) {
+            this._releaseReplayAirport();
+            this._view = null;
+            this._combat?.stop();
+            return false;
+          }
+        }
+      }
     } catch (error) {
+      this._releaseReplayAirport();
       this._disposeRoom();
       this._scenarioAdapter?.release(); this._scenarioAdapter = null;
       throw error;
-    } finally { this.loading = false; }
-    sim.demoDirector?.stop();
-    sim.pilotArena?.stop('replay');
-    if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
-    if (sim.gameFlow.state !== FLOW.FLIGHT) {
-      this._view = null;
-      this._combat?.stop();
-      return false;
+    } finally {
+      if (this._loadToken === loadToken) this.loading = false;
     }
     // This sortie exists to host the replay; it is not a flight the pilot flew.
     sim.flightRecorder.active = false;
@@ -249,7 +302,16 @@ export class ReplayDirector {
   }
 
   stop() {
-    if (!this.active) return;
+    if (!this._spawningHost) {
+      this._loadToken += 1;
+      this.loading = false;
+      this._cancelPendingLoad?.();
+      this._cancelPendingLoad = null;
+    }
+    if (!this.active) {
+      if (!this._spawningHost) this._releaseReplayAirport();
+      return;
+    }
     this.active = false;
     const sim = this.sim;
     this._scenarioAdapter?.release();
@@ -265,6 +327,7 @@ export class ReplayDirector {
     }
     this._clearCrash();
     this._disposeRoom();
+    this._releaseReplayAirport();
     sim.aircraft.group.visible = true;
     if (this._view) this._restoreView(this._view);
     this._view = null;
@@ -281,6 +344,37 @@ export class ReplayDirector {
     this.hostVelocity.x = this.hostVelocity.y = this.hostVelocity.z = 0;
     this.onChange();
     this._syncPlaybackHeld();
+  }
+
+  async _prepareReplayAirport(code, tileId, loadToken) {
+    const streamer = this.sim.airportStreamer;
+    if (!streamer || !isExternalDestination(code) || this._loadToken !== loadToken) return;
+    streamer.setHome?.(code);
+    streamer.holdDestination?.(code);
+    this._heldAirport = code;
+    streamer.ensure?.(code, { tileId });
+    streamer.releaseGroundHold?.();
+    const pending = streamer.ensure?.(code, { tileId });
+    if (pending && typeof pending.then === 'function') {
+      let timer = null;
+      const cancelPromise = new Promise(resolve => { this._cancelPendingLoad = resolve; });
+      try {
+        await Promise.race([
+          pending,
+          cancelPromise,
+          new Promise(resolve => { timer = setTimeout(resolve, 6000); }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+        if (this._loadToken === loadToken) this._cancelPendingLoad = null;
+      }
+    }
+  }
+
+  _releaseReplayAirport() {
+    if (!this._heldAirport) return;
+    this.sim.airportStreamer?.releaseDestinationHold?.();
+    this._heldAirport = null;
   }
 
   /** Freeze the pose, drop the render interpolation, and put the camera back on the target. */

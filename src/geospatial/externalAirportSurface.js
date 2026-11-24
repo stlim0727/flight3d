@@ -3,6 +3,7 @@
 // the ARP); baseOffset translates that frame into the Incheon world frame.
 import * as THREE from 'three';
 import { projectToLocal } from './incheon.js';
+import { wgs84ToLocal } from './TileCoordinateSystem.js';
 import { applyLogDepthOffset } from '../environment/RunwayMarkings.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { nightLightLevel } from '../environment/AirportNightLighting.js';
@@ -28,18 +29,24 @@ function normalizedOffset(baseOffset) {
   return { x: 0, z: 0 };
 }
 
-function airportOrigin(airport) {
+function projectPoint(latitude, longitude, geoOrigin = null) {
+  return geoOrigin && finite(geoOrigin.latitude) && finite(geoOrigin.longitude)
+    ? wgs84ToLocal(latitude, longitude, geoOrigin)
+    : projectToLocal(latitude, longitude);
+}
+
+function airportOrigin(airport, geoOrigin = null) {
   if (!airport || !finite(airport.latitude) || !finite(airport.longitude)) return { x: 0, z: 0 };
   try {
-    const [x, z] = projectToLocal(airport.latitude, airport.longitude);
+    const [x, z] = projectPoint(airport.latitude, airport.longitude, geoOrigin);
     return { x, z };
   } catch {
     return { x: 0, z: 0 };
   }
 }
 
-function localPoint(point, origin, fallbackElevation, hasElevationOverride = false) {
-  const [x, z] = projectToLocal(point.latitude, point.longitude);
+function localPoint(point, origin, fallbackElevation, hasElevationOverride = false, geoOrigin = null) {
+  const [x, z] = projectPoint(point.latitude, point.longitude, geoOrigin);
   return {
     x: x - origin.x,
     z: z - origin.z,
@@ -48,9 +55,9 @@ function localPoint(point, origin, fallbackElevation, hasElevationOverride = fal
 }
 
 /** WGS84 runway geometry converted into the airport's local east/south frame. */
-export function buildExternalRunwayDescriptors(airport, overrides) {
+export function buildExternalRunwayDescriptors(airport, overrides, { geoOrigin = null } = {}) {
   if (!airport || !Array.isArray(airport.runways)) return [];
-  const origin = airportOrigin(airport);
+  const origin = airportOrigin(airport, geoOrigin);
   const fallbackElevation = finite(overrides?.elevationM)
     ? overrides.elevationM
     : (finite(airport.elevationM) ? airport.elevationM : 0);
@@ -73,8 +80,8 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
           : (finite(end.threshold?.elevationM) ? end.threshold.elevationM : fallbackElevation);
         return {
           ident: end.ident ?? '',
-          physical: localPoint(end.physical, origin, elev, hasElevOverride),
-          threshold: localPoint(end.threshold, origin, threshElev, hasElevOverride),
+          physical: localPoint(end.physical, origin, elev, hasElevOverride, geoOrigin),
+          threshold: localPoint(end.threshold, origin, threshElev, hasElevOverride, geoOrigin),
           displacedThresholdM: finite(end.displacedThresholdM)
             ? Math.max(0, end.displacedThresholdM) : 0,
           headingDegT: finite(end.headingDegT) ? end.headingDegT : 0,
@@ -98,8 +105,8 @@ export function buildExternalRunwayDescriptors(airport, overrides) {
           ...end,
           // Corrected ends may intentionally declare different elevations
           // (e.g. Lukla's sloped runway), so do not flatten them.
-          physical: localPoint(corrected.physical, origin, fallbackElevation, false),
-          threshold: localPoint(corrected.threshold, origin, fallbackElevation, false),
+          physical: localPoint(corrected.physical, origin, fallbackElevation, false, geoOrigin),
+          threshold: localPoint(corrected.threshold, origin, fallbackElevation, false, geoOrigin),
           displacedThresholdM: finite(corrected.displacedThresholdM)
             ? Math.max(0, corrected.displacedThresholdM) : 0,
         };
@@ -232,15 +239,15 @@ function smoothstep(value) {
 
 /** Airport-local terrain contact surface with runway, taxiway, and facility integration. */
 export class ExternalAirportSurface {
-  constructor({ airport, baseOffset = [0, 0], outsideHeight, overrides } = {}) {
+  constructor({ airport, baseOffset = [0, 0], outsideHeight, overrides, geoOrigin = null } = {}) {
     const code = airport?.ident ?? airport?.icao ?? airport?.iata ?? airport?.code;
     this.overrides = overrides ?? getAirportOverride(code);
-    this.runways = buildExternalRunwayDescriptors(airport, this.overrides);
+    this.runways = buildExternalRunwayDescriptors(airport, this.overrides, { geoOrigin });
     this.baseOffset = normalizedOffset(baseOffset);
     this.outsideHeight = typeof outsideHeight === 'function' ? outsideHeight : null;
     this.isLoaded = true;
 
-    const origin = airportOrigin(airport);
+    const origin = airportOrigin(airport, geoOrigin);
     const fallbackElevation = finite(this.overrides?.elevationM)
       ? this.overrides.elevationM
       : (finite(airport?.elevationM) ? airport.elevationM : 0);
@@ -1281,7 +1288,7 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
 }
 
 /** Terrain facade, runway mesh and airport API for one streamed airport. */
-export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outsideHeight, overrides } = {}) {
+export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outsideHeight, overrides, geoOrigin = null } = {}) {
   const code = airport?.ident ?? airport?.icao ?? airport?.iata ?? airport?.code;
   const resolvedOverrides = overrides ?? getAirportOverride(code);
   const terrain = new ExternalAirportSurface({
@@ -1289,6 +1296,7 @@ export function createExternalAirportRegion({ airport, baseOffset = [0, 0], outs
     baseOffset,
     outsideHeight,
     overrides: resolvedOverrides,
+    geoOrigin,
   });
   const offset = terrain.baseOffset;
 

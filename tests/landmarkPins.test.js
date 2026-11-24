@@ -133,6 +133,12 @@ test('pin renderer merges streamed landmarks, prioritizes major landmarks over o
     const kindIcons = ['city', 'bridge', 'park', 'water'].map(kind => landmarkPinIcon({ kinds: [kind] }));
     assert.equal(new Set(kindIcons).size, 4);
     assert.notEqual(kindIcons[0], landmarkPinIcon({ kinds: ['unknown'] }));
+
+    // Switching to a distant customOrigin must drop built-in Incheon catalog pins
+    sim.world = { customOrigin: { latitude: 40.6413, longitude: -73.7781 } };
+    sim.geographicLandmarkLayer = { version: 2, records: [] };
+    inLanguage('en', () => pins.update(sim, true));
+    assert.ok(container.children.every(c => c.hidden), 'Incheon catalog pin must not appear at JFK custom origin');
   } finally {
     delete globalThis.document;
   }

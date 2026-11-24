@@ -1,10 +1,17 @@
 // Pure geometry for map-based flight starts (#922). No DOM and no simulator state.
 import { projectToLocal } from '../geospatial/incheon.js';
+import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 import { AIRCRAFT_REGISTRY } from './aircraftConfigs.js';
 const finite = Number.isFinite;
 const DEG = Math.PI / 180;
 const TAKEOFF_DISTANCE_M = 100;
 const DEFAULT_CLEARANCE_M = 3.5;
+
+function projectPoint(latitude, longitude, origin) {
+  return origin && finite(origin.latitude) && finite(origin.longitude)
+    ? wgs84ToLocal(latitude, longitude, origin)
+    : projectToLocal(latitude, longitude);
+}
 
 /** World frame: +x east, +z south; heading 0 points north (-z). */
 export function headingToDirection(deg) {
@@ -37,10 +44,10 @@ function offsetParts(value) {
   return { x: 0, z: 0 };
 }
 
-function airportOrigin(airport) {
+function airportOrigin(airport, geoOrigin = null) {
   if (!airport || !finite(airport.latitude) || !finite(airport.longitude)) return { x: 0, z: 0 };
   try {
-    const [x, z] = projectToLocal(airport.latitude, airport.longitude);
+    const [x, z] = projectPoint(airport.latitude, airport.longitude, geoOrigin);
     return { x, z };
   } catch {
     return { x: 0, z: 0 };
@@ -48,14 +55,14 @@ function airportOrigin(airport) {
 }
 
 /** Airport-local ARP frame; WGS84 ends are rebased onto the airport reference point. */
-function endPoint(point, origin) {
+function endPoint(point, origin, geoOrigin = null) {
   if (!point || typeof point !== 'object') return null;
   let x = point.x;
   let z = point.z;
   if (!finite(x) || !finite(z)) {
     if (!finite(point.latitude) || !finite(point.longitude)) return null;
     try {
-      [x, z] = projectToLocal(point.latitude, point.longitude);
+      [x, z] = projectPoint(point.latitude, point.longitude, geoOrigin);
     } catch {
       return null;
     }
@@ -66,7 +73,7 @@ function endPoint(point, origin) {
 }
 
 /** Aiming frame for one physical runway end, derived from its opposite end. */
-export function runwayEndFrame(airport, runwayId, endId) {
+export function runwayEndFrame(airport, runwayId, endId, { origin: geoOrigin = null } = {}) {
   if (!airport || runwayId == null || endId == null || !Array.isArray(airport.runways)) return null;
   const runway = airport.runways.find(r => r && String(r.id) === String(runwayId));
   if (!runway || !Array.isArray(runway.ends) || runway.ends.length < 2) return null;
@@ -75,10 +82,10 @@ export function runwayEndFrame(airport, runwayId, endId) {
   const other = runway.ends.find(e => e && e !== end);
   if (!other) return null;
 
-  const origin = airportOrigin(airport);
-  const physical = endPoint(end.physical, origin);
-  const opposite = endPoint(other.physical, origin);
-  const threshold = endPoint(end.threshold, origin);
+  const origin = airportOrigin(airport, geoOrigin);
+  const physical = endPoint(end.physical, origin, geoOrigin);
+  const opposite = endPoint(other.physical, origin, geoOrigin);
+  const threshold = endPoint(end.threshold, origin, geoOrigin);
   if (!physical || !opposite || !threshold) return null;
   const length = Math.hypot(opposite.x - physical.x, opposite.z - physical.z);
   if (!(length > 0)) return null;
@@ -150,12 +157,12 @@ export function takeoffSpawnPlan({
 }
 
 export function cruiseSpawnPlan({
-  latitude, longitude, headingDeg, altitudeM, anchorBase = [0, 0], aircraftId = 'B738',
+  latitude, longitude, headingDeg, altitudeM, anchorBase = [0, 0], aircraftId = 'B738', origin = null,
 } = {}) {
   if (![latitude, longitude, headingDeg, altitudeM].every(finite)) return null;
   let projected;
   try {
-    projected = projectToLocal(latitude, longitude);
+    projected = projectPoint(latitude, longitude, origin);
   } catch {
     return null;
   }
@@ -213,11 +220,11 @@ export function approachSpawnPlan({
 }
 
 export function resolveMapFlightPlan({
-  state, airport, runwayId, endId, point, baseOffset, anchorBase, aircraftId,
+  state, airport, runwayId, endId, point, baseOffset, anchorBase, aircraftId, origin = null,
 } = {}) {
   if (state === 'cruise') {
     if (!point || typeof point !== 'object') return null;
-    const spawn = cruiseSpawnPlan({ ...point, anchorBase, aircraftId });
+    const spawn = cruiseSpawnPlan({ ...point, anchorBase, aircraftId, origin });
     return spawn ? { scenario: 'cruise', spawn } : null;
   }
   if (state !== 'runway' && state !== 'approach') return null;
@@ -225,8 +232,8 @@ export function resolveMapFlightPlan({
   // when the player leaves the optional runway direction on Automatic.
   const defaultRunway = airport?.runways?.[0];
   const frame = runwayId || endId
-    ? runwayEndFrame(airport, runwayId, endId)
-    : runwayEndFrame(airport, defaultRunway?.id, defaultRunway?.ends?.[0]?.ident);
+    ? runwayEndFrame(airport, runwayId, endId, { origin })
+    : runwayEndFrame(airport, defaultRunway?.id, defaultRunway?.ends?.[0]?.ident, { origin });
   if (!frame) return null;
   const spawn = state === 'runway'
     ? takeoffSpawnPlan({ frame, baseOffset, anchorBase, aircraftId })

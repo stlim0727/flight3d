@@ -7,6 +7,7 @@ import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84 } from '../src/geospatial/airportGeodesy.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 import { APPROACH_DATA } from '../src/config/approachData.js';
+import { registerExternalDestinations } from '../src/config/externalDestinations.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../src/geospatial/CorridorCoordinateSystem.js';
 
@@ -585,4 +586,63 @@ test('worldPositionToWgs84 has no frame for fictional anchors', () => {
     assert.equal(worldPositionToWgs84(id, 100, 200), null, id);
   }
   assert.ok(worldPositionToWgs84('incheon', 0, 0));
+});
+
+test('custom tangent-plane origin isolates distant global flights from built-in regions and preserves WGS84', () => {
+  const { world, incheon } = makeWorld();
+  const chadOrigin = { latitude: 21.77655, longitude: 19.20233 };
+  assert.equal(world.setCustomOrigin(chadOrigin), true);
+  assert.equal(incheon.group.visible, false, 'built-in Incheon group is hidden under custom origin');
+  assert.equal(world.regionAt(0, 0), null, 'built-in Incheon region does not claim (0, 0) in Chad');
+  assert.ok(world.mesh && world.mesh !== incheon.group, 'custom origin uses its own open-world host group');
+
+  const roundTrip = worldPositionToWgs84('incheon', 0, 0, world.customOrigin);
+  assert.ok(Math.abs(roundTrip.latitude - chadOrigin.latitude) < 1e-6);
+  assert.ok(Math.abs(roundTrip.longitude - chadOrigin.longitude) < 1e-6);
+
+  const jfk = { latitude: 40.6413, longitude: -73.7781 };
+  assert.equal(world.setCustomOrigin(jfk), true);
+  const jfkWgs = worldPositionToWgs84('incheon', 0, 0, world.customOrigin);
+  assert.ok(Math.abs(jfkWgs.latitude - jfk.latitude) < 1e-6, 'JFK does not fold across Incheon horizon');
+  assert.ok(Math.abs(jfkWgs.longitude - jfk.longitude) < 1e-6);
+
+  const toIncheon = world.destinationInfo(0, 0, 'incheon');
+  assert.equal(toIncheon.synthetic, false);
+  assert.ok(toIncheon.distanceM > 10_000_000, 'JFK -> Incheon distance is >10,000 km');
+  assert.ok(Math.abs(Math.hypot(toIncheon.dx, toIncheon.dz) - toIncheon.distanceM) < 1,
+    'destination marker vector matches great-circle distance under custom origin');
+  const markerBearing = (Math.atan2(toIncheon.dx, -toIncheon.dz) * 180 / Math.PI + 360) % 360;
+  assert.ok(Math.abs(markerBearing - toIncheon.bearingDeg) < 1e-6,
+    'destination marker vector aligns with great-circle bearing under custom origin');
+
+  const dyn = fakeRegion(4, [0, 0]);
+  dyn.airport.checkBuildingCollision = () => ({ point: new THREE.Vector3(0, 10, 0), part: 'JFK Terminal' });
+  world.registerDynamic('KJFK', { ...dyn, baseOffset: [0, 0] });
+  assert.equal(world.regionAt(0, 0)?.id, 'KJFK', 'streamed airport resolves in custom origin frame');
+
+  // Built-in airport colliders must be excluded when customOrigin is active,
+  // while dynamic streamed airports at the custom origin remain active.
+  incheon.airport.checkBuildingCollision = () => ({ point: new THREE.Vector3(0, 10, 0), part: 'Incheon Terminal' });
+  const facade = createWorldAirportFacade(world, null);
+  assert.deepEqual(facade.airportRegions.map(entry => entry.airport), [dyn.airport]);
+  const detector = new CollisionDetector(world, facade, null, null, null);
+  const hit = detector.checkAirportBuildings(new THREE.Vector3(0, 10, 0), [{ pos: new THREE.Vector3(0, 10, 0), radius: 1, desc: 'nose' }]);
+  assert.equal(hit?.part, 'JFK Terminal', 'only dynamic airport collider is active under custom origin');
+
+  assert.equal(world.setCustomOrigin(null), true);
+  assert.equal(incheon.group.visible, true, 'clearing custom origin restores Incheon group');
+});
+
+test('setCustomOrigin invalidates remembered destination offsets from the previous tangent plane', () => {
+  registerExternalDestinations(['KJFK']);
+  const { world } = makeWorld();
+  world.setCustomOrigin({ latitude: 40.6413, longitude: -73.7781 });
+  world.rememberDestination('KJFK', [0, 0]);
+  assert.equal(world.destinationInfo(0, 0, 'KJFK').distanceM, 0);
+
+  // Switching to KLAX must clear JFK's (0, 0) offset so KJFK does not appear at LAX.
+  world.setCustomOrigin({ latitude: 33.9416, longitude: -118.4085 });
+  const fromLax = world.destinationInfo(0, 0, 'KJFK');
+  assert.equal(fromLax.target, 'unknown');
+  assert.equal(fromLax.distanceM, null);
 });

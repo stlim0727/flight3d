@@ -752,11 +752,40 @@ class PresetSpawnerMethods {
 
     this.currentTerrain = world;
     const mountingChanged = this.updateRegionMounting();
-    const spawnAirport = this.spawnAirportFor(id);
+    const spawnAirport = world.customOrigin ? null : this.spawnAirportFor(id);
     const facade = mountingChanged ? this.currentAirport : createWorldAirportFacade(world, spawnAirport);
     this.currentAirport = facade;
     if (this.collisionDetector) this.collisionDetector.airport = facade;
     return true;
+  }
+
+  /** Set or clear a local WGS84 tangent-plane origin for distant global map flights. */
+  setCustomWorldOrigin(origin) {
+    if (!this.world?.setCustomOrigin) return false;
+    const changed = this.world.setCustomOrigin(origin, this.scene);
+    if (changed) {
+      this.openWorldSurface = null;
+      this.geographicBuildingLayer?.dispose?.();
+      this.geographicBuildingLayer = null;
+      this.geographicRoadLayer?.dispose?.();
+      this.geographicRoadLayer = null;
+      this.geographicGreenLayer?.dispose?.();
+      this.geographicGreenLayer = null;
+      this.geographicLandmarkLayer?.dispose?.();
+      this.geographicLandmarkLayer = null;
+      this.airportStreamer?.resetForOriginChange?.();
+      this.ndCanvas?.setAirport?.(this.world.customOrigin ? 'custom' : this.activeAirport);
+      if (this.collisionDetector && this.currentTerrain === this.world) {
+        this.collisionDetector.setEnvironment(
+          this.world,
+          this.currentAirport,
+          this.worldObstacles(),
+          this.world.customOrigin ? null : this.ships,
+          !this.world.customOrigin && this.activeAirport === 'coastal' ? this.water : null,
+        );
+      }
+    }
+    return changed;
   }
 
   spawnAirportFor(id) {
@@ -771,6 +800,7 @@ class PresetSpawnerMethods {
   /** Regions that must stay mounted regardless of distance to the aircraft. */
   requiredMountedRegions() {
     const world = this.world;
+    if (world.customOrigin) return new Set();
     const required = new Set([world.anchor]);
     const x = this.position?.x ?? 0;
     const z = this.position?.z ?? 0;
@@ -811,8 +841,10 @@ class PresetSpawnerMethods {
       const region = world.regions.get(id);
       if (!region) continue;
       const distance = world.distanceToRegion(id, x, z);
-      const mounted = required.has(id)
-        || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin);
+      const mounted = world.customOrigin
+        ? false
+        : (required.has(id)
+          || (world.isMounted(id) ? distance <= unmountMargin : distance <= approachMargin));
       if (world.setMounted(id, mounted)) changed = true;
       this.setSceneObject(region.group, mounted);
       if (region.mesh !== region.group) this.setSceneObject(region.mesh, mounted);
@@ -823,14 +855,14 @@ class PresetSpawnerMethods {
     if (this.foliage?.group) this.foliage.group.visible = coastalMounted;
     if (this.ships?.group) this.ships.group.visible = coastalMounted;
     if (!changed) return false;
-    const facade = createWorldAirportFacade(world, this.spawnAirportFor(world.anchor));
+    const facade = createWorldAirportFacade(world, world.customOrigin ? null : this.spawnAirportFor(world.anchor));
     this.currentAirport = facade;
     this.collisionDetector?.setEnvironment(
       world,
       facade,
       this.worldObstacles(),
-      this.ships,
-      this.activeAirport === 'coastal' ? this.water : null,
+      world.customOrigin ? null : this.ships,
+      !world.customOrigin && this.activeAirport === 'coastal' ? this.water : null,
     );
     return true;
   }
@@ -847,7 +879,7 @@ class PresetSpawnerMethods {
   /** Static obstacles from all mounted regions, translated into world coordinates. */
   worldObstacles() {
     const world = this.world;
-    if (!world) return null;
+    if (!world || world.customOrigin) return null;
     const [cx, cz] = world.offsets.get('coastal') ?? [0, 0];
     const [nx, nz] = world.offsets.get('neon') ?? [0, 0];
     const shifted = (data, ox, oz) => (data ?? []).map(item => ({ ...item, x: item.x + ox, z: item.z + oz }));
@@ -1029,7 +1061,7 @@ class PresetSpawnerMethods {
 
   /** Stream neighboring unified regions only as the aircraft approaches their 65 km perimeter. */
   updateUnifiedRegionStreaming(nowMs = performance.now()) {
-    if (!this.world || !this.position || !WORLD_REGIONS.includes(this.activeAirport)) return;
+    if (!this.world || this.world.customOrigin || !this.position || !WORLD_REGIONS.includes(this.activeAirport)) return;
     const x = this.position.x;
     const z = this.position.z;
     const movedSq = this._lastRegionStreamX === undefined
@@ -1057,12 +1089,13 @@ class PresetSpawnerMethods {
     if (WORLD_REGIONS.includes(this.activeAirport)) {
       this.syncUnifiedWorld(this.activeAirport);
       if (this.collisionDetector) {
+        const custom = Boolean(this.world?.customOrigin);
         this.collisionDetector.setEnvironment(
           this.currentTerrain,
           this.currentAirport,
           this.worldObstacles(),
-          this.ships,
-          this.activeAirport === 'coastal' ? this.water : null,
+          custom ? null : this.ships,
+          !custom && this.activeAirport === 'coastal' ? this.water : null,
         );
       }
       if (id === 'coastal' && this.startupReady && this.ships) {
@@ -1188,8 +1221,15 @@ class PresetSpawnerMethods {
     this.syncUnifiedWorld(id);
 
     if (this.collisionDetector) {
+      const custom = Boolean(this.world?.customOrigin);
       const obstacles = this.worldObstacles();
-      this.collisionDetector.setEnvironment(this.currentTerrain, this.currentAirport, obstacles, this.ships, isCoastal ? this.water : null);
+      this.collisionDetector.setEnvironment(
+        this.currentTerrain,
+        this.currentAirport,
+        obstacles,
+        custom ? null : this.ships,
+        !custom && isCoastal ? this.water : null,
+      );
     }
 
     if (this.explosionSystem) {
@@ -1233,7 +1273,7 @@ class PresetSpawnerMethods {
 
     // Reconfigure cockpit navigation displays for active airport
     if (this.ndCanvas && typeof this.ndCanvas.setAirport === 'function') {
-      this.ndCanvas.setAirport(id);
+      this.ndCanvas.setAirport(this.world?.customOrigin ? 'custom' : id);
     }
     if (this.cduCanvas && typeof this.cduCanvas.setAirport === 'function') {
       this.cduCanvas.setAirport(id);

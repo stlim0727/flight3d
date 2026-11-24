@@ -89,6 +89,45 @@ export function mapPlanRegion(plan, places = {}) {
   const jeju = haversineDistanceM(location.latitude, location.longitude, JEJU_ORIGIN.latitude, JEJU_ORIGIN.longitude);
   return (jeju < incheon && location.latitude < 34.2) ? 'jeju' : 'incheon';
 }
+
+// Beyond 500 km from the built-in anchor, projecting onto Incheon's tangent
+// plane introduces severe orthographic shear and degrades float32 precision.
+export const CUSTOM_ORIGIN_THRESHOLD_M = 500_000;
+
+/**
+ * Return a local WGS84 tangent-plane origin when a map plan lies far outside
+ * the built-in regional frame, or null when the anchor frame stays accurate.
+ */
+export function mapPlanCustomOrigin(plan, places = {}, anchor = 'incheon') {
+  const location = plan?.state === 'cruise'
+    ? mapCruisePoint(plan, places)
+    : places.airports?.find(entry => entry.code === plan?.airportCode);
+  if (!Number.isFinite(location?.latitude) || !Number.isFinite(location?.longitude)) return null;
+  const anchorOrigin = anchor === 'jeju' ? JEJU_ORIGIN : INCHEON_PATCH.origin;
+  const distanceM = haversineDistanceM(
+    location.latitude, location.longitude,
+    anchorOrigin.latitude, anchorOrigin.longitude,
+  );
+  if (distanceM <= CUSTOM_ORIGIN_THRESHOLD_M) return null;
+  return Object.freeze({ latitude: location.latitude, longitude: location.longitude });
+}
+
+/** Human-readable place label for HUD/debrief/diagnostics on a map-planned flight. */
+export function mapPlanLabel(plan, places = {}) {
+  if (!plan || plan.state === 'none') return null;
+  const airport = places.airports?.find(entry => entry.code === plan.airportCode);
+  if (airport) return airport.name ? `${airport.code} · ${airport.name}` : airport.code;
+  const point = places.points?.find(entry => entry.id === plan.pointId) ?? plan.point;
+  if (!point) return null;
+  if (typeof point.id === 'string' && point.id.startsWith('map:')
+    && Number.isFinite(point.latitude) && Number.isFinite(point.longitude)) {
+    const ns = point.latitude >= 0 ? 'N' : 'S';
+    const ew = point.longitude >= 0 ? 'E' : 'W';
+    return `${Math.abs(point.latitude).toFixed(2)}°${ns}, ${Math.abs(point.longitude).toFixed(2)}°${ew}`;
+  }
+  return point.label ?? null;
+}
+
 const KOREAN_AIRPORT_ALIASES = {
   RKPK: ['김해', '김해국제공항', '김해공항', '부산'],
   RKSS: ['김포', '김포국제공항', '김포공항', '서울'],

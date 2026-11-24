@@ -44,7 +44,10 @@ export const RUNWAY_THRESHOLDS = Object.freeze({
  * must be rebased by the anchor's offset in that plane before inversion.
  * Fictional anchors have no WGS84 frame and report null.
  */
-export function worldPositionToWgs84(anchor, x, z) {
+export function worldPositionToWgs84(anchor, x, z, customOrigin = null) {
+  if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
+    return localToWgs84(x, z, customOrigin);
+  }
   const offset = realOffsetInIncheonFrame(anchor);
   return offset ? localToWgs84(x + offset[0], z + offset[1], AIRPORT_ORIGINS.incheon) : null;
 }

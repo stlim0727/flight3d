@@ -5,7 +5,7 @@ import {
   takeoffSpawnPlan, cruiseSpawnPlan, approachSpawnPlan, resolveMapFlightPlan,
 } from '../src/config/mapFlightPlan.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
-import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion, specialRegionPlaces } from '../src/config/mapFlightPlaces.js';
+import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion, mapPlanCustomOrigin, mapPlanLabel, specialRegionPlaces } from '../src/config/mapFlightPlaces.js';
 
 const close = (actual, expected, epsilon = 1e-9, label = 'value') => {
   assert.ok(Math.abs(actual - expected) <= epsilon, `${label}: ${actual} != ${expected}`);
@@ -305,4 +305,24 @@ test('specialRegionPlaces exposes non-Korea and fictional free-flight regions fo
       ['region', 'coastal'],
     ],
   );
+});
+
+test('distant global map plans activate a local tangent-plane origin and avoid Incheon shear', () => {
+  const gimpo = { code: 'RKSS', name: 'Gimpo', latitude: 37.558, longitude: 126.791 };
+  const jfk = { code: 'KJFK', name: 'John F Kennedy International Airport', latitude: 40.6413, longitude: -73.7781 };
+  const chadPoint = { id: 'map:21.77655,19.20233', label: '21.77655, 19.20233', latitude: 21.77655, longitude: 19.20233 };
+
+  assert.equal(mapPlanCustomOrigin({ state: 'runway', airportCode: 'RKSS' }, { airports: [gimpo] }, 'incheon'), null);
+  const jfkOrigin = mapPlanCustomOrigin({ state: 'runway', airportCode: 'KJFK' }, { airports: [jfk] }, 'incheon');
+  assert.deepEqual(jfkOrigin, { latitude: jfk.latitude, longitude: jfk.longitude });
+
+  const chadOrigin = mapPlanCustomOrigin({ state: 'cruise', point: chadPoint }, {}, 'incheon');
+  assert.deepEqual(chadOrigin, { latitude: chadPoint.latitude, longitude: chadPoint.longitude });
+
+  const chadSpawn = cruiseSpawnPlan({ ...chadPoint, headingDeg: 90, altitudeM: 3500, origin: chadOrigin });
+  close(chadSpawn.x, 0, 1e-6, 'distant cruise spawns at custom local origin x=0');
+  close(chadSpawn.z, 0, 1e-6, 'distant cruise spawns at custom local origin z=0');
+
+  assert.equal(mapPlanLabel({ state: 'runway', airportCode: 'KJFK' }, { airports: [jfk] }), 'KJFK · John F Kennedy International Airport');
+  assert.equal(mapPlanLabel({ state: 'cruise', point: chadPoint }, {}), '21.78°N, 19.20°E');
 });

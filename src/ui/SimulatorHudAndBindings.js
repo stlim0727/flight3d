@@ -224,10 +224,12 @@ class SimulatorHudAndBindingsMethods {
     if (elRegion) {
       const missionValley = this.activeAirport === 'generated-valley';
       const x = this.position.x, z = this.position.z;
-      const code = missionValley ? 'VAL' : this.world?.regionCode?.(x, z);
+      const code = missionValley
+        ? 'VAL'
+        : (this.world?.regionCode?.(x, z) ?? this.activeMapPlace?.code ?? (this.activeMapPlace?.label ? 'MAP' : null));
       const key = missionValley ? 'valley.region' : this.world?.regionNameKey?.(x, z);
       elRegion.textContent = code ?? '';
-      elRegion.title = key ? t(key) : '';
+      elRegion.title = key ? t(key) : (this.activeMapPlace?.label ?? '');
     }
     const fuel = document.getElementById('hud-fuel');
     if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
