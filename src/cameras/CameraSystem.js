@@ -139,6 +139,28 @@ export class CameraSystem {
     this.cockpitUserOffset.set(0, 0, 0);
     if (typeof this.onCockpitUserOffsetChange === 'function') this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
   }
+  getPreferredStartMode() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('flight3d.startCameraMode');
+        if (stored !== null && stored !== '') {
+          const parsed = parseInt(stored, 10);
+          if (Number.isFinite(parsed)) return parsed;
+        }
+      }
+    } catch {}
+    return CameraSystem.MODES.COCKPIT;
+  }
+  setPreferredStartMode(mode) {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('flight3d.startCameraMode', String(mode));
+      }
+    } catch {}
+    if (typeof this.onPreferredStartModeChange === 'function') {
+      this.onPreferredStartModeChange(mode);
+    }
+  }
   updatePovButtonState() { updatePovButtonState(this); }
   applyHatLook(dirX, dirY, dt) { applyHatLook(this, dirX, dirY, dt); }
   updatePovReturn(dt) { updatePovReturn(this, dt); }

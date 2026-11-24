@@ -549,6 +549,10 @@
         </section>
       </div>
       <div class="lobby-actions">
+        <button id="btn-lobby-camera" class="btn btn-lobby-camera" type="button" aria-haspopup="dialog" aria-controls="lobby-camera-modal" aria-expanded="false" title="카메라 설정" data-i18n-title="ui.lobbyCamera.openSettings">
+          <span class="btn-icon" aria-hidden="true">🎥</span>
+          <span id="lobby-camera-btn-label">카메라 · 조종석 ▾</span>
+        </button>
         <button id="btn-lobby-resume" class="btn" hidden><span class="btn-icon" aria-hidden="true">▶️</span> <span data-i18n="lobby.resume">비행 계속하기</span></button>
         <button id="btn-lobby-restart" class="btn" hidden><span class="btn-icon" aria-hidden="true">🔄</span> <span data-i18n="pause.restart">시나리오 재시작</span></button>
         <button id="btn-lobby-end" class="btn" hidden><span class="btn-icon" aria-hidden="true">⏹️</span> <span data-i18n="debrief.end">비행 종료</span></button>
@@ -572,6 +576,87 @@
       <button id="dev-live-stop" class="btn" data-i18n="dev.stop">종료·복구</button>
     </div>
   </aside>
+  <!-- Lobby Camera & Cockpit POV Settings Modal -->
+  <dialog id="lobby-camera-modal" class="lobby-camera-modal" aria-labelledby="lobby-camera-title">
+    <div class="lobby-camera-card">
+      <header class="lobby-camera-header">
+        <div class="lobby-camera-title-group">
+          <span class="lobby-camera-icon" aria-hidden="true">🎥</span>
+          <h3 id="lobby-camera-title" class="lobby-camera-title">카메라 설정 · C172</h3>
+        </div>
+        <button id="btn-lobby-camera-close" class="btn btn-close lobby-camera-close" type="button" aria-label="닫기" data-i18n-aria-label="ui.cockpitPov.close">&times;</button>
+      </header>
+
+      <div class="lobby-camera-body">
+        <div class="lobby-camera-field">
+          <label for="lobby-camera-start-mode" class="lobby-camera-field-label" data-i18n="ui.lobbyCamera.startMode">시작 시점</label>
+          <select id="lobby-camera-start-mode" class="btn lobby-camera-select">
+            <option value="0" data-i18n="ui.camera.name.cockpit">조종석</option>
+            <option value="1" data-i18n="ui.camera.name.chase">추적</option>
+            <option value="2" data-i18n="ui.camera.name.wing">날개</option>
+            <option value="8" data-i18n="ui.camera.name.hud">HUD</option>
+            <option value="4" data-i18n="ui.camera.name.flyby">플라이바이</option>
+          </select>
+        </div>
+
+        <div class="lobby-camera-preview-box">
+          <div class="lobby-camera-preview-viewfinder">
+            <span class="preview-badge" data-i18n="ui.lobbyCamera.previewHint">선택한 기체의 조종석 미리보기</span>
+            <div class="preview-reticle" aria-hidden="true">
+              <span class="reticle-corner tl"></span>
+              <span class="reticle-corner tr"></span>
+              <span class="reticle-corner bl"></span>
+              <span class="reticle-corner br"></span>
+              <span class="reticle-cross"></span>
+            </div>
+          </div>
+        </div>
+
+        <div class="lobby-camera-controls">
+          <div class="cockpit-pov-row" data-axis="y">
+            <div class="cockpit-pov-label-row">
+              <label for="lobby-pov-y" data-i18n="ui.lobbyCamera.eyeHeight">눈높이</label>
+              <output id="lobby-pov-y-val" class="cockpit-pov-val">0 cm</output>
+            </div>
+            <div class="cockpit-pov-control-group">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="y" data-dir="-1" title="아래로" aria-label="아래로">−</button>
+              <input id="lobby-pov-y" type="range" class="cockpit-pov-slider" min="-0.20" max="0.30" step="0.005" value="0">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="y" data-dir="1" title="위로" aria-label="위로">+</button>
+            </div>
+          </div>
+
+          <div class="cockpit-pov-row" data-axis="z">
+            <div class="cockpit-pov-label-row">
+              <label for="lobby-pov-z" data-i18n="ui.lobbyCamera.foreAft">앞뒤 위치</label>
+              <output id="lobby-pov-z-val" class="cockpit-pov-val">0 cm</output>
+            </div>
+            <div class="cockpit-pov-control-group">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="z" data-dir="-1" title="앞으로" aria-label="앞으로">−</button>
+              <input id="lobby-pov-z" type="range" class="cockpit-pov-slider" min="-0.40" max="0.40" step="0.005" value="0">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="z" data-dir="1" title="뒤로" aria-label="뒤로">+</button>
+            </div>
+          </div>
+
+          <div class="cockpit-pov-row" data-axis="x">
+            <div class="cockpit-pov-label-row">
+              <label for="lobby-pov-x" data-i18n="ui.lobbyCamera.lateral">좌우 위치</label>
+              <output id="lobby-pov-x-val" class="cockpit-pov-val">0 cm</output>
+            </div>
+            <div class="cockpit-pov-control-group">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="x" data-dir="-1" title="좌측" aria-label="좌측">−</button>
+              <input id="lobby-pov-x" type="range" class="cockpit-pov-slider" min="-0.25" max="0.25" step="0.005" value="0">
+              <button type="button" class="btn cockpit-pov-step lobby-pov-step" data-axis="x" data-dir="1" title="우측" aria-label="우측">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="lobby-camera-footer">
+        <button id="btn-lobby-camera-reset" type="button" class="btn lobby-camera-btn-reset" data-i18n="ui.lobbyCamera.resetAircraft">기체 기본값으로</button>
+        <button id="btn-lobby-camera-done" type="button" class="btn btn-primary lobby-camera-btn-done" data-i18n="ui.lobbyCamera.done">완료</button>
+      </footer>
+    </div>
+  </dialog>
   <section id="replay-panel" hidden aria-label="Replay"></section>
   <div id="replay-library" hidden role="dialog" aria-modal="true" aria-labelledby="replay-library-title"></div>
   <div id="debrief-overlay" class="flow-overlay" role="dialog" aria-modal="true" aria-labelledby="debrief-title"></div>
