@@ -625,8 +625,8 @@ export function buildF16PilotScene() {
   return { root, seat, body, head };
 }
 
-let pilotTemplate = null;
-let pilotLoadingPromise = null;
+const pilotTemplates = new Map();
+const pilotLoadingPromises = new Map();
 
 /**
  * Returns the URL path to the pilot model GLB.
@@ -637,29 +637,28 @@ export function getPilotModelUrl(variant = 'f16') {
 }
 
 /**
- * Loads the pilot GLB model template asynchronously with caching.
+ * Loads a pilot GLB template asynchronously, caching each variant separately.
  */
 export async function loadPilotModel(variant = 'f16') {
-  if (pilotTemplate) return pilotTemplate;
-  if (pilotLoadingPromise) return pilotLoadingPromise;
-
-  pilotLoadingPromise = (async () => {
-    try {
-      const url = getPilotModelUrl(variant);
-      const loader = new GLTFLoader();
-      const gltf = await loader.loadAsync(url);
-      const scene = gltf.scene || gltf.scenes?.[0];
-      if (scene) {
-        pilotTemplate = scene;
-        return scene;
+  if (pilotTemplates.has(variant)) return pilotTemplates.get(variant);
+  if (!pilotLoadingPromises.has(variant)) {
+    pilotLoadingPromises.set(variant, (async () => {
+      try {
+        const url = getPilotModelUrl(variant);
+        const loader = new GLTFLoader();
+        const gltf = await loader.loadAsync(url);
+        const scene = gltf.scene || gltf.scenes?.[0];
+        if (scene) {
+          pilotTemplates.set(variant, scene);
+          return scene;
+        }
+      } catch {
+        // In test / headless offline environments, procedural fallback is used
       }
-    } catch {
-      // In test / headless offline environments, procedural fallback is used
-    }
-    return null;
-  })();
-
-  return pilotLoadingPromise;
+      return null;
+    })());
+  }
+  return pilotLoadingPromises.get(variant);
 }
 
 /**
