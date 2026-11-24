@@ -43,6 +43,7 @@ export function createSimulatorScenarioStart(sim) {
         sim.setCustomWorldOrigin?.(request.mapPlan?.origin ?? null);
         sim.activeMapPlace = request.mapPlan
           ? {
+            pointId: request.mapPlan.pointId,
             label: request.mapPlan.placeLabel ?? null,
             code: request.mapPlan.placeCode ?? request.mapPlan.airportCode ?? null,
             tileId: request.mapPlan.placeTileId ?? null,
@@ -170,6 +171,7 @@ function resolveLobbyMapPlan(sim) {
   return {
     ...plan,
     origin,
+    pointId: plan.scenario === 'cruise' ? point?.id ?? null : null,
     placeLabel: mapPlanLabel(choice, catalog),
     placeCode: airport?.code ?? null,
     placeTileId: choice.tileId ?? airport?.tileId ?? null,
