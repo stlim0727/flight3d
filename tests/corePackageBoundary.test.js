@@ -9,7 +9,7 @@ import { AutopilotController } from '../src/physics/Autopilot.js';
 import { approachDeviation } from '../src/config/approachData.js';
 import {
   analyticTerrainProvider,
-  assertTerrainProviderContract,
+  assertTerrainProviderContract, assertTerrainProviderConformance,
   createGroundHeightQuery,
   createGroundSurfaceQueries,
   resolveGroundHeight,
@@ -26,6 +26,7 @@ test('compatibility imports share package classes, terrain helpers, and aircraft
   }
   assert.equal(analyticTerrainProvider, packageApi.analyticTerrainProvider);
   assert.equal(assertTerrainProviderContract, packageApi.assertTerrainProviderContract);
+  assert.equal(assertTerrainProviderConformance, packageApi.assertTerrainProviderConformance);
   assert.equal(createGroundHeightQuery, packageApi.createGroundHeightQuery);
   assert.equal(createGroundSurfaceQueries, packageApi.createGroundSurfaceQueries);
   assert.equal(resolveGroundHeight, packageApi.resolveGroundHeight);

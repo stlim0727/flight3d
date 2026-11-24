@@ -10,7 +10,8 @@ import { CollisionDetector } from '../src/physics/CollisionDetector.js';
 import { installPhysicsIntegrator } from '../src/core/PhysicsIntegrator.js';
 import { createHeadlessSimulation } from '../src/core/HeadlessSimulation.js';
 import {
-  analyticTerrainProvider, assertTerrainProviderContract, createGroundHeightQuery, createGroundSurfaceQueries,
+  analyticTerrainProvider, assertTerrainProviderContract, assertTerrainProviderConformance,
+  createGroundHeightQuery, createGroundSurfaceQueries,
   openWorldTerrainProvider, resolveGroundHeight,
 } from '../src/environment/TerrainProvider.js';
 
@@ -32,7 +33,9 @@ function loadedWorld(protectedAreas = []) {
 
 test('analytic provider satisfies the contract', () => {
   const provider = analyticTerrainProvider(new CorridorFlightSurface({ activeOrigin: JEJU_ORIGIN }));
-  assert.equal(assertTerrainProviderContract(provider, [[0, 0], [5000, 8000], [3741, 16591]]), true);
+  const points = [[0, 0], [5000, 8000], [3741, 16591]];
+  assert.equal(assertTerrainProviderContract(provider, points), true);
+  assert.equal(assertTerrainProviderConformance(provider, points), true);
   assert.equal(provider.isReady(0, 0), true);
   assert.ok(Math.abs(provider.getHeight(0, 0) - 36) < 1e-9);
 });
@@ -45,12 +48,14 @@ test('open-world provider is not ready until its tile loads and satisfies the co
   const empty = openWorldTerrainProvider(new OpenWorldTerrain({ origin }));
   assert.equal(empty.getHeight(0, 0), null);
   assert.equal(empty.isReady(0, 0), false);
+  assert.equal(assertTerrainProviderConformance(empty, [[0, 0]]), true);
   assertTerrainProviderContract(empty, [[0, 0]]);
 
   const { world, px, pz } = loadedWorld();
   const provider = openWorldTerrainProvider(world);
   assert.equal(provider.isReady(px, pz), true);
   assert.ok(Math.abs(provider.getHeight(px, pz) - 40) < 0.5);
+  assert.equal(assertTerrainProviderConformance(provider, [[px, pz]]), true);
   assertTerrainProviderContract(provider, [[px, pz]]);
   provider.dispose();
 });
