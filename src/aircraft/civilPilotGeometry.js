@@ -97,8 +97,8 @@ export function createCessnaMaterials() {
 }
 
 export const CIVIL_PILOT_STYLES = Object.freeze({
-  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15 },
-  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15 },
+  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
+  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
   // Sits up and leans towards the Cessna's deep-set yoke.
   cessna: { outfit: 'cessna', recline: 0.02 },
 });
@@ -445,7 +445,7 @@ function createLeg(mats, style, side) {
   foot.add(mesh(new THREE.BoxGeometry(0.1, 0.075, 0.27), shoe, v(0, -0.035, -0.07)));
   foot.add(mesh(new THREE.SphereGeometry(0.05, 10, 8), shoe, v(0, -0.01, 0.0)));
   for (const segment of [thigh, shin, foot]) mergeByMaterial(segment, segment.name);
-  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN };
+  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN, poleY: style.legPoleY ?? 1 };
 }
 
 /** Builds the civil pilot hierarchy (no seat: the cockpit models provide their own). */
@@ -553,6 +553,10 @@ const wristTarget = new THREE.Vector3();
 const shoulder = new THREE.Vector3();
 const hip = new THREE.Vector3();
 const pole = new THREE.Vector3();
+const handForward = new THREE.Vector3();
+const handUp = new THREE.Vector3();
+const handRight = new THREE.Vector3();
+const handBasis = new THREE.Matrix4();
 
 /** Poses one arm so its fist closes on gripTarget (pilot frame, real metres). */
 export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLINE_RAD) {
@@ -564,14 +568,20 @@ export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLIN
   aimSegment(limb.upper, shoulder, joint, UPPER_ARM);
   aimSegment(limb.fore, joint, end, FOREARM);
   limb.hand.position.copy(end);
-  limb.hand.quaternion.copy(limb.fore.quaternion);
+  // Twist the fist around the forearm so the upturned thumb stays vertical on the yoke horn.
+  handForward.set(0, 1, 0).applyQuaternion(limb.fore.quaternion);
+  handUp.copy(UP).addScaledVector(handForward, -UP.dot(handForward)).normalize();
+  handRight.crossVectors(handForward, handUp).normalize();
+  handUp.crossVectors(handRight, handForward).normalize();
+  handBasis.makeBasis(handRight, handForward, handUp);
+  limb.hand.quaternion.setFromRotationMatrix(handBasis);
   return stretch;
 }
 
 /** Poses one leg with the ankle at ankleTarget and the sole pointing along toeDirection. */
 export function poseCivilLeg(limb, side, ankleTarget, toeDirection) {
   hip.set(side * HIP_JOINT.x, HIP_JOINT.y, HIP_JOINT.z);
-  pole.set(side * 0.12, 1, -0.7);
+  pole.set(side * 0.12, limb.poleY ?? 1, -0.7);
   const thighLength = limb.thighLength ?? THIGH;
   const shinLength = limb.shinLength ?? SHIN;
   const stretch = solveTwoBone(hip, ankleTarget, thighLength, shinLength, pole, joint, end);
@@ -609,6 +619,7 @@ function civilLimbsFromScene(scene, style) {
       foot: scene.getObjectByName(`${prefix}_Foot`),
       thighLength,
       shinLength: SHIN,
+      poleY: style?.legPoleY ?? 1,
     };
   });
   return { arms, legs };
@@ -776,7 +787,7 @@ export function createB737Pilots() {
     mounts: { cockpit: eyeAlignedMount(B737_CAPTAIN_EYE, s, 'airlineCaptain') },
     targets: seatedTargets({
       scale: s,
-      grips: [[-0.395, 0.655, -12.692], [-0.211, 0.655, -12.692]],
+      grips: [[-0.422, 0.655, -12.692], [-0.182, 0.655, -12.692]],
       toes: [[-0.368, 0.37, -12.97], [-0.238, 0.37, -12.97]],
       toeDirection: v(0, -0.12, -1),
     }),
@@ -787,7 +798,7 @@ export function createB737Pilots() {
     mounts: { cockpit: eyeAlignedMount(B737_FIRST_OFFICER_EYE, s, 'airlineFirstOfficer') },
     targets: seatedTargets({
       scale: s,
-      grips: [[0.162, 0.655, -12.692], [0.345, 0.655, -12.692]],
+      grips: [[0.134, 0.655, -12.692], [0.374, 0.655, -12.692]],
       toes: [[0.195, 0.37, -12.97], [0.325, 0.37, -12.97]],
       toeDirection: v(0, -0.12, -1),
     }),
