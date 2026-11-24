@@ -55,6 +55,7 @@ export class LobbyCameraModal {
     this.savedCameraMode = null;
     this.savedUserModeSelected = null;
     this.savedAutoSwitch = null;
+    this.savedCustomViewUpdater = null;
     this.isOpen = false;
 
     this.initBindings();
@@ -268,6 +269,7 @@ export class LobbyCameraModal {
       this.savedCameraMode = this.cameraSystem.mode;
       this.savedUserModeSelected = this.cameraSystem.userModeSelected;
       this.savedAutoSwitch = this.cameraSystem.autoSwitch;
+      this.savedCustomViewUpdater = this.cameraSystem.customViewUpdater;
       if (typeof this.cameraSystem.setMode === 'function') {
         // Use isUserAction=true to bypass userModeSelected guard and enter cockpit view
         this.cameraSystem.setMode(CameraSystem.MODES.COCKPIT, true);
@@ -300,9 +302,13 @@ export class LobbyCameraModal {
       if (this.savedAutoSwitch !== null && this.savedAutoSwitch !== undefined) {
         this.cameraSystem.autoSwitch = this.savedAutoSwitch;
       }
+      if (this.savedCustomViewUpdater !== undefined) {
+        this.cameraSystem.customViewUpdater = this.savedCustomViewUpdater;
+      }
       this.savedCameraMode = null;
       this.savedUserModeSelected = null;
       this.savedAutoSwitch = null;
+      this.savedCustomViewUpdater = null;
     }
 
     this.updateLobbyButtonLabel();

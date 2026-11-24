@@ -218,11 +218,15 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     cam.setMode(CameraSystem.MODES.CHASE, true);
     assert.equal(cam.userModeSelected, true);
 
+    const mockUpdater = () => {};
+    cam.customViewUpdater = mockUpdater;
+
     modal.open();
     assert.equal(cam.mode, CameraSystem.MODES.COCKPIT);
     modal.close();
     assert.equal(cam.mode, CameraSystem.MODES.CHASE);
     assert.equal(cam.userModeSelected, true);
+    assert.equal(cam.customViewUpdater, mockUpdater, 'customViewUpdater should be restored after preview close');
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
