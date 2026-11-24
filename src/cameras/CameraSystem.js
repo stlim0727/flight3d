@@ -166,6 +166,10 @@ export class CameraSystem {
         localStorage.setItem('flight3d.startCameraMode', String(mode));
       }
     } catch {}
+    if (this.pauseView) {
+      this.pauseView.mode = mode;
+      this.pauseView.userModeSelected = true;
+    }
     if (typeof this.onPreferredStartModeChange === 'function') {
       this.onPreferredStartModeChange(mode);
     }

@@ -952,13 +952,13 @@ class FlightSimulator {
     if (this.airportLoading || this.startingFlight || this.isCrashed) return;
     if (this.gameFlow.canResumeFromLobby()) {
       this.lobbyCameraModal?.close();
+      this.gameFlow.enterFlight();
       if (this.cameraSystem && typeof this.cameraSystem.getPreferredStartMode === 'function') {
         const preferred = this.cameraSystem.getPreferredStartMode();
         if (typeof this.cameraSystem.setMode === 'function') {
           this.cameraSystem.setMode(preferred, true);
         }
       }
-      this.gameFlow.enterFlight();
     }
   }
 

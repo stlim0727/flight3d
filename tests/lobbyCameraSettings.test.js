@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { LobbyCameraModal } from '../src/ui/LobbyCameraModal.js';
+import { SimulatorClass } from './helpers/simulatorClass.js';
 
 test('CameraSystem preferred start mode loads and saves to localStorage', () => {
   const previousLocalStorage = globalThis.localStorage;
@@ -275,7 +276,7 @@ test('preset spawn applies custom preferred start mode and sets userModeSelected
   }
 });
 
-test('resumeFlight from lobby applies updated preferred camera mode', async () => {
+test('resumeFlight from lobby applies updated preferred camera mode and updates pauseView', async () => {
   const previousLocalStorage = globalThis.localStorage;
   const store = new Map();
   globalThis.localStorage = {
@@ -288,6 +289,12 @@ test('resumeFlight from lobby applies updated preferred camera mode', async () =
     const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
     cam.setMode(CameraSystem.MODES.CHASE, true);
 
+    // Hold sortie in lobby (enters pauseView)
+    assert.equal(cam.beginPauseView(), true);
+    assert.equal(cam.mode, CameraSystem.MODES.DRONE);
+    assert.ok(cam.pauseView);
+    assert.equal(cam.pauseView.mode, CameraSystem.MODES.CHASE);
+
     let modalClosed = false;
     let enteredFlight = false;
     const sim = {
@@ -298,33 +305,25 @@ test('resumeFlight from lobby applies updated preferred camera mode', async () =
       lobbyCameraModal: { close: () => { modalClosed = true; } },
       gameFlow: {
         canResumeFromLobby: () => true,
-        enterFlight: () => { enteredFlight = true; },
+        enterFlight: () => {
+          enteredFlight = true;
+          // In production, syncFlowUi calls cameraSystem.endPauseView()
+          cam.endPauseView();
+        },
       },
     };
 
-    // Simulate resumeFlight method logic from main.js
-    const resumeFlight = () => {
-      if (sim.airportLoading || sim.startingFlight || sim.isCrashed) return;
-      if (sim.gameFlow.canResumeFromLobby()) {
-        sim.lobbyCameraModal?.close();
-        if (sim.cameraSystem && typeof sim.cameraSystem.getPreferredStartMode === 'function') {
-          const preferred = sim.cameraSystem.getPreferredStartMode();
-          if (typeof sim.cameraSystem.setMode === 'function') {
-            sim.cameraSystem.setMode(preferred, true);
-          }
-        }
-        sim.gameFlow.enterFlight();
-      }
-    };
-
-    // Change preferred mode to COCKPIT
+    // Change preferred mode to COCKPIT while in held lobby
     cam.setPreferredStartMode(CameraSystem.MODES.COCKPIT);
+    assert.equal(cam.pauseView.mode, CameraSystem.MODES.COCKPIT, 'pauseView mode should update with preferred start mode');
 
-    resumeFlight();
+    SimulatorClass.prototype.resumeFlight.call(sim);
 
     assert.equal(modalClosed, true);
     assert.equal(enteredFlight, true);
+    assert.equal(cam.pauseView, null, 'pauseView should be ended on resume');
     assert.equal(cam.mode, CameraSystem.MODES.COCKPIT, 'resumed flight should switch to preferred start mode');
+    assert.equal(cam.userModeSelected, true);
   } finally {
     if (previousLocalStorage === undefined) delete globalThis.localStorage;
     else globalThis.localStorage = previousLocalStorage;
