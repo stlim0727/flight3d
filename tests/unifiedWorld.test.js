@@ -7,6 +7,7 @@ import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 import { AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, worldPositionToWgs84 } from '../src/geospatial/airportGeodesy.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 import { APPROACH_DATA } from '../src/config/approachData.js';
+import { registerExternalDestinations } from '../src/config/externalDestinations.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
 import { haversineDistanceM, initialBearingDeg } from '../src/geospatial/CorridorCoordinateSystem.js';
 
@@ -630,4 +631,18 @@ test('custom tangent-plane origin isolates distant global flights from built-in 
 
   assert.equal(world.setCustomOrigin(null), true);
   assert.equal(incheon.group.visible, true, 'clearing custom origin restores Incheon group');
+});
+
+test('setCustomOrigin invalidates remembered destination offsets from the previous tangent plane', () => {
+  registerExternalDestinations(['KJFK']);
+  const { world } = makeWorld();
+  world.setCustomOrigin({ latitude: 40.6413, longitude: -73.7781 });
+  world.rememberDestination('KJFK', [0, 0]);
+  assert.equal(world.destinationInfo(0, 0, 'KJFK').distanceM, 0);
+
+  // Switching to KLAX must clear JFK's (0, 0) offset so KJFK does not appear at LAX.
+  world.setCustomOrigin({ latitude: 33.9416, longitude: -118.4085 });
+  const fromLax = world.destinationInfo(0, 0, 'KJFK');
+  assert.equal(fromLax.target, 'unknown');
+  assert.equal(fromLax.distanceM, null);
 });

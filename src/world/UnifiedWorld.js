@@ -149,6 +149,7 @@ export class UnifiedWorld {
       this.customTerrain.geographicGreenLayer = null;
     }
     this.customOrigin = next;
+    this.destinationOffsets.clear();
     if (next) {
       this.customTerrain ??= createCustomTerrainHost();
       if (scene && !this.customTerrain.mesh.parent) scene.add(this.customTerrain.mesh);

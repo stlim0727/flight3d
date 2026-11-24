@@ -743,3 +743,49 @@ test('replay load reloads and holds recorded external airport after restoring cu
   director.stop();
   assert.ok(events.includes('releaseHold'), 'stopping replay releases destination hold');
 });
+
+test('starting another flight during slow replay airport load cancels the pending replay load', async () => {
+  const sim = fakeSim();
+  let resolveEnsure;
+  let holdsReleased = 0;
+  sim.airportStreamer = {
+    resetForOriginChange() {},
+    setHome() {},
+    holdDestination() {},
+    releaseDestinationHold() { holdsReleased++; },
+    releaseGroundHold() {},
+    ensure() {
+      return new Promise(resolve => { resolveEnsure = resolve; });
+    },
+  };
+  sim.setCustomWorldOrigin = () => {};
+  sim.syncUnifiedWorld = () => {};
+
+  const director = new ReplayDirector(sim);
+  const source = track(20);
+  source.metadata.airport = 'incheon';
+  source.metadata.scenario = 'runway';
+  source.metadata.customOrigin = { latitude: 40.6398, longitude: -73.7789 };
+  source.metadata.airportCode = 'KJFK';
+  source.metadata.airportTileId = '12-34';
+
+  const loadPromise = director.load(source);
+  // Let sim.fly() finish so load() reaches _prepareReplayAirport().
+  await new Promise(resolve => setTimeout(resolve, 10));
+  assert.equal(director.loading, true, 'replay is awaiting recorded airport');
+
+  // Simulate user returning to lobby and starting a new live sortie before ensure() resolves.
+  director.stop();
+  sim.flightRecorder.active = true;
+  sim.replayRecorder.active = true;
+  sim.controls.setAircraftControlsDisabled(false);
+
+  const ok = await loadPromise;
+  resolveEnsure?.(true);
+  assert.equal(ok, false, 'cancelled replay load resolves to false immediately');
+  assert.equal(director.active, false, 'cancelled replay never activates');
+  assert.equal(director.loading, false, 'cancelled replay clears loading immediately');
+  assert.ok(holdsReleased >= 1, 'cancelled replay releases airport destination hold');
+  assert.equal(sim.flightRecorder.active, true, 'new live sortie recorder remains active');
+  assert.equal(sim.controls.aircraftControlsDisabled, false, 'new live sortie keeps aircraft controls enabled');
+});

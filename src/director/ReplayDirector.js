@@ -39,6 +39,9 @@ export class ReplayDirector {
     this.roomEffects = null;
     this._playbackHeld = false;
     this._heldAirport = null;
+    this._loadToken = 0;
+    this._spawningHost = false;
+    this._cancelPendingLoad = null;
   }
 
   /**
@@ -73,6 +76,15 @@ export class ReplayDirector {
     const sim = this.sim;
     if (sim.multiplayer?.active || sim.startingFlight || sim.airportLoading || this.loading) return false;
     this.stop();
+    const loadToken = ++this._loadToken;
+    const cancelled = () => this._loadToken !== loadToken;
+    const abortCancelled = () => {
+      this._releaseReplayAirport();
+      this._disposeRoom();
+      this._scenarioAdapter?.release(); this._scenarioAdapter = null;
+      this._view = null;
+      return false;
+    };
     const view = this._captureView();
     Object.assign(sim.lobby, { airport, aircraft, preset: scenario, demoProfile });
     if (sim.lobby.mapPlan) sim.lobby.mapPlan = null;
@@ -84,10 +96,20 @@ export class ReplayDirector {
         // Rebuild the recorded course without starting another judged arena attempt.
         sim.pilotArena?.stop('replay');
         const { SlalomMissionAdapter } = await import('../arena/SlalomMissionAdapter.js');
+        if (cancelled()) return abortCancelled();
         this._scenarioAdapter = new SlalomMissionAdapter(sim);
         await this._scenarioAdapter.prepare({ seed, pilotKind: 'human' });
+        if (cancelled()) return abortCancelled();
         sim.gameFlow.enterFlight();
-      } else await sim.fly();
+      } else {
+        this._spawningHost = true;
+        try {
+          await sim.fly();
+        } finally {
+          this._spawningHost = false;
+        }
+        if (cancelled()) return abortCancelled();
+      }
       if (track.remotes?.length && sim.gameFlow.state === FLOW.FLIGHT) {
         // Live respawns preserve wreckage. A replay starts a different timeline.
         sim.explosionSystem?.clear();
@@ -97,6 +119,7 @@ export class ReplayDirector {
           this.remotes.push({ visual, sample: {}, seek: {} });
         }
         await Promise.all(this.remotes.map(remote => remote.visual.ready));
+        if (cancelled()) return abortCancelled();
         this.remotes.forEach((remote, index) => {
           remote.events = crashEvents(track, index + 1);
           remote.effects = this.createEffects({ scene: sim.scene, aircraft: remote.visual.model,
@@ -127,7 +150,8 @@ export class ReplayDirector {
         const tileId = airportTileId ?? sim.mapPlaces?.airports?.find?.(entry => entry.code === airportCode)?.tileId;
         registerExternalDestinations([{ code: airportCode, tileId }]);
         if (isExternalDestination(airportCode)) {
-          await this._prepareReplayAirport(airportCode, tileId);
+          await this._prepareReplayAirport(airportCode, tileId, loadToken);
+          if (cancelled()) return abortCancelled();
           if (sim.gameFlow.state !== FLOW.FLIGHT) {
             this._releaseReplayAirport();
             this._view = null;
@@ -141,7 +165,9 @@ export class ReplayDirector {
       this._disposeRoom();
       this._scenarioAdapter?.release(); this._scenarioAdapter = null;
       throw error;
-    } finally { this.loading = false; }
+    } finally {
+      if (this._loadToken === loadToken) this.loading = false;
+    }
     // This sortie exists to host the replay; it is not a flight the pilot flew.
     sim.flightRecorder.active = false;
     sim.replayRecorder.active = false;
@@ -276,7 +302,16 @@ export class ReplayDirector {
   }
 
   stop() {
-    if (!this.active) return;
+    if (!this._spawningHost) {
+      this._loadToken += 1;
+      this.loading = false;
+      this._cancelPendingLoad?.();
+      this._cancelPendingLoad = null;
+    }
+    if (!this.active) {
+      if (!this._spawningHost) this._releaseReplayAirport();
+      return;
+    }
     this.active = false;
     const sim = this.sim;
     this._scenarioAdapter?.release();
@@ -311,9 +346,9 @@ export class ReplayDirector {
     this._syncPlaybackHeld();
   }
 
-  async _prepareReplayAirport(code, tileId) {
+  async _prepareReplayAirport(code, tileId, loadToken) {
     const streamer = this.sim.airportStreamer;
-    if (!streamer || !isExternalDestination(code)) return;
+    if (!streamer || !isExternalDestination(code) || this._loadToken !== loadToken) return;
     streamer.setHome?.(code);
     streamer.holdDestination?.(code);
     this._heldAirport = code;
@@ -322,13 +357,16 @@ export class ReplayDirector {
     const pending = streamer.ensure?.(code, { tileId });
     if (pending && typeof pending.then === 'function') {
       let timer = null;
+      const cancelPromise = new Promise(resolve => { this._cancelPendingLoad = resolve; });
       try {
         await Promise.race([
           pending,
+          cancelPromise,
           new Promise(resolve => { timer = setTimeout(resolve, 6000); }),
         ]);
       } finally {
         if (timer) clearTimeout(timer);
+        if (this._loadToken === loadToken) this._cancelPendingLoad = null;
       }
     }
   }

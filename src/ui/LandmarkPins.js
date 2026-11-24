@@ -43,16 +43,19 @@ export class LandmarkPins {
     if (!visible) return;
     const streamLayer = this.places === undefined ? sim.geographicLandmarkLayer : null;
     const streamVersion = streamLayer?.version ?? 0;
+    const customOrigin = sim.world?.customOrigin ?? sim.currentTerrain?.customOrigin ?? null;
     if (!this.loaded || sim.activeAirport !== this.map || sim.currentTerrain !== this.terrain
       || sim.currentAirport !== this.airport || this.places !== this.loadedPlaces
-      || streamLayer !== this.streamLayer || streamVersion !== this.streamVersion) {
+      || streamLayer !== this.streamLayer || streamVersion !== this.streamVersion
+      || customOrigin !== this.customOrigin) {
       this.map = sim.activeAirport;
       this.terrain = sim.currentTerrain;
       this.airport = sim.currentAirport;
       this.loadedPlaces = this.places;
       this.streamLayer = streamLayer;
       this.streamVersion = streamVersion;
-      const baseRecords = landmarksForMap(this.map, this.terrain, this.airport, this.places);
+      this.customOrigin = customOrigin;
+      const baseRecords = landmarksForMap(this.map, this.terrain, this.airport, this.places, { customOrigin });
       const streamedRecords = streamLayer?.records;
       this.records = streamedRecords?.length
         ? dedupeLandmarks([...baseRecords, ...streamedRecords])

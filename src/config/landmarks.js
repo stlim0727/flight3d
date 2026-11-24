@@ -1,6 +1,6 @@
 import { SIM_CONFIG } from './simConfig.js';
 import { NEON_RIVER, bridgeToWorld } from './neonRiver.js';
-import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { JEJU_ORIGIN, haversineDistanceM } from '../geospatial/CorridorCoordinateSystem.js';
 import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import landmarkPlaces from './landmarkPlaces.json' with { type: 'json' };
@@ -120,7 +120,21 @@ function geographicLandmarks(records, project, terrain) {
   });
 }
 
-export function landmarksForMap(map, terrain, airport, places = LANDMARK_PLACES) {
+export function landmarksForMap(map, terrain, airport, places = LANDMARK_PLACES, options = {}) {
+  const rawCustomOrigin = options?.customOrigin ?? terrain?.customOrigin;
+  const customOrigin = Number.isFinite(rawCustomOrigin?.latitude) && Number.isFinite(rawCustomOrigin?.longitude)
+    ? rawCustomOrigin
+    : null;
+  if (customOrigin) {
+    const nearby = normalizeLandmarkPlaces(places).filter(place =>
+      haversineDistanceM(place.latitude, place.longitude, customOrigin.latitude, customOrigin.longitude) <= 500_000
+    );
+    return geographicLandmarks(
+      nearby,
+      (latitude, longitude) => wgs84ToLocal(latitude, longitude, customOrigin),
+      terrain,
+    );
+  }
   const project = geographicProjections[map]
     ?? (places !== LANDMARK_PLACES && Number.isFinite(terrain?.origin?.latitude) && Number.isFinite(terrain?.origin?.longitude)
       ? (latitude, longitude) => wgs84ToLocal(latitude, longitude, terrain.origin)

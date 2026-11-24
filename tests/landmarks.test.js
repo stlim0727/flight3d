@@ -114,3 +114,23 @@ test('resolveLandmarkHeight tracks terrain height dynamically for groundRelative
   assert.equal(resolveLandmarkHeight(building, terrain), 295);
   assert.equal(resolveLandmarkHeight(peak, terrain), 1947);
 });
+
+test('landmarksForMap uses customOrigin and excludes out-of-hemisphere or distant built-in catalog places', () => {
+  const jfkOrigin = { latitude: 40.6413, longitude: -73.7781 };
+  const terrain = { customOrigin: jfkOrigin, getHeight: () => 5 };
+  // Default Korean catalog places (and antipodal points) must not appear near JFK.
+  assert.deepEqual(landmarksForMap('incheon', terrain), []);
+
+  const antipodalToIncheon = { latitude: -37.4691, longitude: -53.5494 };
+  assert.deepEqual(landmarksForMap('incheon', { customOrigin: antipodalToIncheon, getHeight: () => 0 }), []);
+
+  // Custom catalog places near JFK project cleanly in JFK's tangent plane.
+  const nycPlaces = [
+    { id: 'statue-of-liberty', names: { ko: '자유의 여신상', en: 'Statue of Liberty' },
+      latitude: 40.6892, longitude: -74.0445, elevationM: 93, kinds: ['attraction'], importance: 5 },
+  ];
+  const projected = landmarksForMap('incheon', terrain, {}, nycPlaces);
+  assert.equal(projected.length, 1);
+  assert.ok(projected[0].x < -20000 && projected[0].x > -25000, 'Statue of Liberty is ~22 km west of JFK');
+  assert.ok(projected[0].z < -5000 && projected[0].z > -6000, 'Statue of Liberty is ~5.3 km north of JFK');
+});

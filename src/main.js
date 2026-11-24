@@ -800,7 +800,7 @@ class FlightSimulator {
    * - In PAUSED: resumes flight.
    */
   toggleMainMenu() {
-    if (this.replayDirector.active) { this.replayPanel.exit(); return; }
+    if (this.replayDirector.active || this.replayDirector.loading) { this.replayPanel.exit(); return; }
     if (this.gameFlow.state === FLOW.DEBRIEF) return;
     if (this.gameFlow.state === FLOW.FLIGHT) {
       this.gameFlow.returnToLobby(true);
