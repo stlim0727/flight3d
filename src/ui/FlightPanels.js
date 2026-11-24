@@ -282,6 +282,12 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   }
   cameraSelect.addEventListener('change', () => onSelectCamera(Number(cameraSelect.value)));
   cameraLabel.append(caption, cameraSelect);
+  const lobbyCameraBtn = document.createElement('button');
+  lobbyCameraBtn.id = 'btn-lobby-open-camera-settings';
+  lobbyCameraBtn.className = 'btn';
+  lobbyCameraBtn.type = 'button';
+  bindText(lobbyCameraBtn, () => t('ui.lobbyCamera.openSettings'));
+  settings?.append(cameraLabel, lobbyCameraBtn);
   // Issue #798: the pilot chooses which optional top-menu buttons stay visible.
   // The camera select above always lists every view, so a hidden one stays reachable.
   const optionalItems = toolbarOptionalItems(CAMERA_MODES.map(([, name]) => name));

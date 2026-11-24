@@ -15,6 +15,7 @@ import { loadMapFlightPlaces, mapPlanRegion } from '../config/mapFlightPlaces.js
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
 import { CockpitPovPanel } from './CockpitPovPanel.js';
+import { LobbyCameraModal } from './LobbyCameraModal.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
@@ -744,6 +745,10 @@ class SimulatorHudAndBindingsMethods {
       onAircraft: id => {
         this.lobby.aircraft = id;
         this.lobbyScreen?.refresh();
+        this.lobbyCameraModal?.updateTitle();
+        if (this.lobbyCameraModal?.isOpen) {
+          this.lobbyCameraModal.syncFromCamera();
+        }
       },
       onFly: () => this.fly(),
       onRestart: () => restartFlight(),
@@ -795,6 +800,8 @@ class SimulatorHudAndBindingsMethods {
     document.getElementById('btn-lobby-end')?.addEventListener('click', () => this.endFlight());
     this.developerPanel = new DeveloperPanel(this);
     this.cockpitPovPanel = new CockpitPovPanel(this);
+    this.lobbyCameraModal = new LobbyCameraModal(this);
+    document.getElementById('btn-lobby-open-camera-settings')?.addEventListener('click', () => this.lobbyCameraModal.open());
     document.getElementById('btn-pause-resume')?.addEventListener('click', () => this.gameFlow.resume());
     document.getElementById('btn-pause-restart')?.addEventListener('click', restartFlight);
     document.getElementById('btn-pause-report')?.addEventListener('click', () => this.openFeedbackDialog?.());
