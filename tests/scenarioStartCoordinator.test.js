@@ -4,6 +4,7 @@ import { ScenarioStartCoordinator } from '../src/core/ScenarioStartCoordinator.j
 import { createSimulatorScenarioStart } from '../src/core/simulatorScenarioStart.js';
 import { loadSavedFlightSelection, saveFlightSelection } from '../src/config/flightSelection.js';
 import { saveSimulatorPreferences, loadSimulatorPreferences } from '../src/config/simulatorPreferences.js';
+import { cruisePlaces } from '../src/config/mapFlightPlaces.js';
 import { GameFlowController } from '../src/ui/GameFlowController.js';
 import { recoverSimulatorFlightStart } from '../src/core/simulatorFlightStart.js';
 
@@ -78,6 +79,24 @@ test('pending menu edits during lazy preparation cannot replace the launched sel
   assert.equal(loadSimulatorPreferences().demoProfile, 'standard');
   assert.equal(events.length, 1);
   assert.equal(events[0].pilotMode, 'human');
+}));
+
+test('map-planned cruise keeps the selected point on the active flight', () => withStorage(async () => {
+  const { sim } = simulator();
+  sim.activeAirport = 'incheon';
+  sim.currentAircraftId = 'C172';
+  sim.mapPlaces = { points: cruisePlaces() };
+  sim.applyMapSpawn = () => {};
+  Object.assign(sim.lobby, { airport: 'incheon', aircraft: 'C172', preset: 'cruise' });
+  const start = createSimulatorScenarioStart(sim);
+  for (const pointId of ['busan', 'jamsil']) {
+    sim.lobby.mapPlan = { state: 'cruise', pointId };
+    await start.start();
+    assert.equal(sim.activeMapPlace.pointId, pointId);
+  }
+  sim.lobby.mapPlan = null;
+  await start.start();
+  assert.equal(sim.activeMapPlace, null);
 }));
 
 test('scenario failure leaves saved flight/preferences and flight-start analytics untouched', () => withStorage(async () => {

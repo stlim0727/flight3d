@@ -236,7 +236,9 @@ class SimulatorHudAndBindingsMethods {
     if (fuel) fuel.textContent = `${Math.round(Math.max(0, Math.min(100, 100 * (this.telemetry.fuelKg || 0) / this.engines.fuelCapacityKg)))}%`;
     const map = document.getElementById('pilotage-map');
     if (map) {
-      const available = this.currentAircraftId === 'C172' && this.lastPresetType === 'busan'
+      const busanCruise = this.lastPresetType === 'busan'
+        || (this.lastPresetType === 'cruise' && this.activeMapPlace?.pointId === 'busan');
+      const available = this.currentAircraftId === 'C172' && busanCruise
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) {
         map.hidden = !available;
