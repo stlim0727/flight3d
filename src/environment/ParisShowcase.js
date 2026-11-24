@@ -90,6 +90,25 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
         [Math.abs(p1[0] - p0[0]) + 6, Math.abs(p1[1] - p0[1]) + 6, Math.abs(p1[2] - p0[2]) + 6]));
     }
   }
+  // Near/mid models carry large X diagonals; short boxes follow each member
+  // without filling the open span between the legs.
+  const braceSegments = 8;
+  for (const [bottom, top] of [[0, 57], [57, 115]]) {
+    for (let face = 0; face < 4; face++) {
+      const next = (face + 1) % 4;
+      const low = archCorner(bottom + 6), high = archCorner(top - 6);
+      for (const [a, b] of [[low[face], high[next]], [low[next], high[face]]]) {
+        for (let step = 0; step < braceSegments; step++) {
+          const t0 = step / braceSegments, t1 = (step + 1) / braceSegments;
+          const p0 = a.map((value, i) => value + (b[i] - value) * t0);
+          const p1 = a.map((value, i) => value + (b[i] - value) * t1);
+          solids.push(solid(`brace-${bottom}-${face}-${a[0]}-${step}`, 'Eiffel Tower X brace',
+            [base.x + (p0[0] + p1[0]) / 2, base.y + (p0[1] + p1[1]) / 2, base.z + (p0[2] + p1[2]) / 2],
+            [Math.abs(p1[0] - p0[0]) + 4, Math.abs(p1[1] - p0[1]) + 4, Math.abs(p1[2] - p0[2]) + 4]));
+        }
+      }
+    }
+  }
   for (const [bottom, top, width, part] of [
     [59, 115, 28, 'tower shaft'],
     [116, 276, 16, 'upper tower'],
@@ -264,26 +283,33 @@ export function updateParisShowcase(sim) {
     if (sim.currentTerrain?.parisShowcase === current) delete sim.currentTerrain.parisShowcase;
   }
   if (!active || !sim.currentTerrain?.mesh) {
+    sim.parisShowcaseGeneration = (sim.parisShowcaseGeneration ?? 0) + 1;
     sim.parisShowcasePending = null;
     return;
   }
   if (!sim.parisShowcase) {
     const clearPending = () => { sim.parisShowcasePending = null; };
-    sim.parisShowcasePending ??= loadEiffelKit().then(kit => {
-      if (!isParisShowcaseOrigin(sim.world?.customOrigin)) { clearPending(); return null; }
-      const showcase = new ParisShowcase(kit, sim.world.customOrigin);
-      sim.currentTerrain.mesh.add(showcase.group);
-      sim.parisShowcase = showcase;
-      sim.currentTerrain.parisShowcase = showcase;
-      clearPending();
-      // Rebuild streamed buildings so the generic tower gives way to the GLB.
-      const buildings = sim.currentTerrain.geographicBuildingLayer;
-      buildings?.dispose();
-      if (sim.geographicBuildingLayer === buildings) sim.geographicBuildingLayer = null;
-      sim.currentTerrain.geographicBuildingLayer = null;
-      return showcase;
-    }).catch(error => { clearPending(); console.warn('Paris showcase failed to load:', error); });
+    if (!sim.parisShowcasePending) {
+      const generation = sim.parisShowcaseGeneration = (sim.parisShowcaseGeneration ?? 0) + 1;
+      sim.parisShowcasePending = loadEiffelKit().then(kit => {
+        if (sim.parisShowcaseGeneration !== generation
+          || !isParisShowcaseOrigin(sim.world?.customOrigin)) { clearPending(); return null; }
+        if (sim.parisShowcase) { clearPending(); return sim.parisShowcase; }
+        const showcase = new ParisShowcase(kit, sim.world.customOrigin);
+        sim.currentTerrain.mesh.add(showcase.group);
+        sim.parisShowcase = showcase;
+        sim.currentTerrain.parisShowcase = showcase;
+        clearPending();
+        // Rebuild streamed buildings so the generic tower gives way to the GLB.
+        const buildings = sim.currentTerrain.geographicBuildingLayer;
+        buildings?.dispose();
+        if (sim.geographicBuildingLayer === buildings) sim.geographicBuildingLayer = null;
+        sim.currentTerrain.geographicBuildingLayer = null;
+        return showcase;
+      }).catch(error => { clearPending(); console.warn('Paris showcase failed to load:', error); });
+    }
     return;
   }
   sim.parisShowcase.update(sim);
 }
+

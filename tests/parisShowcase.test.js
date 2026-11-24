@@ -8,7 +8,7 @@ import {
 } from '../src/config/parisShowcase.js';
 import {
   EIFFEL_LOD_LEVELS, ParisShowcase, createEiffelTower,
-  eiffelCollisionSolids, validateEiffelKit,
+  eiffelCollisionSolids, updateParisShowcase, validateEiffelKit,
 } from '../src/environment/ParisShowcase.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 import { GeographicBuildings } from '../src/environment/GeographicBuildings.js';
@@ -78,7 +78,7 @@ test('collision envelopes leave the arch open but cover legs, decks and antenna'
   assert.equal(hits(new THREE.Vector3(10, 45, -20)), false, 'no phantom solid under the arch');
   assert.equal(hits(new THREE.Vector3(10, 100, -20)), true, 'first deck is solid');
   assert.equal(hits(new THREE.Vector3(10 + 30, 35 + 57, -20)), true, 'first deck slab spans 74 m');
-  assert.equal(hits(new THREE.Vector3(10, 35 + 32, -20 + 55.4)), true, 'lower arch member is solid');
+  assert.equal(hits(new THREE.Vector3(10 + 18.553, 35 + 28.5, -20 + 38.5)), true, 'lower X brace is solid');
 
 });
 test('showcase placement uses one ground height for visuals, exclusion and collision', () => {
@@ -100,6 +100,44 @@ test('showcase placement uses one ground height for visuals, exclusion and colli
   assert.equal(missing.place({ getHeight: () => undefined }), false);
   missing.dispose();
   showcase.dispose();
+});
+
+test('leaving Paris while the GLB loads invalidates the previous creation callback', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalRequest = globalThis.Request;
+  globalThis.Request = class extends originalRequest {
+    constructor(input, init) {
+      super(typeof input === 'string' && input.startsWith('/') ? `http://localhost${input}` : input, init);
+    }
+  };
+  const originalProgressEvent = globalThis.ProgressEvent;
+  globalThis.ProgressEvent = class extends Event {
+    constructor(type, init = {}) { super(type); Object.assign(this, init); }
+  };
+  const glb = readFileSync(new URL('../public/models/landmarks/eiffel-tower.glb', import.meta.url));
+  globalThis.fetch = async () => new Response(glb, { status: 200, headers: { 'content-type': 'model/gltf-binary' } });
+  const mesh = new THREE.Group();
+  const sim = {
+    world: { customOrigin: PARIS_SHOWCASE_ORIGIN },
+    currentTerrain: { mesh, getHeight: () => 35 },
+    camera: new THREE.PerspectiveCamera(),
+  };
+  try {
+    updateParisShowcase(sim);
+    const first = sim.parisShowcasePending;
+    assert.ok(first, 'first load started');
+    sim.world.customOrigin = { latitude: 37.5, longitude: 127 };
+    updateParisShowcase(sim);
+    sim.world.customOrigin = PARIS_SHOWCASE_ORIGIN;
+    updateParisShowcase(sim);
+    await Promise.all([first, sim.parisShowcasePending]);
+    assert.equal(mesh.children.length, 1, 'stale callback must not add a second showcase');
+    sim.parisShowcase?.dispose();
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Request = originalRequest;
+    globalThis.ProgressEvent = originalProgressEvent;
+  }
 });
 
 test('building exclusion receives the footprint corners', () => {
