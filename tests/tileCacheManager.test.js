@@ -107,6 +107,9 @@ test('TileCacheManager dispose aborts in-flight requests and resolves null', asy
   };
 
   const pending = manager.getTileImage(10, 5, 5);
+  // The shared scheduler dispatches queued work in a microtask; wait for the
+  // fetch to become active so dispose has a controller to abort.
+  await new Promise(resolve => setTimeout(resolve, 0));
   manager.dispose();
   const res = await pending;
 

@@ -8,6 +8,7 @@
  * - Request deduplication for simultaneous tile requirements
  * - Graceful fallback on network timeout or CORS failures
  */
+import { createTileScheduler } from '@stlim0727/flightsim-core/tile/TileScheduler.js';
 
 const DEFAULT_CDN_TEMPLATE = 'https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const DEFAULT_TIMEOUT_MS = 6000;
@@ -31,18 +32,10 @@ export class TileCacheManager {
     this.enableBrowserCache = options.enableBrowserCache ?? true;
 
     this.memoryCache = new Map(); // key -> HTMLImageElement / ImageBitmap / ImageBuffer
-    this.inFlight = new Map(); // key -> Promise
-    this.requestQueue = [];
-    this.activeRequests = 0;
     this.activeAbortControllers = new Set();
     this.disposed = false;
-
-    this.metrics = {
-      hits: 0,
-      misses: 0,
-      networkRequests: 0,
-      errors: 0,
-    };
+    this.metrics = { hits: 0, errors: 0, networkRequests: 0 };
+    this.scheduler = createTileScheduler({ maxConcurrent: this.maxConcurrent });
   }
 
   getTileKey(z, x, y) {
@@ -78,57 +71,22 @@ export class TileCacheManager {
       return cached;
     }
 
-    // 2. De-duplicate in-flight requests
-    if (this.inFlight.has(key)) {
-      return this.inFlight.get(key);
-    }
-
-    const promise = this._queueTileRequest(z, x, y, key);
-    this.inFlight.set(key, promise);
-
+    // 2. Scheduler owns dedup, queueing and concurrency for the same tile key.
+    const promise = this.scheduler.schedule(
+      key,
+      { z, x, y, key },
+      tile => this._fetchTile(tile.z, tile.x, tile.y, tile.key)
+    );
     try {
       return await promise;
-    } finally {
-      this.inFlight.delete(key);
-    }
-  }
-
-  _queueTileRequest(z, x, y, key) {
-    return new Promise((resolve) => {
-      this.requestQueue.push({
-        z,
-        x,
-        y,
-        key,
-        resolve,
-      });
-      this._drainQueue();
-    });
-  }
-
-  async _drainQueue() {
-    if (this.activeRequests >= this.maxConcurrent || this.requestQueue.length === 0) {
-      return;
-    }
-
-    this.activeRequests++;
-    const task = this.requestQueue.shift();
-
-    try {
-      const result = await this._fetchTile(task.z, task.x, task.y, task.key);
-      task.resolve(result);
     } catch {
       this.metrics.errors++;
-      task.resolve(null); // Never throw: always resolve null so caller can fallback
-    } finally {
-      this.activeRequests--;
-      this._drainQueue();
+      return null; // Always give callers a safe offline fallback.
     }
   }
 
   async _fetchTile(z, x, y, key) {
     if (this.disposed) return null;
-    this.metrics.misses++;
     const url = this.getTileUrl(z, x, y);
 
     // 1. Try Browser Cache API if available
@@ -235,11 +193,15 @@ export class TileCacheManager {
    * Current performance and memory metrics.
    */
   getMetrics() {
+    const stats = this.scheduler.stats();
     return {
-      ...this.metrics,
+      hits: this.metrics.hits,
+      misses: stats.misses,
+      networkRequests: this.metrics.networkRequests,
+      errors: this.metrics.errors,
       cachedTilesCount: this.memoryCache.size,
-      inFlightCount: this.inFlight.size,
-      queuedCount: this.requestQueue.length,
+      inFlightCount: this.scheduler.inFlightCount(),
+      queuedCount: stats.queued,
       estimatedMemoryBytes: this.memoryCache.size * 256 * 256 * 4,
     };
   }
@@ -249,10 +211,6 @@ export class TileCacheManager {
    */
   dispose() {
     this.disposed = true;
-    for (const task of this.requestQueue) {
-      task.resolve(null);
-    }
-    this.requestQueue = [];
     for (const ctrl of this.activeAbortControllers) {
       try {
         ctrl.abort();
@@ -260,7 +218,6 @@ export class TileCacheManager {
     }
     this.activeAbortControllers.clear();
     this.memoryCache.clear();
-    this.inFlight.clear();
-    this.activeRequests = 0;
+    this.scheduler.dispose();
   }
 }
