@@ -80,8 +80,8 @@ Imagery contributors; attribution is available from the linked service.
 
 ## Near-surface rendering
 
-The satellite imagery retains its georeferenced UVs. `luklaSurfaceMaterial.js`
-adds distance-faded, metre-scale procedural color variation and surface-gradient
+The satellite imagery retains its georeferenced UVs. `createRasterSurfaceMaterial()`
+in `RasterRegionSurface.js` adds distance-faded, metre-scale procedural color variation and surface-gradient
 bump shading. Steep slopes receive stronger rock strata; gentler slopes retain
 a grass tint. Three-dimensional local-metre sampling avoids stretched detail on
 cliffs and seams between the regional and airport terrace meshes. This detail

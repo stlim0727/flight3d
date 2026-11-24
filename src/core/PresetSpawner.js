@@ -685,8 +685,8 @@ class PresetSpawnerMethods {
     });
     if (this.luklaTerrain) world.register('lukla', {
       terrain: this.luklaTerrain,
-      airport: this.luklaAirport,
-      group: this.luklaAirport.group,
+      airport: this.luklaTerrain,
+      group: null,
       mesh: this.luklaTerrain.mesh,
       extent: REGION_EXTENTS.lukla,
     });
@@ -791,7 +791,7 @@ class PresetSpawnerMethods {
   spawnAirportFor(id) {
     return id === 'incheon' ? this.incheonAirport
       : id === 'jeju' ? this.jejuAirportFacade
-      : id === 'lukla' ? this.luklaAirport
+      : id === 'lukla' ? (this.airportStreamer?.regionFor?.('VNLK')?.airport ?? null)
       : id === 'neon' ? this.neonCity?.airport
       : id === 'valley' ? null
       : this.airport;
@@ -957,26 +957,20 @@ class PresetSpawnerMethods {
   }
 
   async ensureLuklaRegion() {
-    if (this.luklaTerrain && this.luklaAirport) return this.luklaAirport;
-    this._luklaLoad ??= Promise.all([
-      import('../environment/RasterRegionSurface.js'),
-      import('../environment/luklaSurfaceMaterial.js'),
-      import('../environment/LuklaAirport.js'),
-    ]).then(([{ RasterRegionSurface }, { luklaSurfaceMaterial }, { LuklaAirport }]) => {
-      const config = REGION_SURFACES.lukla;
-      this.luklaTerrain = new RasterRegionSurface(config, {
-        createMaterial: texture => luklaSurfaceMaterial(texture),
-        castShadow: mesh => castFarSunShadow(mesh),
+    if (this.luklaTerrain) return this.luklaTerrain;
+    this._luklaLoad ??= import('../environment/RasterRegionSurface.js')
+      .then(({ RasterRegionSurface }) => {
+        this.luklaTerrain = new RasterRegionSurface(REGION_SURFACES.lukla, {
+          castShadow: mesh => castFarSunShadow(mesh),
+        });
+        this.luklaTerrain.mesh.visible = false;
+        this.scene?.add(this.luklaTerrain.mesh);
+        return this.luklaTerrain;
+      })
+      .catch(error => {
+        this._luklaLoad = null;
+        throw error;
       });
-      this.luklaAirport = new LuklaAirport();
-      this.luklaTerrain.mesh.visible = false;
-      this.luklaAirport.group.visible = false;
-      this.scene?.add(this.luklaTerrain.mesh, this.luklaAirport.group);
-      return this.luklaAirport;
-    }).catch(error => {
-      this._luklaLoad = null;
-      throw error;
-    });
     return this._luklaLoad;
   }
 
@@ -1032,7 +1026,7 @@ class PresetSpawnerMethods {
 
   _isRegionLoaded(id) {
     if (id === 'coastal') return Boolean(this.terrain && this.airport);
-    if (id === 'lukla') return Boolean(this.luklaTerrain && this.luklaAirport);
+    if (id === 'lukla') return Boolean(this.luklaTerrain);
     if (id === 'incheon') return Boolean(this.incheonAirport);
     if (id === 'jeju') return Boolean(this.jejuSurface);
     if (id === 'neon') return Boolean(this.neonCity);
@@ -1042,7 +1036,7 @@ class PresetSpawnerMethods {
 
   _isRegionLoadingOrLoaded(id) {
     if (id === 'coastal') return Boolean((this.terrain && this.airport) || this._coastalLoad);
-    if (id === 'lukla') return Boolean((this.luklaTerrain && this.luklaAirport) || this._luklaLoad);
+    if (id === 'lukla') return Boolean(this.luklaTerrain || this._luklaLoad);
     if (id === 'incheon') return Boolean(this.incheonAirport || this.incheonLoad);
     if (id === 'jeju') return Boolean(this.jejuSurface);
     if (id === 'neon') return Boolean(this.neonCity || this._neonLoad);
@@ -1203,7 +1197,6 @@ class PresetSpawnerMethods {
     if (this.foliage?.group) this.foliage.group.visible = isCoastal;
 
     if (this.luklaTerrain?.mesh) this.luklaTerrain.mesh.visible = isLukla;
-    if (this.luklaAirport?.group) this.luklaAirport.group.visible = isLukla;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
     if (this.neonCity?.group) this.neonCity.group.visible = isNeon;
@@ -1215,7 +1208,7 @@ class PresetSpawnerMethods {
       : this.terrain;
     this.currentAirport = isNeon ? this.neonCity.airport
       : isIncheon ? this.incheonAirport
-      : isLukla ? this.luklaAirport
+      : isLukla ? this.spawnAirportFor('lukla')
       : isValley ? null
       : this.airport;
     this.syncUnifiedWorld(id);
@@ -1259,8 +1252,15 @@ class PresetSpawnerMethods {
           );
         }
       } else if (isLukla) {
-        const t = this.luklaAirport.controlTowerData;
-        this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
+        const tower = getAirportOverride('VNLK')?.facilities?.find(f => f.kind === 'tower');
+        if (tower) {
+          const [ox, oz] = this.world.offsets.get('VNLK') ?? [0, 0];
+          this.cameraSystem.towerPos.set(
+            tower.position[0] + ox,
+            tower.position[1] + tower.height + (tower.cabHeight ?? 8) / 2,
+            tower.position[2] + oz,
+          );
+        }
       } else {
         this.cameraSystem.towerPos.set(120, 78, 280);
       }

@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
+import { RasterRegionSurface } from '../src/environment/RasterRegionSurface.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { createValleyManifest, projectValleyPosition, valleyLegs } from '../src/arena/valleyCourse.js';
 import { ValleyMission } from '../src/arena/ValleyMission.js';
 
@@ -33,7 +34,7 @@ function flyStraight({ agl = () => 15, revisit = false } = {}) {
 test('declared route follows measured terrain outside the airport and ends in open recovery terrain', () => {
   const bytes = readFileSync(new URL('../public/terrain/lukla_dem.bin', import.meta.url));
   const elevations = new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4);
-  const terrain = new LuklaTerrain(undefined, 8, elevations);
+  const terrain = new RasterRegionSurface(REGION_SURFACES.lukla, { elevations, load: false });
   const m = createValleyManifest();
   assert.ok(m.courseLengthM > 5500 && m.courseLengthM < 6000);
   assert.ok(m.course.points.every(p => Math.hypot(p.x, p.z) > 1500));
@@ -45,7 +46,7 @@ test('declared route follows measured terrain outside the airport and ends in op
     const z = finish.z + last.dz / last.lengthM * distance;
     assert.ok(terrain.getHeight(x, z) < finishHeight + 30, 'finish must not aim immediately into a rising wall');
   }
-  terrain.geometry.dispose(); terrain.localTerraceGeometry.dispose(); terrain.mesh.material.dispose();
+  terrain.dispose();
 });
 
 test('ordered plane crossings and complete distance coverage determine completion', () => {

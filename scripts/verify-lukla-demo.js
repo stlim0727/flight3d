@@ -81,11 +81,28 @@ async function testLuklaDemo() {
       return res?.result?.value;
     };
 
+    // The demo now runs on the common streamed VNLK surface; stage checks are
+    // only meaningful once that region's runway has actually been mounted.
+    const waitForVnlkRegion = async () => {
+      for (let attempt = 0; attempt < 80; attempt++) {
+        const ready = await evalJs(`(() => {
+          const sim = window.simulator;
+          const region = sim.airportStreamer?.regionFor?.('VNLK');
+          return Boolean(sim.activeAirport === 'lukla' && sim.currentAirport?.isLoaded &&
+            region?.airport?.terrain?.runways?.length);
+        })()`);
+        if (ready) return;
+        await new Promise(resolve => setTimeout(resolve, 250));
+      }
+      throw new Error('VNLK streamed airport region never became ready');
+    };
+
     await send('Page.enable');
     await send('Runtime.enable');
 
     console.log('⏳ Waiting 4s for simulator to initialize WebGL...');
     await new Promise(r => setTimeout(r, 4000));
+    await waitForVnlkRegion();
 
     // Verify initial airport is Lukla and demo flight is active
     const state = await evalJs(`

@@ -1,12 +1,10 @@
 import * as THREE from 'three';
-import { readFileSync } from 'node:fs';
 import { Aerodynamics, createAeroResult } from '../../src/physics/Aerodynamics.js';
 import { EngineModel } from '../../src/physics/EngineModel.js';
 import { LandingGear } from '../../src/physics/LandingGear.js';
 import { FlightControls } from '../../src/controls/FlightControls.js';
 import { F16_FALCON } from '../../src/config/aircraftConfigs.js';
-import { LuklaTerrain } from '../../src/environment/LuklaTerrain.js';
-import { LuklaAirport } from '../../src/environment/LuklaAirport.js';
+import { createLuklaFixture } from './luklaFixture.js';
 import { CollisionDetector } from '../../src/physics/CollisionDetector.js';
 import { installPhysicsIntegrator } from '../../src/core/PhysicsIntegrator.js';
 import { installPresetSpawner } from '../../src/core/PresetSpawner.js';
@@ -21,10 +19,7 @@ installPresetSpawner(PhysicsHost);
 
 /** Real 120 Hz controls, forces, contacts, DEM and airport collisions; no renderer. */
 export function flyF16Lukla({ Scenario = F16LuklaScenario, maxSeconds = 300 } = {}) {
-  const bytes = readFileSync(new URL('../../public/terrain/lukla_dem.bin', import.meta.url));
-  const terrain = new LuklaTerrain(undefined, 16,
-    new Float32Array(bytes.buffer, bytes.byteOffset, bytes.length / 4));
-  const airport = new LuklaAirport();
+  const { terrain, airport } = createLuklaFixture();
   const sim = new PhysicsHost();
   const stages = [], cameras = [];
   Object.assign(sim, {

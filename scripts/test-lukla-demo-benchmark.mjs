@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 
 const PORT = Number(process.env.PORT || 5173);
 const CDP_PORT = Number(process.env.CDP_PORT || 9488);
-const SIM_URL = `http://127.0.0.1:${PORT}/`;
+const SIM_URL = `http://127.0.0.1:${PORT}/?terrain=lukla&scenario=demo`;
 const ARTIFACT_DIR = path.resolve(process.env.ARTIFACT_DIR || '.tmp/lukla-physics');
 const screenshots = process.argv.includes('--screenshots');
 const rootExecution = process.getuid?.() === 0;
@@ -67,11 +67,12 @@ async function main() {
     // A test-only second start() after loading would hide a broken startup path.
     await send('Fetch.enable', { patterns: [{ urlPattern: '*/terrain/lukla_dem.bin', requestStage: 'Request' }] });
     await send('Page.navigate', { url: SIM_URL });
+    await send('Page.bringToFront');
     let startupPending;
     for (let i = 0; i < 100 && !startupPending; i++) {
       startupPending = await evaluate(`(() => {
         const sim = window.simulator;
-        if (!sim) return null;
+        if (!sim?.luklaTerrain || !sim.demoDirector?.luklaScenario) return null;
         return { loaded: sim.luklaTerrain.isLoaded, active: sim.demoDirector.isActive,
           waiting: sim.demoDirector.waitingForTerrain, outcome: sim.demoDirector.luklaScenario.result.status };
       })()`);
@@ -95,21 +96,38 @@ async function main() {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     })()`);
-    const cancellations = await evaluate(`(() => {
+    await evaluate(`(() => {
       const sim = window.simulator;
       sim.clock.getDelta = () => 0;
       sim.physicsAccumulator = 0;
       sim.gameFlow.enterFlight();
-      return ['escape', 'preset', 'airport'].map(action => {
-        sim.demoDirector.start('lukla');
-        const before = sim.demoDirector.luklaScenario.result.status;
-        if (action === 'escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-        if (action === 'preset') sim.setPreset('runway');
-        if (action === 'airport') sim.setAirport('coastal');
-        return { action, before, active: sim.demoDirector.isActive,
-          outcome: sim.demoDirector.luklaScenario.result.status };
-      });
+      return true;
     })()`);
+    const cancellations = [];
+    for (const action of ['escape', 'preset', 'airport']) {
+      const before = await evaluate(`(() => {
+        window.simulator.demoDirector.start('lukla');
+        return window.simulator.demoDirector.luklaScenario.result.status;
+      })()`);
+      await evaluate(`(() => {
+        const sim = window.simulator;
+        if ('${action}' === 'escape') window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        if ('${action}' === 'preset') sim.setPreset('runway');
+        if ('${action}' === 'airport') sim.setAirport('coastal');
+        return true;
+      })()`);
+      let result = null;
+      for (let i = 0; i < 30 && !result; i++) {
+        result = await evaluate(`(() => {
+          const director = window.simulator.demoDirector;
+          return director.isActive || director.luklaScenario.result.status === 'pending' ? null
+            : { active: director.isActive, outcome: director.luklaScenario.result.status };
+        })()`);
+        if (!result) await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      cancellations.push({ action, before, active: result?.active ?? true,
+        outcome: result?.outcome ?? 'pending' });
+    }
     for (const cancellation of cancellations) {
       assert.equal(cancellation.before, 'running');
       assert.equal(cancellation.active, false);
@@ -117,63 +135,57 @@ async function main() {
     }
     const reports = [];
     for (let run = 0; run < repetitions; run++) {
-      await evaluate(`(() => {
+      // Step the circuit in one browser task: interleaving CDP round-trips with
+      // the live frame loop lets the lobby restart a finished demo between runs.
+      const report = await evaluate(`(async () => {
         const sim = window.simulator;
-        // Freeze wall-clock advance only. stepSimulation still uses the actual
-        // director, controls, terrain, forces, collision and 120 Hz integration.
         sim.clock.getDelta = () => 0;
         sim.physicsAccumulator = 0;
-        sim.setAirport('lukla');
+        await sim.setAirport('lukla');
+        sim.gameFlow.enterFlight();
         sim.demoDirector.start('lukla');
+        const metrics = { stallFrames: 0, maxAlpha: 0, stages: [], touchdowns: [], finite: true };
         const original = sim.integratePhysics.bind(sim);
-        window.luklaMetrics = { stallFrames: 0, maxAlpha: 0, stages: [], touchdowns: [], finite: true };
         sim.integratePhysics = function(dt) {
           original(dt);
-          const m = window.luklaMetrics;
-          m.stallFrames += this.aero.isStalled ? 1 : 0;
-          m.maxAlpha = Math.max(m.maxAlpha, this.aero.alpha * 180 / Math.PI);
-          m.finite &&= [...this.position, ...this.linearVelocity, ...this.angularVelocity].every(Number.isFinite);
+          metrics.stallFrames += this.aero.isStalled ? 1 : 0;
+          metrics.maxAlpha = Math.max(metrics.maxAlpha, this.aero.alpha * 180 / Math.PI);
+          metrics.finite &&= [...this.position, ...this.linearVelocity, ...this.angularVelocity].every(Number.isFinite);
           const stage = this.demoDirector.currentStage;
-          if (m.stages.at(-1) !== stage) m.stages.push(stage);
+          if (metrics.stages.at(-1) !== stage) metrics.stages.push(stage);
           if (this.demoDirector.luklaScenario.result.airborne && this.gear.touchdownEvent) {
-            m.touchdowns.push({ speedKt: this.telemetry.iasKnots,
+            metrics.touchdowns.push({ speedKt: this.telemetry.iasKnots,
               contacts: this.gear.contacts.filter(c => c.touchdownThisFrame).map(c => c.id) });
           }
         };
-        window.restoreLuklaIntegration = () => { sim.integratePhysics = original; };
-      })()`);
-      const captured = new Set();
-      let final;
-      for (let slice = 0; slice < 960; slice++) {
-        const state = await evaluate(`(() => {
-          const sim = window.simulator;
+        let slices = 0;
+        for (; slices < 960; slices++) {
           sim.stepSimulation(0.25);
-          return { active: sim.demoDirector.isActive, crashed: sim.isCrashed,
-            stage: sim.demoDirector.currentStage, outcome: sim.demoDirector.luklaScenario.result.status };
-        })()`);
-        if (screenshots && run === 0 && [1, 2, 4].includes(state.stage) && !captured.has(state.stage)) {
-          captured.add(state.stage);
-          await evaluate('window.simulator.renderer.render(window.simulator.scene, window.simulator.camera)');
-          const shot = await send('Page.captureScreenshot', { format: 'png' });
-          fs.writeFileSync(path.join(ARTIFACT_DIR, `stage-${state.stage}.png`), Buffer.from(shot.data, 'base64'));
+          const d = sim.demoDirector;
+          if (sim.isCrashed || !d.isActive
+            || ['completed', 'cancelled', 'failed'].includes(d.luklaScenario.result.status)) break;
         }
-        if (state.crashed || !state.active) { final = state; break; }
-      }
-      const report = await evaluate(`(() => {
-        const sim = window.simulator;
         const result = structuredClone(sim.demoDirector.luklaScenario.result);
         const stop = sim.position.clone();
         sim.stepSimulation(10);
         const s = sim.position.x * 0.848048 - sim.position.z * 0.529919;
-        return { ...window.luklaMetrics, result, maxImpact: sim.gear.maxImpactSpeed,
+        sim.integratePhysics = original;
+        return { ...metrics, result, slices, maxImpact: sim.gear.maxImpactSpeed,
           remainingRunwayM: 263.5 - s, holdDriftM: sim.position.distanceTo(stop),
           speedMs: sim.linearVelocity.length(), gearFailure: sim.gear.failure,
-          crashed: sim.isCrashed, parkingBrake: sim.controls.parkingBrake };
+          crashed: sim.isCrashed, parkingBrake: sim.controls.parkingBrake,
+          gates: { flow: sim.gameFlow.state, starting: sim.startingFlight,
+            blocks: sim.devRunner?.blocksPhysics, restart: sim.demoDirector.isRestartConfirmOpen,
+            loaded: sim.currentTerrain?.isLoaded, waiting: sim.demoDirector.waitingForTerrain } };
       })()`);
-      await evaluate('window.restoreLuklaIntegration()');
+      if (screenshots && run === 0) {
+        await evaluate('window.simulator.renderer.render(window.simulator.scene, window.simulator.camera)');
+        const shot = await send('Page.captureScreenshot', { format: 'png' });
+        fs.writeFileSync(path.join(ARTIFACT_DIR, 'final-stage.png'), Buffer.from(shot.data, 'base64'));
+      }
       reports.push(report);
       fs.writeFileSync(path.join(ARTIFACT_DIR, 'report.json'), JSON.stringify({ renderer, startup, reports }, null, 2));
-      assert.ok(final, 'Circuit timed out; screenshots or stage changes cannot count as success');
+      assert.ok(report.slices < 960, 'Circuit timed out; stage changes cannot count as success');
       assert.equal(report.result.status, 'completed', JSON.stringify(report));
       assert.equal(report.crashed, false);
       assert.equal(report.gearFailure, null);

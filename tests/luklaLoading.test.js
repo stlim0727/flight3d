@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
+import { RasterRegionSurface } from '../src/environment/RasterRegionSurface.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
+
+const config = REGION_SURFACES.lukla;
 
 test('DEM loading exposes terminal failures and can recover on an explicit retry', async t => {
   const previousWindow = globalThis.window;
@@ -13,22 +16,32 @@ test('DEM loading exposes terminal failures and can recover on an explicit retry
   for (const [name, response, error] of [
     ['HTTP error', async () => ({ ok: false, status: 503 }), /HTTP 503/],
     ['network rejection', async () => { throw new Error('Network unavailable'); }, /Network unavailable/],
-    ['invalid grid', async () => ({ ok: true, arrayBuffer: async () => new Float32Array([1]).buffer }), /Invalid Lukla DEM grid/]
+    ['invalid grid', async () => ({ ok: true, arrayBuffer: async () => new Float32Array([1]).buffer }),
+      /Invalid DEM grid/]
   ]) {
     await t.test(name, async st => {
-      const terrain = { isLoaded: false, loadError: null, gridSize: 2,
-        textureLoader: { load() {} }, updateGeometryElevations() {},
-        onLoaded() { this.loadedCallbacks = (this.loadedCallbacks || 0) + 1; } };
-      st.mock.method(globalThis, 'fetch', response);
-      await LuklaTerrain.prototype.loadRealWorldAssets.call(terrain);
-      assert.equal(terrain.isLoaded, false);
-      assert.match(terrain.loadError, error);
-      assert.equal(terrain.loadedCallbacks, undefined);
-      globalThis.fetch = async () => ({ ok: true, arrayBuffer: async () => new Float32Array([1, 2, 3, 4]).buffer });
-      await LuklaTerrain.prototype.loadRealWorldAssets.call(terrain);
-      assert.equal(terrain.isLoaded, true);
-      assert.equal(terrain.loadError, null);
-      assert.equal(terrain.loadedCallbacks, 1);
+      const surface = new RasterRegionSurface(config, { load: false });
+      // Keep this test about DEM loading; imagery uses a separate loader.
+      surface.imageryUrl = '';
+      let loadedCallbacks = 0;
+      surface.onLoaded = () => { loadedCallbacks += 1; };
+
+      await surface.loadAssets(response);
+      assert.equal(surface.isLoaded, false);
+      assert.match(surface.loadError, error);
+      assert.equal(loadedCallbacks, 0);
+
+      const recover = async () => ({
+        ok: true,
+        arrayBuffer: async () => new Float32Array(config.gridSize * config.gridSize)
+          .fill(config.runway.midElevationM).buffer,
+      });
+      await surface.loadAssets(recover);
+      assert.equal(surface.isLoaded, true);
+      assert.equal(surface.loadError, null);
+      assert.equal(loadedCallbacks, 1);
+      assert.equal(surface.getNaturalHeight(0, 0), config.runway.midElevationM);
+      surface.dispose();
     });
   }
 });

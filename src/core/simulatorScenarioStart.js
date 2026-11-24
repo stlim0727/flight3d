@@ -82,10 +82,6 @@ export function createSimulatorScenarioStart(sim) {
           && ['runway', 'cliff', 'approach'].includes(request.scenario)) {
           sim.airportStreamer?.setHome?.('VNLK');
           await waitForStreamedAirport(sim, 'VNLK');
-          if (sim.airportStreamer?.regionFor?.('VNLK')) {
-            registerHandoff('VNLK', [sim.luklaAirport?.runwayGroup
-              ?? sim.luklaAirport?.group?.getObjectByName?.('legacy-sloped-runway')]);
-          }
         }
         if (!request.mapPlan && request.airport === 'incheon'
           && ['runway', 'approach', 'challenge'].includes(request.scenario)) {

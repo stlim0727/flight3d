@@ -58,5 +58,18 @@ export const REGION_SURFACES = Object.freeze({
       depressionM: 0.5,
       coarseDepressionM: 10,
     }),
+    contact: Object.freeze({
+      apron: Object.freeze({
+        s: Object.freeze([15, 105]),
+        w: Object.freeze([12, 52]),
+        safetyS: Object.freeze([10, 110]),
+        safetyW: Object.freeze([8, 58]),
+      }),
+      departureCorridor: Object.freeze({
+        s: Object.freeze([-400, -265]),
+        halfWidthM: 30,
+        safetyHalfWidthM: 35,
+      }),
+    }),
   }),
 });

@@ -49,13 +49,70 @@ try {
   await call('Emulation.setDeviceMetricsOverride', { width: 1200, height: 800, deviceScaleFactor: 1, mobile: false });
   for (const version of process.env.BASELINE_PREFIX ? ['before', 'after'] : ['after']) {
     const prefix = version === 'before' ? process.env.BASELINE_PREFIX : '/src/environment';
-    for (const airportName of ['Airport', 'LuklaAirport']) {
+    for (const airportName of ['Airport', 'VNLK']) {
       await evaluate(`(async () => {
         const THREE = await import('/node_modules/three/build/three.module.js');
-        const { ${airportName}: AirportClass } = await import(${JSON.stringify(`${prefix}/${airportName}.js`)});
-        // Building-kit replacement is unrelated and would change timing asynchronously.
-        class ControlledAirport extends AirportClass { async loadBuildings() { return false; } }
-        const airport = new ControlledAirport();
+        let airport, frame;
+        if ('${airportName}' === 'Airport') {
+          const { Airport: AirportClass } = await import(${JSON.stringify(`${prefix}/Airport.js`)});
+          // Building-kit replacement is unrelated and would change timing asynchronously.
+          class ControlledAirport extends AirportClass { async loadBuildings() { return false; } }
+          airport = new ControlledAirport();
+          frame = airport.group.getObjectByName('runway-pavement');
+        } else if ('${version}' === 'before') {
+          // Historical review-only baseline: the retired class is read from the
+          // git snapshot, never from src/. The 'after' fixture is the common
+          // streamed airport surface with declarative VNLK facilities.
+          const { LuklaAirport } = await import(${JSON.stringify(`${prefix}/LuklaAirport.js`)});
+          airport = new LuklaAirport();
+          frame = airport.group.getObjectByName('runway-pavement');
+        } else {
+          const { getAirportOverride } = await import('/src/config/airportOverrides.js');
+          const { createExternalAirportRegion } = await import('/src/geospatial/externalAirportSurface.js');
+          const overrides = getAirportOverride('VNLK');
+          const runwayOverride = overrides.runways[0];
+          const firstEnd = runwayOverride.ends[0].physical;
+          const record = {
+            ident: 'VNLK',
+            latitude: firstEnd.latitude,
+            longitude: firstEnd.longitude,
+            elevationM: overrides.elevationM,
+            runways: [{
+              id: '06/24',
+              surface: 'ASP',
+              widthM: runwayOverride.widthM,
+              lengthM: runwayOverride.lengthM,
+              ends: runwayOverride.ends,
+              lighted: true,
+            }],
+          };
+          const region = createExternalAirportRegion({ airport: record, overrides });
+          const runway = region.group.children.find(child => child.userData?.runwayId && !child.userData?.kind);
+          const position = runway.geometry.getAttribute('position');
+          const point = index => new THREE.Vector3().fromBufferAttribute(position, index);
+          const start = point(0).add(point(1)).multiplyScalar(0.5);
+          const end = point(2).add(point(3)).multiplyScalar(0.5);
+          frame = new THREE.Object3D();
+          frame.position.copy(start).add(end).multiplyScalar(0.5);
+          frame.rotation.set(
+            Math.asin((end.y - start.y) / start.distanceTo(end)),
+            -Math.atan2(end.x - start.x, -(end.z - start.z)),
+            0,
+            'YXZ',
+          );
+          region.group.add(frame);
+          airport = {
+            group: region.group,
+            elevation: overrides.elevationM,
+            nightLighting: region.airport.nightLighting,
+            update: (dt, cameraPosition, time, options) => region.airport.update(dt, cameraPosition, time, {
+              ...options,
+              sunHeight: options?.sunHeight ?? time,
+              cameraPosition: options?.cameraPosition ?? cameraPosition,
+            }),
+            dispose: () => region.dispose(),
+          };
+        }
         const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
         renderer.setSize(1200, 800); renderer.setPixelRatio(1);
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -94,12 +151,26 @@ try {
           performance.now = strobeClock;
           if (!airport.approachStrobes.some(p => strobeA.equals(p)) || strobeA.equals(strobeB)) throw new Error('Approach strobes not sequenced');
         }
-        window.review = { THREE, renderer, scene, camera, airport, hemi, sun };
+        if (airport.nightLighting?.papiSystems?.length) {
+          const papi = airport.nightLighting.papiSystems[0];
+          for (const [angle, white] of [[2, 0], [3, 2], [4, 4], [2, 0]]) {
+            const cameraPosition = papi.center.clone().addScaledVector(papi.approachDir, 1000);
+            cameraPosition.y += Math.tan(angle * Math.PI / 180) * 1000;
+            airport.update(0, cameraPosition, 12.5);
+            if (papi.units.filter(unit => unit.lensMat.color.getHex() === 0xffffff).length !== white) throw new Error('PAPI transition failed');
+          }
+          const lamps = airport.nightLighting.lamps;
+          if (lamps.length !== 6) throw new Error('VNLK apron lamps missing');
+          airport.update(0, null, -6);
+          if (!(lamps[0].light.intensity > 0)) throw new Error('Apron lamps inactive at night');
+          airport.update(0, null, 12);
+          if (lamps[0].light.intensity !== 0) throw new Error('Apron lamps should be off by day');
+        }
+        window.review = { THREE, renderer, scene, camera, airport, frame, hemi, sun };
       })()`);
       for (const view of ['approach', 'close', 'apron', 'night']) {
         const result = await evaluate(`(async () => {
-          const { THREE, renderer, scene, camera, airport, hemi, sun } = window.review;
-          const runway = airport.group.getObjectByName('runway-pavement');
+          const { THREE, renderer, scene, camera, airport, frame, hemi, sun } = window.review;
           airport.group.updateMatrixWorld(true);
           let position, target;
           if ('${airportName}' === 'Airport') {
@@ -109,8 +180,8 @@ try {
           } else {
             [position, target] = '${view}' === 'close' ? [[8.4, 3, 180], [8.4, 0, 153]] :
               '${view}' === 'apron' ? [[45, 20, 30], [45, 0, -70]] : [[0, 10, 410], [0, 0, -70]];
-            camera.position.copy(runway.localToWorld(new THREE.Vector3(...position)));
-            camera.lookAt(runway.localToWorld(new THREE.Vector3(...target)));
+            camera.position.copy(frame.localToWorld(new THREE.Vector3(...position)));
+            camera.lookAt(frame.localToWorld(new THREE.Vector3(...target)));
           }
           const night = '${view}' === 'night'; hemi.intensity = night ? 0.12 : 2; sun.intensity = night ? 0 : 3;
           scene.background.set(night ? 0x121c30 : 0xb5ccdc);
@@ -151,14 +222,16 @@ try {
         fs.writeFileSync(path.join(dir, `${version}-${airportName}-${view}.png`), Buffer.from(shot.data, 'base64'));
       }
       await evaluate(`(() => {
-        const { renderer, scene } = window.review;
+        const { renderer, scene, airport } = window.review;
         scene.traverse(o => { o.geometry?.dispose(); if (o.material) o.material.dispose(); });
+        airport.dispose?.();
         renderer.dispose();
       })()`);
     }
   }
   assert.ok(results.length >= 8);
-  assert.ok(results.every(r => r.pavementMaps === 6 && r.programs.length && r.programs.every(Boolean)));
+  assert.ok(results.every(r => r.pavementMaps === (r.airport === 'VNLK' && r.version === 'after' ? 3 : 6)
+    && r.programs.length && r.programs.every(Boolean)));
   assert.equal(errors.length, 0, JSON.stringify(errors));
 } finally {
   fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ assetBytes: sources.reduce((s, a) => s + a.bytes, 0), results, errors }, null, 2));

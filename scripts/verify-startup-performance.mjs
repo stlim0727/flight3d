@@ -126,16 +126,17 @@ try {
       sim.setPreset('bridge');
       const bridge = sim.bridgeFlight.active;
       await sim.setAirport('lukla');
-      const terrain = sim.luklaTerrain, airport = sim.luklaAirport;
+      const terrain = sim.luklaTerrain;
+      const airport = () => sim.airportStreamer?.regionFor?.('VNLK')?.airport ?? null;
       const deadline = performance.now() + 30000;
       while (!terrain.isLoaded && !terrain.loadError && performance.now() < deadline) await new Promise(r => setTimeout(r, 100));
       const loaded = terrain.isLoaded;
       await sim.setAirport('coastal');
-      const hidden = !terrain.mesh.visible && !airport.group.visible;
+      const hidden = !terrain.mesh.visible && !sim.world.isMounted('lukla');
       await sim.setAirport('lukla');
       return { initial, bridge, loaded, hidden,
-        reused: sim.luklaTerrain === terrain && sim.luklaAirport === airport,
-        visible: terrain.mesh.visible && airport.group.visible,
+        reused: sim.luklaTerrain === terrain,
+        visible: terrain.mesh.visible && Boolean(airport()),
         collision: sim.collisionDetector.terrain === terrain || sim.collisionDetector.terrain === sim.world };
     })()`);
     fs.writeFileSync(`${artifacts}/scenery.json`, JSON.stringify(scenery, null, 2));

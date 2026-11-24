@@ -2,7 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { readFileSync } from 'node:fs';
-import { LuklaTerrain } from '../src/environment/LuklaTerrain.js';
+import { RasterRegionSurface } from '../src/environment/RasterRegionSurface.js';
+import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { BODY_SUPPORT_POINTS } from '../src/physics/groundContacts.js';
 import { LandingGear } from '../src/physics/LandingGear.js';
 import { EngineModel, asymmetricThrustYawMoment } from '../src/physics/EngineModel.js';
@@ -136,11 +137,14 @@ describe('Body penetration constraint', () => {
   it('keeps loaded Lukla DEM and airport-boundary samples within 2mm of the contact limit', () => {
     const bytes = readFileSync(new URL('../public/terrain/lukla_dem.bin', import.meta.url));
     const elevations = new Float32Array(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
-    const terrain = new LuklaTerrain(undefined, 16, elevations);
+    const terrain = new RasterRegionSurface(REGION_SURFACES.lukla, { elevations, load: false });
     assert.equal(terrain.isLoaded, true, 'Use the bundled DEM, not the flat loading fallback');
     const sites = [];
+    const heading = REGION_SURFACES.lukla.runway.headingDeg * Math.PI / 180;
+    const sin = Math.sin(heading);
+    const cos = Math.cos(heading);
     for (const s of [-200, 0, 200]) for (const w of [0, 25, 50]) {
-      sites.push([s * 0.848048 + w * 0.529919, -s * 0.529919 + w * 0.848048]);
+      sites.push([s * sin + w * cos, -s * cos + w * sin]);
     }
     for (const x of [-1000, -500, 0, 500, 1000]) for (const z of [-1000, -500, 0, 500, 1000]) sites.push([x, z]);
     try {
@@ -154,9 +158,7 @@ describe('Body penetration constraint', () => {
         `loaded DEM (${x}, ${z}): clearance ${clearance}`);
       }
     } finally {
-      terrain.geometry.dispose();
-      terrain.localTerraceGeometry.dispose();
-      terrain.mesh.material.dispose();
+      terrain.dispose();
     }
   });
 

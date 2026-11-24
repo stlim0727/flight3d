@@ -4,7 +4,40 @@ import * as THREE from 'three';
 import { setPavementUVs, createPavementMaterial, createRunwayRepairs, createRunwaySurfaceWear, createRunwayWearMaterial } from '../src/environment/Pavement.js';
 import { applyLogDepthOffset, createRunwayMarkingMaterial } from '../src/environment/RunwayMarkings.js';
 import { useProjectionDepth } from '../src/aircraft/CockpitDepth.js';
-import { LuklaAirport } from '../src/environment/LuklaAirport.js';
+import { getAirportOverride } from '../src/config/airportOverrides.js';
+import { buildExternalRunwayDescriptors, createExternalAirportRegion, EXTERNAL_MESH_LIFT_M, MARKING_LIFT_M } from '../src/geospatial/externalAirportSurface.js';
+
+function createVnlkRegion() {
+  const overrides = getAirportOverride('VNLK');
+  const runwayOverride = overrides.runways[0];
+  const firstEnd = runwayOverride.ends[0].physical;
+  const airport = {
+    ident: 'VNLK',
+    latitude: firstEnd.latitude,
+    longitude: firstEnd.longitude,
+    elevationM: overrides.elevationM,
+    runways: [{
+      id: '06/24',
+      surface: 'ASP',
+      widthM: runwayOverride.widthM,
+      lengthM: runwayOverride.lengthM,
+      ends: runwayOverride.ends,
+    }],
+  };
+  const descriptors = buildExternalRunwayDescriptors(airport, overrides);
+  return { overrides, descriptor: descriptors[0], region: createExternalAirportRegion({ airport, overrides }) };
+}
+
+function ribbonSpan(mesh) {
+  const position = mesh.geometry.getAttribute('position');
+  const point = index => new THREE.Vector3().fromBufferAttribute(position, index);
+  const start = point(0).add(point(1)).multiplyScalar(0.5);
+  const end = point(2).add(point(3)).multiplyScalar(0.5);
+  return {
+    width: point(0).distanceTo(point(1)),
+    length: Math.hypot(end.x - start.x, end.z - start.z),
+  };
+}
 
 test('pavement retains a three metre tile across different slabs and subdivisions', () => {
   for (const [width, length, segments] of [[3200, 60, 1], [30, 527, 32], [36, 80, 1]]) {
@@ -51,28 +84,53 @@ test('repair and crack overlays stay inside both runways and share crack artwork
   }
 });
 
-test('Lukla apron foundation cannot coincide with the pavement', () => {
-  const airport = new LuklaAirport();
-  const apron = airport.group.children.find(g => g.children.some(o => o.material?.name === 'pavement-concrete'));
-  assert.ok(apron);
-  const foundation = apron.children.find(o => o.geometry?.type === 'BoxGeometry');
-  assert.ok(foundation.position.y + foundation.geometry.parameters.height / 2 < 0);
+test('VNLK apron skirt cannot coincide with the pavement', () => {
+  const { region } = createVnlkRegion();
+  let apron = null;
+  region.group.traverse(child => { if (child.name === 'vnlk-apron') apron = child; });
+  assert.ok(apron, 'declarative VNLK apron model must exist');
+  const pavement = [];
+  apron.traverse(child => { if (child.material?.name === 'pavement-concrete') pavement.push(child); });
+  assert.equal(pavement.length, 1);
+  const { width, height } = pavement[0].geometry.parameters;
+  assert.deepEqual([width, height], [36, 80]);
+  let skirt = null;
+  apron.traverse(child => {
+    if (child.geometry?.type === 'BoxGeometry' && child.material?.color?.getHex() === 0x3a4048) skirt = child;
+  });
+  assert.ok(skirt, 'apron foundation must remain a distinct stone box');
+  assert.deepEqual([skirt.geometry.parameters.width, skirt.geometry.parameters.height, skirt.geometry.parameters.depth], [36, 16, 80]);
+  assert.ok(skirt.position.y + skirt.geometry.parameters.height / 2 < 0,
+    'the skirt top must stay below the textured apron');
+  region.dispose();
 });
 
-test('Lukla runway retains dimensions, shadows and depth offset with headless fallback', () => {
-  for (const AirportClass of [LuklaAirport]) {
-    const airport = new AirportClass();
-    const runway = airport.group.getObjectByName('runway-pavement');
-    assert.ok(runway);
-    assert.equal(runway.receiveShadow, true);
-    assert.equal(runway.material.metalness, 0);
-    assert.equal(runway.material.polygonOffset, true);
-    assert.equal(runway.material.map, null);
-    assert.ok(runway.material.polygonOffsetFactor < 0);
-    const { width, height } = runway.geometry.parameters;
-    assert.deepEqual([width, height].sort((a,b) => a-b),
-      [airport.runwayLength, airport.runwayWidth].sort((a,b) => a-b));
-  }
+test('VNLK runway retains dimensions, shadows, lift and depth offset with headless fallback', () => {
+  const { descriptor, region } = createVnlkRegion();
+  const runway = region.group.children.find(child => child.userData?.runwayId && !child.userData?.kind);
+  const markings = region.group.children.find(child => child.userData?.kind === 'markings');
+  assert.ok(runway);
+  assert.ok(markings);
+  assert.strictEqual(runway.receiveShadow, true);
+  assert.strictEqual(runway.material.metalness, 0);
+  assert.strictEqual(runway.material.polygonOffset, true);
+  assert.strictEqual(runway.material.map, null);
+  assert.ok(runway.material.polygonOffsetFactor < 0);
+  assert.equal(runway.material.userData.logDepthOffsetUnits, 1);
+  assert.equal(runway.material.color.getHex(), 0x4b4b4b);
+  assert.strictEqual(markings.receiveShadow, true);
+  assert.equal(markings.material.polygonOffsetFactor, -2);
+  assert.equal(markings.material.userData.logDepthOffsetUnits, 2);
+  assert.equal(markings.material.color.getHex(), 0xf0f0e8);
+  const { width, length } = ribbonSpan(runway);
+  assert.ok(Math.abs(width - descriptor.widthM) < 0.01);
+  assert.ok(Math.abs(length - descriptor.lengthM) < 0.1);
+  assert.deepEqual([descriptor.widthM, descriptor.lengthM], [30, 527]);
+  const position = runway.geometry.getAttribute('position');
+  assert.ok(Math.abs(position.getY(0) - (descriptor.ends[0].physical.elevationM + EXTERNAL_MESH_LIFT_M)) < 1e-3);
+  const markingPosition = markings.geometry.getAttribute('position');
+  assert.ok(Math.abs(markingPosition.getY(0) - (position.getY(0) + MARKING_LIFT_M)) < 1e-3);
+  region.dispose();
 });
 
 test('coastal pavement coverage follows the actual eight slabs without changing contact heights', async () => {

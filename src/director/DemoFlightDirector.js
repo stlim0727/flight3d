@@ -345,7 +345,7 @@ export class DemoFlightDirector {
     this.sim.activeMapPlace = null;
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
-    const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaAirport ? 'lukla' : 'coastal');
+    const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaTerrain ? 'lukla' : 'coastal');
     const airportSwitch = (this.sim.setAirport && this.sim.activeAirport !== airport)
       ? this.sim.setAirport(airport)
       : null;

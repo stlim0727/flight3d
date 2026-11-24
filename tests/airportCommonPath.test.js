@@ -699,8 +699,17 @@ test('RKSI hides the unmapped 16R/34L runway from the common region', () => {
   assert.deepEqual(descriptors.map(descriptor => descriptor.id), ['237288']);
 });
 
-test('VNLK common region does not duplicate dedicated facilities', () => {
-  assert.equal(getAirportOverride('VNLK').facilities, undefined);
+test('VNLK declares its facilities once for the common region', () => {
+  const facilities = getAirportOverride('VNLK').facilities;
+  assert.ok(Array.isArray(facilities) && facilities.length >= 5);
+  const descriptors = buildExternalFacilityDescriptors(facilities, 2836);
+  const result = createExternalAirportFacilities(descriptors, 2836);
+  for (const name of ['vnlk-terminal', 'vnlk-tower', 'vnlk-apron', 'vnlk-windsock', 'vnlk-wall']) {
+    assert.equal(result.group.children.filter(child => child.name === name).length, 1, `${name} must be built once`);
+  }
+  const terminal = descriptors.find(facility => facility.kind === 'terminal');
+  assert.equal(result.hasModeledBuilding(terminal.position[0], terminal.position[2]), true);
+  result.dispose();
 });
 
 test('rotated facility collider uses the same orientation as its mesh', () => {

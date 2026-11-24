@@ -67,15 +67,15 @@ node scripts/verify-pavement.mjs
 ```
 
 `SIM_URL`, `CDP_URL`, and `ARTIFACT_DIR` override those defaults. For before/after,
-export the base revision's `Pavement.js`, `Airport.js`, and `LuklaAirport.js` into
-`.cache/pavement-baseline/`. In the copied `Airport.js` only, point the
-`AirportBuildings.js` import to `/src/environment/AirportBuildings.js`; the
-review subclass prevents asynchronous building replacement for both versions.
-Set `BASELINE_PREFIX=/.cache/pavement-baseline` and rerun. This produces 16 PNGs
-and JSON measurements, with identical camera, light, animation time and 1200×800
-resolution in each pair. Actual production airport classes/materials are used.
-The coastal views include production terrain; Lukla views isolate the sloped
-airport and do not load its DEM.
+`scripts/serve-runway-wear-review.mjs` extracts the base revision's
+`Pavement.js`, `Airport.js`, and historical `LuklaAirport.js` from `origin/main`
+into `.cache/pavement-baseline/`; that legacy module is only a review artifact.
+The current scene builds its VNLK runway, apron and lamps from the common
+external-airport region and declarative overrides, with no legacy runtime import.
+Set `BASELINE_PREFIX=/.cache/pavement-baseline` to compare pairs. This produces
+16 PNGs and JSON measurements with identical camera, light, animation time and
+1200×800 resolution in each pair. The coastal views include production terrain;
+Lukla views isolate the common streamed region and do not load its DEM.
 
 The script verifies all six map files against recorded SHA-256/size, waits for
 the actual maps, checks all shaders and browser errors, and exercises PAPI
