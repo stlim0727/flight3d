@@ -76,7 +76,7 @@ test('collision envelopes leave the arch open but cover legs, decks and antenna'
   const hits = point => boxes.some(box => box.distanceToPoint(point) <= 3);
   assert.equal(hits(new THREE.Vector3(10, 45, -20)), false, 'no phantom solid under the arch');
   assert.equal(hits(new THREE.Vector3(10, 100, -20)), true, 'first deck is solid');
-  assert.equal(hits(new THREE.Vector3(10, 35 + EIFFEL_TOWER_HEIGHT_M, -20)), true, 'antenna reaches 330 m');
+  assert.equal(hits(new THREE.Vector3(10 + 30, 35 + 57, -20)), true, 'first deck slab spans 74 m');
 });
 
 test('showcase placement uses one ground height for visuals, exclusion and collision', () => {

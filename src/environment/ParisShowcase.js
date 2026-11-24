@@ -72,9 +72,9 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
     }
   }
   for (const [bottom, top, width, part] of [
-    [57, 115, 42, 'first observation deck'],
-    [115, 276, 26, 'upper tower'],
-    [276, 300, 14, 'summit'],
+    [59, 115, 28, 'tower shaft'],
+    [116, 276, 16, 'upper tower'],
+    [277, 300, 10, 'summit'],
     [300, EIFFEL_TOWER_HEIGHT_M, 2, 'antenna'],
   ]) {
     solids.push({
@@ -82,6 +82,12 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
       center: [base.x, base.y + (bottom + top) / 2, base.z],
       size: [width, top - bottom, width],
     });
+  }
+  // Slab widths and thicknesses match the generator exactly; the deck edges
+  // are solid so a low pass cannot fly through a visible platform.
+  for (const [y, width, thickness] of [[57, 74, 3.2], [115, 46, 2.8], [276, 22, 1.8], [300, 12, 1.4]]) {
+    solids.push(solid(`deck-${y}`, `observation deck at ${y} m`,
+      [base.x, base.y + y, base.z], [width, thickness, width]));
   }
   return solids;
 }
@@ -238,20 +244,26 @@ export function updateParisShowcase(sim) {
     sim.parisShowcase = null;
     if (sim.currentTerrain?.parisShowcase === current) delete sim.currentTerrain.parisShowcase;
   }
-  if (!active || !sim.currentTerrain?.mesh) return;
+  if (!active || !sim.currentTerrain?.mesh) {
+    sim.parisShowcasePending = null;
+    return;
+  }
   if (!sim.parisShowcase) {
+    const clearPending = () => { sim.parisShowcasePending = null; };
     sim.parisShowcasePending ??= loadEiffelKit().then(kit => {
-      if (!isParisShowcaseOrigin(sim.world?.customOrigin)) return null;
+      if (!isParisShowcaseOrigin(sim.world?.customOrigin)) { clearPending(); return null; }
       const showcase = new ParisShowcase(kit, sim.world.customOrigin);
       sim.currentTerrain.mesh.add(showcase.group);
       sim.parisShowcase = showcase;
       sim.currentTerrain.parisShowcase = showcase;
-      sim.parisShowcasePending = null;
+      clearPending();
       // Rebuild streamed buildings so the generic tower gives way to the GLB.
-      sim.currentTerrain.geographicBuildingLayer?.dispose();
+      const buildings = sim.currentTerrain.geographicBuildingLayer;
+      buildings?.dispose();
+      if (sim.geographicBuildingLayer === buildings) sim.geographicBuildingLayer = null;
       sim.currentTerrain.geographicBuildingLayer = null;
       return showcase;
-    }).catch(error => { sim.parisShowcasePending = null; console.warn('Paris showcase failed to load:', error); });
+    }).catch(error => { clearPending(); console.warn('Paris showcase failed to load:', error); });
     return;
   }
   sim.parisShowcase.update(sim);

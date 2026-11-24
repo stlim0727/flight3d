@@ -52,6 +52,9 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   }
   assert.ok(await waitFor(session, 'sim.parisShowcase.ready === true'), 'Eiffel GLB was not placed');
   assert.ok(await waitFor(session, 'sim.parisShowcase.tower.position.y > 20'), 'tower was seated before DEM load');
+  assert.ok(await evaluate(`Boolean(sim.geographicBuildingLayer
+    && sim.geographicBuildingLayer === sim.currentTerrain.geographicBuildingLayer
+    && sim.geographicBuildingLayer.group.parent)`), 'building layer was not rebuilt after the GLB swap');
 
   const samples = {};
   for (const [name, z, altitude] of [['far', 1800, 240], ['near', 320, 140]]) {
