@@ -97,8 +97,8 @@ export function createCessnaMaterials() {
 }
 
 export const CIVIL_PILOT_STYLES = Object.freeze({
-  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH },
-  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH },
+  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15 },
+  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15 },
   // Sits up and leans towards the Cessna's deep-set yoke.
   cessna: { outfit: 'cessna', recline: 0.02 },
 });
@@ -487,9 +487,13 @@ export function buildCivilPilotScene(styleName = 'airlineCaptain') {
   for (const { arm } of limbs.arms) body.add(arm);
   for (const { leg } of limbs.legs) body.add(leg);
 
-  root.add(seat, body, head);
+  const visual = new THREE.Group();
+  visual.name = 'Pilot_Visual';
+  visual.position.z = style.bodyOffsetZ ?? 0;
+  visual.add(seat, body, head);
+  root.add(visual);
   const eye = EYE_IN_HEAD.clone().add(head.position);
-  return { root, seat, body, head, limbs, style, eye };
+  return { root, visual, seat, body, head, limbs, style, eye };
 }
 
 /** Pilot-frame shoulder joint (real metres). */
@@ -621,6 +625,7 @@ export function applyCivilPilotGlb(pilot, template) {
   const head = scene.getObjectByName('Pilot_Head');
   const body = scene.getObjectByName('Pilot_Body');
   const seat = scene.getObjectByName('Pilot_Seat');
+  const visual = scene.getObjectByName('Pilot_Visual');
   const limbs = civilLimbsFromScene(scene, pilot.userData.style);
   const complete = head && body && seat
     && limbs.arms.every(limb => limb.upper && limb.fore && limb.hand)
@@ -635,6 +640,8 @@ export function applyCivilPilotGlb(pilot, template) {
   pilot.userData.head = head;
   pilot.userData.body = body;
   pilot.userData.seat = seat;
+  pilot.userData.visual = visual ?? null;
+  pilot.userData.bodyOffset = visual ? visual.position.clone() : new THREE.Vector3();
   pilot.userData.limbs = limbs;
   applyCivilPilotMount(pilot, pilot.userData.mountMode ?? 'exterior');
   if (pilot.userData.isCockpit !== undefined) {
@@ -652,11 +659,13 @@ export function applyCivilPilotGlb(pilot, template) {
  * targets (parent frame): { grips: [left, right], ankles: [left, right], toeDirection }.
  */
 export function createCivilPilot(styleName, { mounts, targets, name, variant } = {}) {
-  const { root, seat, body, head, limbs, style, eye } = buildCivilPilotScene(styleName);
+  const { root, visual, seat, body, head, limbs, style, eye } = buildCivilPilotScene(styleName);
   const group = new THREE.Group();
   group.name = name ?? `Pilot_${styleName}`;
   group.add(root);
   group.userData.head = head;
+  group.userData.visual = visual;
+  group.userData.bodyOffset = visual.position.clone();
   group.userData.body = body;
   group.userData.seat = seat;
   group.userData.activeScene = root;
@@ -676,7 +685,10 @@ export function createCivilPilot(styleName, { mounts, targets, name, variant } =
 const parentPoint = new THREE.Vector3();
 
 function toPilotFrame(pilot, point, out) {
-  return out.copy(point).sub(pilot.position).divideScalar(pilot.scale.x);
+  out.copy(point).sub(pilot.position).divideScalar(pilot.scale.x);
+  const offset = pilot.userData.bodyOffset;
+  if (offset) out.sub(offset);
+  return out;
 }
 
 /** Moves the pilot to the requested mount and re-solves the limbs against its targets. */
