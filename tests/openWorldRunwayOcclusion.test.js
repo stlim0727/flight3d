@@ -42,12 +42,13 @@ function airport() {
   };
 }
 
-async function loadWorld() {
+async function loadWorld({ mounted = true } = {}) {
   const terrain = new ExternalAirportSurface({
     airport: airport(), overrides: {}, outsideHeight: () => demElevationM,
   });
+  const region = { terrain, extent: terrain.extent, mounted, group: { visible: mounted } };
   const world = {
-    regions: new Map([['RKTH', { terrain, extent: terrain.extent }]]),
+    regions: new Map([['RKTH', region]]),
     offsets: new Map([['RKTH', [0, 0]]]),
   };
   const openWorld = new OpenWorldTerrain({
@@ -57,7 +58,7 @@ async function loadWorld() {
   openWorld.raster = () => Promise.resolve(new Float32Array(256 ** 2).fill(demElevationM));
   openWorld.fetchWater = () => Promise.resolve(null);
   await openWorld.load(tile);
-  return { openWorld, terrain };
+  return { openWorld, terrain, region };
 }
 
 function assertRunwayClear(openWorld, terrain) {
@@ -113,6 +114,25 @@ test('streamed terrain stays below every world runway strip and its contact heig
   openWorld.detailedKey = 'another/tile';
   openWorld.updateRenderGeometry(entry, key);
   assert.equal(entry.mesh.geometry, entry.fullGeometry);
+  assertRunwayClear(openWorld, terrain);
+  openWorld.dispose();
+});
+
+test('unmounted runways keep terrain until the region becomes visible again', async () => {
+  const { openWorld, terrain, region } = await loadWorld({ mounted: false });
+  const entry = openWorld.tiles.get(key);
+  assert.equal(entry.runwayCutouts.length, 0);
+  const centre = terrain.runways[0].centre;
+  const raycaster = new Raycaster(new Vector3(centre.x, 1000, centre.z), new Vector3(0, -1, 0));
+  assert.ok(raycaster.intersectObject(entry.mesh).length > 0,
+    'an unmounted runway must not leave a terrain hole without pavement');
+
+  region.mounted = true;
+  region.group.visible = true;
+  openWorld.syncRunwayVisibility();
+  await new Promise(resolve => setTimeout(resolve, 50));
+  assert.ok(openWorld.tiles.get(key).runwayCutouts.length > 0,
+    'mounting a runway must rebuild the tile with its cutout');
   assertRunwayClear(openWorld, terrain);
   openWorld.dispose();
 });

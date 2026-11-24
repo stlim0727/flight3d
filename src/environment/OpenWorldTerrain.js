@@ -593,6 +593,7 @@ export class OpenWorldTerrain {
     this.insets = insets;
     this.localSurface = localSurface;
     this.world = world;
+    this._runwayVisibilityKey = '';
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
     this.waterSource = waterSource;
@@ -645,7 +646,7 @@ export class OpenWorldTerrain {
     const cutouts = [];
     for (const [id, region] of world.regions) {
       const runways = region.terrain?.runways;
-      if (!Array.isArray(runways) || !runways.length) continue;
+      if (!this.runwayVisible(region)) continue;
       const offset = world.offsets.get(id);
       if (!offset) continue;
       const extent = region.extent;
@@ -684,6 +685,33 @@ export class OpenWorldTerrain {
       }
     }
     return cutouts;
+  }
+
+  runwayVisible(region) {
+    return region.mounted !== false && region.group?.visible !== false && region.mesh?.visible !== false;
+  }
+
+  runwayVisibilityKey() {
+    const world = this.world;
+    if (!world?.regions) return '';
+    return [...world.regions]
+      .filter(([, region]) => region.terrain?.runways?.length && this.runwayVisible(region))
+      .map(([id]) => id)
+      .sort()
+      .join('|');
+  }
+
+  /** Reload tiles whose cutout set no longer matches visible runway meshes. */
+  syncRunwayVisibility() {
+    const key = this.runwayVisibilityKey();
+    if (key === this._runwayVisibilityKey) return;
+    this._runwayVisibilityKey = key;
+    for (const [tileKey, entry] of this.tiles) {
+      if (entry.runwayVisibilityKey === key) continue;
+      const [x, y] = tileKey.split('/').map(Number);
+      this.pending.get(tileKey)?.abort();
+      void this.load({ x, y, key: tileKey });
+    }
   }
 
   protects(x, z) {
@@ -794,6 +822,7 @@ export class OpenWorldTerrain {
   }
 
   update(position, velocity, camera, viewportHeight, reducedGeometry = false) {
+    this.syncRunwayVisibility();
     const center = this.coordinate(position.x, position.z);
     const detailedKey = reducedGeometry ? keyOf(wrapX(center.x), center.y) : null;
     if (this.reducedGeometry !== reducedGeometry || this.detailedKey !== detailedKey) {
@@ -1287,7 +1316,7 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      entry = { mesh, fullGeometry: geometry, cellOffsets, runwayCutouts: cutouts, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
+      entry = { mesh, fullGeometry: geometry, cellOffsets, runwayCutouts: cutouts, runwayVisibilityKey: this.runwayVisibilityKey(), detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
       if (this.localImagery) {
         const [west, north, eastEdge, southEdge] = bounds;
         const extent = local?.extent ?? (half > 0 ? { minX: -half, maxX: half, minZ: -half, maxZ: half } : null);
