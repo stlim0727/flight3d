@@ -120,8 +120,17 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     'btn-lobby-camera-done', 'btn-lobby-camera-reset',
     'lobby-pov-y', 'lobby-pov-y-val', 'lobby-pov-z', 'lobby-pov-z-val',
     'lobby-pov-x', 'lobby-pov-x-val',
+    'lobby-camera-preview-canvas',
   ];
   for (const id of ids) createMockElement(id);
+
+  const previewCanvas = elements.get('lobby-camera-preview-canvas');
+  previewCanvas.width = 380;
+  previewCanvas.height = 150;
+  let drawnArgs = null;
+  previewCanvas.getContext = () => ({
+    drawImage: (...args) => { drawnArgs = args; },
+  });
 
   globalThis.document = {
     getElementById: (id) => elements.get(id) || null,
@@ -130,11 +139,23 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
   try {
     const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
     cam.aircraftConfig = { id: 'C172' };
+    cam.userModeSelected = false;
 
+    let inFlightOffsetNotified = null;
+    cam.onCockpitUserOffsetChange = (offset) => {
+      inFlightOffsetNotified = offset;
+    };
+
+    let setAircraftCalledWith = null;
     const sim = {
       cameraSystem: cam,
-      lobby: { aircraft: 'C172' },
-      currentAircraftId: 'C172',
+      lobby: { aircraft: 'F16' },
+      currentAircraftId: 'B738',
+      setAircraft: (id) => {
+        setAircraftCalledWith = id;
+        sim.currentAircraftId = id;
+        cam.aircraftConfig = { id };
+      },
     };
 
     const modal = new LobbyCameraModal(sim);
@@ -142,11 +163,16 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     // Initial label check
     assert.match(elements.get('lobby-camera-btn-label').textContent, /추적|Chase/);
 
-    // Open modal
+    // Open modal: should sync to chosen lobby aircraft (F16)
     modal.open();
+    assert.equal(setAircraftCalledWith, 'F16');
     assert.equal(elements.get('lobby-camera-modal').open, true);
-    assert.equal(elements.get('lobby-camera-title').textContent, '카메라 설정 · C172');
+    assert.equal(elements.get('lobby-camera-title').textContent, '카메라 설정 · F-16');
     assert.equal(cam.mode, CameraSystem.MODES.COCKPIT);
+
+    // Verify renderPreview calls drawImage on canvas
+    modal.renderPreview({ width: 1920, height: 1080 });
+    assert.ok(drawnArgs !== null);
 
     // Slider adjustment (simulate user changing slider Y)
     const sliderY = elements.get('lobby-pov-y');
@@ -155,6 +181,8 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
 
     assert.equal(cam.cockpitUserOffset.y, 0.05);
     assert.match(elements.get('lobby-pov-y-val').textContent, /\+5 cm/);
+    // Verify chained in-flight listener was preserved
+    assert.ok(inFlightOffsetNotified !== null);
 
     // Reset to defaults
     elements.get('btn-lobby-camera-reset').dispatchEvent({ type: 'click' });
@@ -169,9 +197,10 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.COCKPIT);
     assert.match(elements.get('lobby-camera-btn-label').textContent, /조종석|Cockpit/);
 
-    // Close modal
+    // Close modal: userModeSelected must be restored to original false
     modal.close();
     assert.equal(elements.get('lobby-camera-modal').open, false);
+    assert.equal(cam.userModeSelected, false);
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;

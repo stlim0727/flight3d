@@ -1708,6 +1708,10 @@ class FlightSimulator {
       if (isPhotoCockpit && this.cockpitPhotoOverlay) {
         this.cockpitPhotoOverlay.render(this.renderer);
       }
+
+      if (this.lobbyCameraModal?.isOpen) {
+        this.lobbyCameraModal.renderPreview(this.renderer.domElement);
+      }
     } finally {
       this.flightGpuTimer?.end(gpuQuery);
       this.renderer.info.autoReset = previousAutoReset;

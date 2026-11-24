@@ -42,6 +42,9 @@ export class LobbyCameraModal {
     this.doneBtn = typeof document !== 'undefined' ? document.getElementById('btn-lobby-camera-done') : null;
     this.resetBtn = typeof document !== 'undefined' ? document.getElementById('btn-lobby-camera-reset') : null;
 
+    this.previewCanvas = typeof document !== 'undefined' ? document.getElementById('lobby-camera-preview-canvas') : null;
+    this.previewCtx = this.previewCanvas?.getContext?.('2d') || null;
+
     this.sliderY = typeof document !== 'undefined' ? document.getElementById('lobby-pov-y') : null;
     this.outputY = typeof document !== 'undefined' ? document.getElementById('lobby-pov-y-val') : null;
     this.sliderZ = typeof document !== 'undefined' ? document.getElementById('lobby-pov-z') : null;
@@ -50,6 +53,8 @@ export class LobbyCameraModal {
     this.outputX = typeof document !== 'undefined' ? document.getElementById('lobby-pov-x-val') : null;
 
     this.savedCameraMode = null;
+    this.savedUserModeSelected = null;
+    this.savedAutoSwitch = null;
     this.isOpen = false;
 
     this.initBindings();
@@ -129,10 +134,15 @@ export class LobbyCameraModal {
     }
 
     if (this.cameraSystem) {
-      this.cameraSystem.onCockpitUserOffsetChange = () => {
+      const prevOffsetHandler = this.cameraSystem.onCockpitUserOffsetChange;
+      this.cameraSystem.onCockpitUserOffsetChange = (offset) => {
+        if (typeof prevOffsetHandler === 'function') prevOffsetHandler(offset);
         if (this.isOpen) this.syncFromCamera();
       };
-      this.cameraSystem.onPreferredStartModeChange = () => {
+
+      const prevModeHandler = this.cameraSystem.onPreferredStartModeChange;
+      this.cameraSystem.onPreferredStartModeChange = (mode) => {
+        if (typeof prevModeHandler === 'function') prevModeHandler(mode);
         this.updateLobbyButtonLabel();
       };
     }
@@ -203,8 +213,28 @@ export class LobbyCameraModal {
     this.updateOutputs();
   }
 
+  renderPreview(sourceCanvas) {
+    if (!this.isOpen || !this.previewCanvas || !this.previewCtx || !sourceCanvas) return;
+    const destW = this.previewCanvas.width;
+    const destH = this.previewCanvas.height;
+    const srcW = sourceCanvas.width;
+    const srcH = sourceCanvas.height;
+    if (!srcW || !srcH || !destW || !destH) return;
+
+    try {
+      this.previewCtx.drawImage(sourceCanvas, 0, 0, srcW, srcH, 0, 0, destW, destH);
+    } catch {}
+  }
+
   open() {
     if (!this.dialog) return;
+
+    // Apply active aircraft switch to match chosen lobby aircraft
+    const aircraftId = this.getAircraftId();
+    if (typeof this.simulator?.setAircraft === 'function' && this.simulator.currentAircraftId !== aircraftId) {
+      this.simulator.setAircraft(aircraftId);
+    }
+
     this.isOpen = true;
     this.dialog.hidden = false;
     if (typeof this.dialog.showModal === 'function' && !this.dialog.open) {
@@ -218,14 +248,16 @@ export class LobbyCameraModal {
 
     const startMode = typeof this.cameraSystem?.getPreferredStartMode === 'function'
       ? this.cameraSystem.getPreferredStartMode()
-      : CameraSystem.MODES.COCKPIT;
+      : CameraSystem.MODES.CHASE;
     if (this.startModeSelect) this.startModeSelect.value = String(startMode);
 
-    // Switch camera to cockpit view for live preview while modal is open
+    // Save prior camera selection state before switching to cockpit for preview
     if (this.cameraSystem) {
       this.savedCameraMode = this.cameraSystem.mode;
+      this.savedUserModeSelected = this.cameraSystem.userModeSelected;
+      this.savedAutoSwitch = this.cameraSystem.autoSwitch;
       if (typeof this.cameraSystem.setMode === 'function') {
-        this.cameraSystem.setMode(CameraSystem.MODES.COCKPIT, true);
+        this.cameraSystem.setMode(CameraSystem.MODES.COCKPIT, false);
       }
     }
 
@@ -244,12 +276,20 @@ export class LobbyCameraModal {
     this.dialog.hidden = true;
     this.lobbyBtn?.setAttribute('aria-expanded', 'false');
 
-    // Restore prior camera mode if we temporarily switched to cockpit for preview
+    // Restore prior camera mode and selection state
     if (this.cameraSystem && this.savedCameraMode !== null) {
       if (typeof this.cameraSystem.setMode === 'function') {
-        this.cameraSystem.setMode(this.savedCameraMode, true);
+        this.cameraSystem.setMode(this.savedCameraMode, false);
+      }
+      if (this.savedUserModeSelected !== null && this.savedUserModeSelected !== undefined) {
+        this.cameraSystem.userModeSelected = this.savedUserModeSelected;
+      }
+      if (this.savedAutoSwitch !== null && this.savedAutoSwitch !== undefined) {
+        this.cameraSystem.autoSwitch = this.savedAutoSwitch;
       }
       this.savedCameraMode = null;
+      this.savedUserModeSelected = null;
+      this.savedAutoSwitch = null;
     }
 
     this.updateLobbyButtonLabel();
