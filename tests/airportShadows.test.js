@@ -29,11 +29,11 @@ import { EICASCanvas } from '../src/aircraft/EICASCanvas.js';
 function createVnlkRunwayMesh() {
   const overrides = getAirportOverride('VNLK');
   const runwayOverride = overrides.runways[0];
-  const firstEnd = runwayOverride.ends[0].physical;
+  // Use the indexed ARP, not a runway end, so the runway keeps its declared facilities frame.
   const airport = {
     ident: 'VNLK',
-    latitude: firstEnd.latitude,
-    longitude: firstEnd.longitude,
+    latitude: 27.686768,
+    longitude: 86.729479,
     elevationM: overrides.elevationM,
     runways: [{
       id: '06/24',

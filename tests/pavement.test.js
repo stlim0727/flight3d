@@ -10,11 +10,11 @@ import { buildExternalRunwayDescriptors, createExternalAirportRegion, EXTERNAL_M
 function createVnlkRegion() {
   const overrides = getAirportOverride('VNLK');
   const runwayOverride = overrides.runways[0];
-  const firstEnd = runwayOverride.ends[0].physical;
+  // Use the indexed ARP, not a runway end, so facilities keep their declared offsets.
   const airport = {
     ident: 'VNLK',
-    latitude: firstEnd.latitude,
-    longitude: firstEnd.longitude,
+    latitude: 27.686768,
+    longitude: 86.729479,
     elevationM: overrides.elevationM,
     runways: [{
       id: '06/24',

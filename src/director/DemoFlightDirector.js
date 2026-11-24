@@ -480,6 +480,7 @@ export class DemoFlightDirector {
     if (!streamer || this._luklaStreamHeld) return;
     streamer.setHome?.('VNLK');
     streamer.holdDestination?.('VNLK');
+    streamer.releaseGroundHold?.();
     streamer.ensure?.('VNLK');
     this._luklaStreamHeld = true;
   }

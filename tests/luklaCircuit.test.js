@@ -131,9 +131,11 @@ describe('Lukla continuous circuit and truthful completion', () => {
       holdDestination: code => { held = true; calls.push(['hold', code]); },
       ensure: code => calls.push(['ensure', code]),
       releaseDestinationHold: () => { held = false; calls.push(['release']); },
+      releaseGroundHold: () => calls.push(['release-ground']),
     } });
     assert.ok(calls.some(([action, code]) => action === 'ensure' && code === 'VNLK'));
     assert.ok(calls.some(([action, code]) => action === 'hold' && code === 'VNLK'));
+    assert.ok(calls.some(([action]) => action === 'release-ground'), 'a stale ground hold must not block VNLK');
     assert.equal(director.waitingForTerrain, true);
     director.update(0.1);
     assert.equal(scenario.result.status, 'pending', 'no runway exists until the region streams in');
