@@ -692,6 +692,8 @@ test('replay load reloads and holds recorded external airport after restoring cu
   const sim = fakeSim();
   const events = [];
   let loaded = false;
+  let loadingDuringEnsure = false;
+  const director = new ReplayDirector(sim);
   sim.airportStreamer = {
     resetForOriginChange() { events.push('reset'); loaded = false; },
     setHome(code) { events.push(['setHome', code]); },
@@ -700,7 +702,11 @@ test('replay load reloads and holds recorded external airport after restoring cu
     releaseGroundHold() { events.push('releaseGround'); },
     ensure(code, opts) {
       events.push(['ensure', code, opts?.tileId ?? null]);
-      return Promise.resolve().then(() => { loaded = true; return true; });
+      return Promise.resolve().then(() => {
+        loadingDuringEnsure = director.loading === true;
+        loaded = true;
+        return true;
+      });
     },
   };
   sim.setCustomWorldOrigin = origin => {
@@ -709,7 +715,6 @@ test('replay load reloads and holds recorded external airport after restoring cu
   };
   sim.syncUnifiedWorld = () => { events.push('syncWorld'); };
 
-  const director = new ReplayDirector(sim);
   const jfkOrigin = { latitude: 40.6398, longitude: -73.7789 };
   const source = track(20);
   source.metadata.airport = 'incheon';
@@ -720,6 +725,8 @@ test('replay load reloads and holds recorded external airport after restoring cu
   source.metadata.placeLabel = 'KJFK · John F. Kennedy Intl';
 
   assert.equal(await director.load(source), true);
+  assert.equal(loadingDuringEnsure, true, 'director.loading stays true while awaiting recorded airport load');
+  assert.equal(director.loading, false, 'director.loading clears once replay is armed');
   assert.equal(loaded, true, 'recorded external airport finishes loading before replay starts');
   assert.deepEqual(sim.activeMapPlace, {
     label: 'KJFK · John F. Kennedy Intl',

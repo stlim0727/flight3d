@@ -76,7 +76,8 @@ export class ReplayDirector {
     const view = this._captureView();
     Object.assign(sim.lobby, { airport, aircraft, preset: scenario, demoProfile });
     if (sim.lobby.mapPlan) sim.lobby.mapPlan = null;
-    // The swap holds `startingFlight`, so no frame can render the new aircraft inside old terrain.
+    // Hold `loading` across the entire scene swap and airport preparation so
+    // live physics cannot advance before the first recorded pose is installed.
     this.loading = true;
     try {
       if (valley) {
@@ -105,46 +106,42 @@ export class ReplayDirector {
         this.roomEffects = this.createEffects({ scene: sim.scene, aircraft: sim.aircraft,
           terrain: sim.currentTerrain, breakup: sim.aircraftBreakup, explosions: sim.explosionSystem });
       }
+      sim.demoDirector?.stop();
+      sim.pilotArena?.stop('replay');
+      if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
+        sim.setCustomWorldOrigin?.(customOrigin);
+        sim.syncUnifiedWorld?.(sim.activeAirport);
+      } else {
+        sim.setCustomWorldOrigin?.(null);
+      }
+      sim.activeMapPlace = (placeLabel || airportCode)
+        ? { label: placeLabel ?? null, code: airportCode ?? null, ...(airportTileId ? { tileId: airportTileId } : {}) }
+        : null;
+      if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
+      if (sim.gameFlow.state !== FLOW.FLIGHT) {
+        this._view = null;
+        this._combat?.stop();
+        return false;
+      }
+      if (airportCode && sim.airportStreamer) {
+        const tileId = airportTileId ?? sim.mapPlaces?.airports?.find?.(entry => entry.code === airportCode)?.tileId;
+        registerExternalDestinations([{ code: airportCode, tileId }]);
+        if (isExternalDestination(airportCode)) {
+          await this._prepareReplayAirport(airportCode, tileId);
+          if (sim.gameFlow.state !== FLOW.FLIGHT) {
+            this._releaseReplayAirport();
+            this._view = null;
+            this._combat?.stop();
+            return false;
+          }
+        }
+      }
     } catch (error) {
+      this._releaseReplayAirport();
       this._disposeRoom();
       this._scenarioAdapter?.release(); this._scenarioAdapter = null;
       throw error;
     } finally { this.loading = false; }
-    sim.demoDirector?.stop();
-    sim.pilotArena?.stop('replay');
-    if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
-      sim.setCustomWorldOrigin?.(customOrigin);
-      sim.syncUnifiedWorld?.(sim.activeAirport);
-    } else {
-      sim.setCustomWorldOrigin?.(null);
-    }
-    sim.activeMapPlace = (placeLabel || airportCode)
-      ? { label: placeLabel ?? null, code: airportCode ?? null, ...(airportTileId ? { tileId: airportTileId } : {}) }
-      : null;
-    if (Number.isFinite(timeOfDay)) sim.setTimeOfDay(timeOfDay, { persist: false, userChoice: false });
-    if (sim.gameFlow.state !== FLOW.FLIGHT) {
-      this._view = null;
-      this._combat?.stop();
-      return false;
-    }
-    if (airportCode && sim.airportStreamer) {
-      const tileId = airportTileId ?? sim.mapPlaces?.airports?.find?.(entry => entry.code === airportCode)?.tileId;
-      registerExternalDestinations([{ code: airportCode, tileId }]);
-      if (isExternalDestination(airportCode)) {
-        this.loading = true;
-        try {
-          await this._prepareReplayAirport(airportCode, tileId);
-        } finally {
-          this.loading = false;
-        }
-        if (sim.gameFlow.state !== FLOW.FLIGHT) {
-          this._releaseReplayAirport();
-          this._view = null;
-          this._combat?.stop();
-          return false;
-        }
-      }
-    }
     // This sortie exists to host the replay; it is not a flight the pilot flew.
     sim.flightRecorder.active = false;
     sim.replayRecorder.active = false;
