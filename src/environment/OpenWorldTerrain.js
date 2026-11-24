@@ -12,6 +12,7 @@ import { getInsetsForRegion } from '../config/terrainInsets.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 import { EARTH_RADIUS_M } from './AerialPerspective.js';
 import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
+import { authorityZonesFromBounds, createAuthorityZones } from '@stlim0727/flightsim-core/terrain/AuthorityZones.js';
 
 const zoom = 11;
 const farZoom = 8;
@@ -527,6 +528,7 @@ export class OpenWorldTerrain {
   constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
     this.origin = origin;
     this.protectedAreas = protectedAreas;
+    this._authority = createAuthorityZones(authorityZonesFromBounds(protectedAreas || []));
     this.insets = insets;
     this.localSurface = localSurface;
     this.world = world;
@@ -576,7 +578,7 @@ export class OpenWorldTerrain {
   }
 
   protects(x, z) {
-    return this.protectedAreas.some(area => contains(area, x, z));
+    return this._authority.protects(x, z);
   }
 
   sample(x, z, { unblended = false } = {}) {
@@ -635,7 +637,7 @@ export class OpenWorldTerrain {
 
   readyForTile(tile, level) {
     const [west, north, east, south] = projectedBounds(tile.x, tile.y, this.project, level);
-    if (this.protectedAreas.some(area => contains(area, west, north) && contains(area, east, south))) return true;
+    if (this.protects(west, north) && this.protects(east, south)) return true;
     const children = 2 ** (level - zoom);
     const x = Math.floor(tile.x / children);
     const y = Math.floor(tile.y / children);
@@ -695,7 +697,7 @@ export class OpenWorldTerrain {
           const x = wrapX(center.x + dx), y = center.y + dz;
           if (y < 0 || y >= tilesAcross - 1) continue;
           const [west, north, east, south] = projectedBounds(x, y, this.project);
-          if (!this.localSurface && this.protectedAreas.some(area => contains(area, west, north) && contains(area, east, south))) continue;
+          if (!this.localSurface && this.protects(west, north) && this.protects(east, south)) continue;
           candidates.push({ x, y, key: keyOf(x, y),
             order: dx ** 2 + dz ** 2 - (x === forward.x && y === forward.y ? 0.5 : 0) });
         }

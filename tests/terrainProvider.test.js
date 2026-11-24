@@ -19,6 +19,10 @@ const origin = { latitude: 37.55, longitude: 126.98 };
 const x = 1746, y = 793;
 const flat = h => new Float32Array(256 ** 2).fill(h);
 
+function testOverride({ isReady = () => true, getHeight, getNormal = () => ({ x: 0, y: 1, z: 0 }), ...rest } = {}) {
+  return { kind: 'test', isReady, getHeight, getNormal, update() {}, dispose() {}, ...rest };
+}
+
 function loadedWorld(protectedAreas = []) {
   const world = new OpenWorldTerrain({ origin, protectedAreas });
   const { geometry } = buildOpenTerrainTile({
@@ -219,11 +223,7 @@ test('PhysicsIntegrator pairs getGroundHeight and getGroundNormal across integra
 
   const flatTerrain = { getHeight: () => 0, getNormal: () => new Vector3(0, 1, 0) };
   const overrideNormal = { x: -0.2, y: 0.98, z: 0 };
-  const slopedOverride = {
-    isReady: () => true,
-    getHeight: () => 55,
-    getNormal: () => overrideNormal,
-  };
+  const slopedOverride = testOverride({ getHeight: () => 55, getNormal: () => overrideNormal });
 
   const penetrationCalls = [];
   const integrateCalls = [];
@@ -283,23 +283,23 @@ test('CollisionDetector honors terrainOverrideProvider in terrain and water chec
   const safeSolverContact = { onGround: false, bodyContacts: [] };
 
   // Lower ready override (10 m vs base 200 m): flying at y = 50 must not crash.
-  override = { isReady: () => true, getHeight: () => 10 };
+  override = testOverride({ getHeight: () => 10 });
   assert.equal(detector.checkCollision(pos, quat, levelVel, 0, 0, 0, safeSolverContact), null);
   assert.equal(detector.checkCollision(pos, quat, levelVel, 0, 0, 0, null), null);
 
   // Higher ready override (200 m over flat 10 m base): y = 50 triggers TERRAIN crash.
   detector.setEnvironment(flatBaseTerrain, offRunwayAirport);
-  override = { isReady: () => true, getHeight: () => 200 };
+  override = testOverride({ getHeight: () => 200 });
   assert.equal(detector.checkCollision(pos, quat, levelVel, 0, 0, 0, safeSolverContact)?.type, 'TERRAIN');
 
   // Unready override falls back to base terrain (200 m -> TERRAIN crash at y = 50).
   detector.setEnvironment(highBaseTerrain, offRunwayAirport);
-  override = { isReady: () => false, getHeight: () => 10 };
+  override = testOverride({ isReady: () => false, getHeight: () => 10 });
   assert.equal(detector.checkCollision(pos, quat, levelVel, 0, 0, 0, safeSolverContact)?.type, 'TERRAIN');
 
   // Water check: land base (50 m) overridden by sea (-5 m) triggers WATER when descending near 0 m.
   detector.setEnvironment({ getHeight: () => 50 }, offRunwayAirport);
-  override = { isReady: () => true, getHeight: () => -5 };
+  override = testOverride({ getHeight: () => -5 });
   assert.equal(
     detector.checkCollision(new Vector3(3000, 0, 3000), quat, new Vector3(70, -8, 0), 0, -5, 0, null)?.type,
     'WATER'
@@ -307,7 +307,7 @@ test('CollisionDetector honors terrainOverrideProvider in terrain and water chec
 
   // Water check: sea base (-10 m) overridden by land (50 m) does not falsely trigger WATER at y = 60.
   detector.setEnvironment({ getHeight: () => -10 }, offRunwayAirport);
-  override = { isReady: () => true, getHeight: () => 50 };
+  override = testOverride({ getHeight: () => 50 });
   assert.equal(
     detector.checkCollision(new Vector3(3000, 60, 3000), quat, new Vector3(70, -8, 0), 0, -5, 0, null),
     null
@@ -315,7 +315,7 @@ test('CollisionDetector honors terrainOverrideProvider in terrain and water chec
 
   // Clearing terrain via setEnvironment(null, ...) disables terrain/water collision even if override is ready.
   detector.setEnvironment(null, null, null, null, null);
-  override = { isReady: () => true, getHeight: () => 200 };
+  override = testOverride({ getHeight: () => 200 });
   assert.equal(detector.checkCollision(pos, quat, levelVel, 0, 0, 0, safeSolverContact), null);
 });
 
@@ -340,11 +340,7 @@ test('HeadlessSimulation avoids phantom terrain crash and GPWS warning when terr
   sim.linearVelocity.set(70, 0, 0);
   sim.gear.gearState = 0;
   sim.gear.targetGearState = 0;
-  sim.terrainProviderOverride = {
-    isReady: () => true,
-    getHeight: () => 10,
-    getNormal: () => ({ x: 0, y: 1, z: 0 }),
-  };
+  sim.terrainProviderOverride = testOverride({ getHeight: () => 10 });
 
   sim.integratePhysics(1 / 120);
   assert.equal(Boolean(sim.isCrashed), false);
@@ -354,4 +350,39 @@ test('HeadlessSimulation avoids phantom terrain crash and GPWS warning when terr
   sim.integratePhysics(1 / 120);
   assert.equal(sim.isCrashed, true);
   assert.equal(sim.crashResult?.type, 'TERRAIN');
+});
+
+test('CollisionDetector rejects a non-conforming override on first query and accepts a valid provider', () => {
+  const detector = new CollisionDetector({ getHeight: () => 0 }, null, null, null, null);
+  const invalid = {
+    kind: 'test',
+    isReady: () => true,
+    getHeight: () => 42,
+    getNormal: () => ({ x: 0, y: 1, z: 0 }),
+  };
+  detector.setTerrainOverrideProvider(() => invalid);
+  assert.throws(() => detector.getTerrainHeight(0, 0), /terrain provider conformance failed: terrain provider is missing update\(\)/);
+
+  const valid = testOverride({ getHeight: () => 42 });
+  detector.setTerrainOverrideProvider(() => valid);
+  assert.equal(detector.getTerrainHeight(0, 0), 42);
+});
+
+test('PhysicsIntegrator rejects a non-conforming override on first query and accepts a valid provider', () => {
+  class Harness {}
+  installPhysicsIntegrator(Harness);
+  const sim = new Harness();
+  sim.currentTerrain = { getHeight: () => 0 };
+  sim.terrainProviderOverride = {
+    kind: 'test',
+    isReady: () => true,
+    getHeight: () => 42,
+    getNormal: () => ({ x: 0, y: 1, z: 0 }),
+  };
+  const queries = sim.ensureGroundSurfaceQueries();
+  assert.throws(() => queries.getGroundHeight(0, 0), /terrain provider conformance failed: terrain provider is missing update\(\)/);
+
+  sim.terrainProviderOverride = testOverride({ getHeight: () => 42 });
+  assert.equal(queries.getGroundHeight(0, 0), 42);
+  assert.deepEqual(queries.getGroundNormal(0, 0).toArray(), [0, 1, 0]);
 });
