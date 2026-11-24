@@ -17,6 +17,10 @@ export function createSimulatorScenarioStart(sim) {
       sim.devRunner.stop();
       sim.shadowDemo.stop();
       sim.replayDirector.stop();
+      sim.lobbyCameraModal?.close();
+      if (sim.cameraSystem) {
+        sim.cameraSystem.userModeSelected = false;
+      }
       const request = Object.freeze({ airport: sim.lobby.airport,
         aircraft: sim.lobby.aircraft ?? sim.currentAircraftId,
         scenario: sim.lobby.preset, demoProfile: sim.lobby.demoProfile,
