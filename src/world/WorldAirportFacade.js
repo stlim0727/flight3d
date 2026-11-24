@@ -55,8 +55,14 @@ export function createWorldAirportFacade(world, spawnAirport) {
       }
     },
   };
+  const spawnRegion = [...world.regions].find(([, region]) => region.airport === spawnAirport);
+  const [ox, oz] = (spawnRegion && world.offsets.get(spawnRegion[0])) || [0, 0];
   for (const key of ['controlTowerData', 'terminalData', 'hangarsData', 'retainingWallData']) {
-    if (spawnAirport?.[key]) facade[key] = spawnAirport[key];
+    const value = spawnAirport?.[key];
+    if (!value) continue;
+    facade[key] = (ox || oz) && Number.isFinite(value.x) && Number.isFinite(value.z)
+      ? { ...value, x: value.x + ox, z: value.z + oz }
+      : value;
   }
   let customAirportRegions = null;
   Object.defineProperty(facade, 'airportRegions', {
