@@ -495,15 +495,7 @@ body.demo-active #touch-controls-overlay {
   user-select: none;
 }
 body:not([data-flow="flight"]) #pilotage-map,
-body:not([data-flow="flight"]) #btn-pilotage-map,
-#pilotage-map:not([open]) summary,
-#pilotage-map[open] .map-unfold { display: none; }
-#pilotage-map summary {
-  display: flex;
-  width: max-content;
-  margin-left: auto;
-  cursor: pointer;
-}
+body:not([data-flow="flight"]) #btn-pilotage-map { display: none; }
 #pilotage-map .map-paper {
   position: absolute;
   bottom: calc(100% + .35rem);
@@ -606,7 +598,6 @@ body[data-pilotage-layout="cockpit"] #pilotage-map {
 }
 body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; height: min(31dvh, 17rem); }
 @media (min-width: 601px) and (pointer: fine) {
-  body[data-flow="flight"] #hud-overlay:has(#pilotage-map[open]:not([hidden])) { z-index: 999; }
   body[data-flow="flight"] #pilotage-map[open] {
     --chart-width: min(80vw, 1100px);
     --chart-height: min(70dvh, 720px);
@@ -614,7 +605,8 @@ body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; hei
     inset: 0;
     width: auto;
     transform: none;
-    z-index: 999;
+    /* Keep the flight toolbar and its panels above the chart backdrop. */
+    z-index: 60;
     background: rgb(17 25 32 / 23%);
     backdrop-filter: blur(7px);
     animation: map-backdrop-in 600ms ease-out backwards;
@@ -634,12 +626,6 @@ body[data-pilotage-layout="cockpit"] #pilotage-map .map-paper { width: 100%; hei
     overflow: hidden;
     box-shadow: 0 14px 50px rgb(12 20 24 / 32%);
   }
-  body[data-flow="flight"] #pilotage-map[open] summary {
-    position: absolute;
-    top: calc(50% + var(--chart-height) / 2 + 9px);
-    right: calc((100% - var(--chart-width)) / 2);
-    margin: 0;
-  }
 }
 body[data-pilotage-layout="external"] #canvas-container { width: 56%; }
 body[data-pilotage-layout="external"] #pilotage-map {
@@ -649,14 +635,8 @@ body[data-pilotage-layout="external"] #pilotage-map {
   height: 100%;
   background: #ede5cc;
 }
-body[data-pilotage-layout="external"] #pilotage-map summary {
-  position: absolute;
-  bottom: max(.4rem, env(safe-area-inset-bottom));
-  right: max(.6rem, env(safe-area-inset-right));
-  z-index: 1;
-}
 body[data-pilotage-layout="external"] #pilotage-map .map-paper {
-  inset: max(3rem, env(safe-area-inset-top)) 0 2.7rem;
+  inset: max(3rem, env(safe-area-inset-top)) 0 0;
   width: auto;
   height: auto;
   transform-origin: 50% 50%;
