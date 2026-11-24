@@ -965,6 +965,7 @@ class PresetSpawnerMethods {
         });
         this.luklaTerrain.mesh.visible = false;
         this.scene?.add(this.luklaTerrain.mesh);
+        this.airportStreamer?.setHome?.('VNLK');
         return this.luklaTerrain;
       })
       .catch(error => {

@@ -9,7 +9,7 @@ import { LandingGear } from '../src/physics/LandingGear.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 
 const STAGES = LuklaCircuitScenario.STAGES;
-function setup({ cockpitModelLoading = false } = {}) {
+function setup({ cockpitModelLoading = false, streamer = null } = {}) {
   const inputs = {};
   const modes = [];
   const cockpit = { cockpitModelLoading };
@@ -25,6 +25,7 @@ function setup({ cockpitModelLoading = false } = {}) {
     cockpitInteriorStatus: () => (cockpit.cockpitModelLoading ? 'loading' : 'ready'),
     cameraSystem: { setMode(m) { modes.push(m); }, userLookOverridden: false },
     sky: { setTimeOfDay() {} }, showToast() {},
+    airportStreamer: streamer,
     setPreset() { this.presetCalls = (this.presetCalls || 0) + 1; }
   };
   const director = new DemoFlightDirector(sim);
@@ -118,6 +119,21 @@ describe('Lukla continuous circuit and truthful completion', () => {
     director.update(0.1);
     assert.equal(sim.presetCalls, 3, 'Loading completion must not repeatedly reset the flight');
     assert.equal(sim.controls.parkingBrake, false);
+  });
+
+  it('waits for the streamed VNLK region before starting the demo', () => {
+    let region = null;
+    const { sim, director, scenario } = setup({ streamer: {
+      regionFor: code => (code === 'VNLK' ? region : null),
+    } });
+    assert.equal(director.waitingForTerrain, true);
+    director.update(0.1);
+    assert.equal(scenario.result.status, 'pending', 'no runway exists until the region streams in');
+    region = { airport: { isLoaded: true } };
+    director.update(0.1);
+    assert.equal(director.waitingForTerrain, false);
+    assert.equal(scenario.result.status, 'running');
+    assert.equal(sim.activeAirport, 'lukla');
   });
 
   it('does not resurrect a cancelled pending demo when the terrain finishes loading', () => {

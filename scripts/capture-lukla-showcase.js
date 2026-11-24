@@ -92,8 +92,8 @@ async function main() {
         const ready = await evalJs(`(() => {
           const sim = window.simulator;
           const region = sim.airportStreamer?.regionFor?.('VNLK');
-          return Boolean(sim.activeAirport === 'lukla' && sim.currentAirport?.isLoaded &&
-            region?.airport?.terrain?.runways?.length);
+          return Boolean(sim.activeAirport === 'lukla' && sim.luklaTerrain?.isLoaded &&
+            region?.airport?.isLoaded && region?.airport?.terrain?.runways?.length);
         })()`);
         if (ready) return;
         await new Promise(resolve => setTimeout(resolve, 250));

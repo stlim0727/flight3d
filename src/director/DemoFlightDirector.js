@@ -387,7 +387,11 @@ export class DemoFlightDirector {
     // Keep the constructor's auto-start request alive while the asynchronous
     // region or DEM loads. isActive lets Esc, presets and airport changes cancel it.
     const waitingForAirportSwitch = Boolean(this.sim.setAirport && this.sim.activeAirport !== airport);
-    this.waitingForTerrain = waitingForAirportSwitch || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
+    const streamer = this.sim.airportStreamer;
+    const waitingForStreamedAirport = airport === 'lukla' && Boolean(streamer)
+      && !streamer.regionFor?.('VNLK');
+    this.waitingForTerrain = waitingForAirportSwitch || waitingForStreamedAirport
+      || (airport === 'lukla' && this.sim.currentTerrain?.isLoaded === false);
     if (this.waitingForTerrain) {
       // Discard the previous airport's pose once the destination airport is active.
       // Cancellation must leave a safe runway spawn rather than sea-level flight.
@@ -599,7 +603,11 @@ export class DemoFlightDirector {
         this.stop(() => t('could.not.load.lukla.terrain.refresh.and'));
         return;
       }
-      if (this.sim.currentTerrain?.isLoaded !== false) this.start(this.activeDemoAirport, this.profile);
+      const streamReady = this.activeDemoAirport !== 'lukla' || !this.sim.airportStreamer
+        || Boolean(this.sim.airportStreamer.regionFor?.('VNLK'));
+      if (this.sim.currentTerrain?.isLoaded !== false && streamReady) {
+        this.start(this.activeDemoAirport, this.profile);
+      }
       return;
     }
 

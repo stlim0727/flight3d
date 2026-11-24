@@ -302,7 +302,7 @@ export const AIRPORT_OVERRIDES = {
         position: [76.42, 2844, 1.11],
         size: [44, 18, 24],
         rotationY: 0.5585053606,
-        collision: { type: 'box', halfX: 25.7, halfZ: 17.4, maxAltitudeM: 2862 },
+        collision: { type: 'box', halfX: 22, halfZ: 12, maxAltitudeM: 2862 },
       },
       {
         id: 'tower',
