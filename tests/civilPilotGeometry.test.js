@@ -205,9 +205,12 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
     assert.ok(upperArm.position.y > 0.4, `${file} must bake the seated shoulder joint`);
     assert.ok(hand.position.z < -0.3, `${file} must bake hands onto the yokes`);
     assert.ok(foot.position.z < -0.7, `${file} must bake feet onto the pedals`);
+    const visual = gltf.scene.getObjectByName('Pilot_Visual');
+    assert.ok(visual && visual.position.z < -0.1, `${file} must bake the forward seat offset`);
     assert.equal(applyCivilPilotGlb(pilot, gltf.scene), true, `${file} must supply the named IK nodes`);
     assert.equal(pilot.userData.activeScene.name, `${pilot.name}_GLB`);
     assert.match(pilot.name, /^Pilot_B737_/, 'GLB swap must not rename the mount group');
+    assert.ok(pilot.userData.bodyOffset.z < -0.1, `${pilot.name} must keep the forward offset after swap`);
     assert.ok(countPilotMeshes(pilot) <= 32, `${pilot.name} draws ${countPilotMeshes(pilot)} meshes after swap`);
 
     const stretch = poseCivilHands(pilot);
@@ -226,7 +229,7 @@ test('B737 pilots use longer airline thighs, a narrower flatter stance and uptur
   const { captain, firstOfficer } = createB737Pilots();
   for (const pilot of [captain, firstOfficer]) {
     const leg = pilot.userData.limbs.legs[0];
-    assert.ok(leg.thighLength > 0.5, `${pilot.name} thigh is only ${leg.thighLength} m`);
+    assert.ok(pilot.userData.bodyOffset.z < -0.1, `${pilot.name} body is not forward of the seat back`);
     assert.ok(pilot.userData.targets.toeDirection.y > -0.2, 'feet sit nearly flat on the pedals');
     const footSpacing = pilot.userData.targets.ankles[1].x - pilot.userData.targets.ankles[0].x;
     assert.ok(footSpacing < 0.14, `feet are ${footSpacing.toFixed(3)} m apart`);
@@ -241,4 +244,5 @@ test('B737 pilots use longer airline thighs, a narrower flatter stance and uptur
     assert.ok(box.max.z > 0.04, `${pilot.name} thumb must rise above the fist (z=${box.max.z.toFixed(3)})`);
   }
   assert.equal(createC172Pilot().userData.limbs.legs[0].thighLength, 0.44, 'Cessna proportions stay unchanged');
+  assert.equal(createC172Pilot().userData.bodyOffset.z, 0, 'Cessna stays in its original seat');
 });
