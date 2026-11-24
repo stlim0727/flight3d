@@ -1,6 +1,6 @@
 import { t } from '../i18n/index.js';
 import * as THREE from 'three';
-import { createGroundHeightQuery } from '../environment/TerrainProvider.js';
+import { createGroundHeightQuery, validateTerrainProviderOverride } from '../environment/TerrainProvider.js';
 
 export const B738_COLLISION_PROBES = Object.freeze([
   { id: 'nose', pos: [0, -0.2, -17.5], radius: 1.5, descKey: 'nose.radome' },
@@ -209,7 +209,7 @@ export class CollisionDetector {
     this.terrainOverrideProvider = null;
     this.getTerrainHeight = createGroundHeightQuery({
       getTerrain: () => this.terrain,
-      getOverride: () => this.terrainOverrideProvider?.() ?? null,
+      getOverride: validateTerrainProviderOverride(() => this.terrainOverrideProvider?.() ?? null),
     });
 
     this.buildSpatialGrids();

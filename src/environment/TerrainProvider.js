@@ -10,7 +10,7 @@
 
 import { surfaceNormal } from '@stlim0727/flightsim-core/terrain/TerrainProvider.js';
 
-export { assertTerrainProviderConformance } from '@stlim0727/flightsim-core/terrain/conformance.js';
+export { assertTerrainProviderConformance, validateTerrainProviderOverride } from '@stlim0727/flightsim-core/terrain/conformance.js';
 
 export {
   analyticTerrainProvider,

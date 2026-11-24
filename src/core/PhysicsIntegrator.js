@@ -11,7 +11,7 @@ import { FLOW } from '../ui/GameFlowController.js';
 import { trackFlightCrash } from '../analytics/posthog.js';
 import { PilotPhysiology } from '../physics/PilotPhysiology.js';
 import { WaterDitching } from '../physics/WaterDitching.js';
-import { createGroundSurfaceQueries } from '../environment/TerrainProvider.js';
+import { createGroundSurfaceQueries, validateTerrainProviderOverride } from '../environment/TerrainProvider.js';
 
 const GEAR_LABELS = {
   nose: 'nose.gear',
@@ -115,7 +115,7 @@ class PhysicsIntegratorMethods {
   ensureGroundSurfaceQueries() {
     return this._groundSurfaceQueries ??= createGroundSurfaceQueries({
       getTerrain: () => this.currentTerrain,
-      getOverride: () => this.terrainProviderOverride,
+      getOverride: validateTerrainProviderOverride(() => this.terrainProviderOverride),
     });
   }
 
