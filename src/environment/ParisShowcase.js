@@ -127,6 +127,13 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
   for (const [y, width, thickness] of [[57, 74, 3.2], [115, 46, 2.8], [276, 22, 1.8], [300, 12, 1.4]]) {
     solids.push(solid(`deck-${y}`, `observation deck at ${y} m`,
       [base.x, base.y + y, base.z], [width, thickness, width]));
+    const railHeight = thickness + 2.6;
+    for (const edge of [-1, 1]) {
+      solids.push(solid(`deck-${y}-rail-x-${edge}`, `observation deck railing at ${y} m`,
+        [base.x + edge * width / 2, base.y + y + 1.3, base.z], [2, railHeight, width]));
+      solids.push(solid(`deck-${y}-rail-z-${edge}`, `observation deck railing at ${y} m`,
+        [base.x, base.y + y + 1.3, base.z + edge * width / 2], [width, railHeight, 2]));
+    }
   }
   return solids;
 }

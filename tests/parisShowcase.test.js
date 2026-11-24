@@ -79,7 +79,7 @@ test('collision envelopes leave the arch open but cover legs, decks and antenna'
   assert.equal(hits(new THREE.Vector3(10, 100, -20)), true, 'first deck is solid');
   assert.equal(hits(new THREE.Vector3(10 + 30, 35 + 57, -20)), true, 'first deck slab spans 74 m');
   assert.equal(hits(new THREE.Vector3(10 + 38.5, 35 + 28.5, -20 + 38.5)), true, 'sloped leg includes both endpoints');
-
+  assert.equal(hits(new THREE.Vector3(10 + 37, 35 + 60, -20)), true, 'first deck railing is solid');
 });
 test('showcase placement uses one ground height for visuals, exclusion and collision', () => {
   const showcase = new ParisShowcase(fakeKit(), PARIS_SHOWCASE_ORIGIN);
