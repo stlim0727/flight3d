@@ -78,7 +78,7 @@ test('collision envelopes leave the arch open but cover legs, decks and antenna'
   assert.equal(hits(new THREE.Vector3(10, 45, -20)), false, 'no phantom solid under the arch');
   assert.equal(hits(new THREE.Vector3(10, 100, -20)), true, 'first deck is solid');
   assert.equal(hits(new THREE.Vector3(10 + 30, 35 + 57, -20)), true, 'first deck slab spans 74 m');
-  assert.equal(hits(new THREE.Vector3(10 + 18.553, 35 + 28.5, -20 + 38.5)), true, 'lower X brace is solid');
+  assert.equal(hits(new THREE.Vector3(10 + 38.5, 35 + 28.5, -20 + 38.5)), true, 'sloped leg includes both endpoints');
 
 });
 test('showcase placement uses one ground height for visuals, exclusion and collision', () => {
@@ -100,6 +100,40 @@ test('showcase placement uses one ground height for visuals, exclusion and colli
   assert.equal(missing.place({ getHeight: () => undefined }), false);
   missing.dispose();
   showcase.dispose();
+});
+
+
+test('failed GLB load backs off instead of retrying every frame', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalRequest = globalThis.Request;
+  const originalProgressEvent = globalThis.ProgressEvent;
+  globalThis.Request = class extends originalRequest {
+    constructor(input, init) {
+      super(typeof input === 'string' && input.startsWith('/') ? `http://localhost${input}` : input, init);
+    }
+  };
+  globalThis.ProgressEvent = class extends Event {
+    constructor(type, init = {}) { super(type); Object.assign(this, init); }
+  };
+  let requests = 0;
+  globalThis.fetch = async () => { requests++; throw new Error('offline'); };
+  const sim = {
+    world: { customOrigin: PARIS_SHOWCASE_ORIGIN },
+    currentTerrain: { mesh: new THREE.Group(), getHeight: () => 35 },
+    camera: new THREE.PerspectiveCamera(),
+  };
+  try {
+    for (let frame = 0; frame < 10; frame++) {
+      updateParisShowcase(sim);
+      await new Promise(resolve => setImmediate(resolve));
+    }
+    assert.equal(requests, 1, 'one failed request, not one per frame');
+    assert.ok(sim.parisShowcaseRetryAt > performance.now(), 'retry deadline is set');
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.Request = originalRequest;
+    globalThis.ProgressEvent = originalProgressEvent;
+  }
 });
 
 test('leaving Paris while the GLB loads invalidates the previous creation callback', async () => {

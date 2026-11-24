@@ -61,12 +61,13 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
       for (let step = 0; step < steps; step++) {
         const y0 = bottom + (top - bottom) * step / steps;
         const y1 = bottom + (top - bottom) * (step + 1) / steps;
-        const h = halfWidth((y0 + y1) / 2);
+        const from = halfWidth(y0), to = halfWidth(y1);
+        const margin = 2.7; // covers the generator's 2.2 m leg radius plus slack
         solids.push({
           id: `leg-${sx}-${sz}-${y0}`,
           part: 'Eiffel Tower leg',
-          center: [base.x + sx * h, base.y + (y0 + y1) / 2, base.z + sz * h],
-          size: [11, y1 - y0 + 2, 11],
+          center: [base.x + sx * (from + to) / 2, base.y + (y0 + y1) / 2, base.z + sz * (from + to) / 2],
+          size: [Math.abs(to - from) + margin * 2, y1 - y0 + 2, Math.abs(to - from) + margin * 2],
         });
       }
     }
@@ -288,6 +289,7 @@ export function updateParisShowcase(sim) {
     return;
   }
   if (!sim.parisShowcase) {
+    if ((sim.parisShowcaseRetryAt ?? 0) > performance.now()) return;
     const clearPending = () => { sim.parisShowcasePending = null; };
     if (!sim.parisShowcasePending) {
       const generation = sim.parisShowcaseGeneration = (sim.parisShowcaseGeneration ?? 0) + 1;
@@ -306,10 +308,14 @@ export function updateParisShowcase(sim) {
         if (sim.geographicBuildingLayer === buildings) sim.geographicBuildingLayer = null;
         sim.currentTerrain.geographicBuildingLayer = null;
         return showcase;
-      }).catch(error => { clearPending(); console.warn('Paris showcase failed to load:', error); });
+      }).catch(error => {
+        sim.parisShowcaseRetryAt = performance.now() + 5000;
+        clearPending();
+        console.warn('Paris showcase failed to load:', error);
+      });
     }
-    return;
-  }
+  return;
+}
   sim.parisShowcase.update(sim);
 }
 
