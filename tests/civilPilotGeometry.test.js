@@ -221,3 +221,24 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
   assert.equal(captain.userData.head.visible, false, 'own first-person view still hides the captain head');
   assert.equal(firstOfficer.userData.head.visible, true, 'first officer stays visible from the captain seat');
 });
+
+test('B737 pilots use longer airline thighs, a narrower flatter stance and upturned thumbs', () => {
+  const { captain, firstOfficer } = createB737Pilots();
+  for (const pilot of [captain, firstOfficer]) {
+    const leg = pilot.userData.limbs.legs[0];
+    assert.ok(leg.thighLength > 0.5, `${pilot.name} thigh is only ${leg.thighLength} m`);
+    assert.ok(pilot.userData.targets.toeDirection.y > -0.2, 'feet sit nearly flat on the pedals');
+    const footSpacing = pilot.userData.targets.ankles[1].x - pilot.userData.targets.ankles[0].x;
+    assert.ok(footSpacing < 0.14, `feet are ${footSpacing.toFixed(3)} m apart`);
+
+    const hand = pilot.userData.limbs.arms[0].hand;
+    const box = new THREE.Box3();
+    hand.traverse(node => {
+      if (!node.isMesh) return;
+      node.geometry.computeBoundingBox();
+      box.union(node.geometry.boundingBox.clone().applyMatrix4(node.matrix));
+    });
+    assert.ok(box.max.z > 0.04, `${pilot.name} thumb must rise above the fist (z=${box.max.z.toFixed(3)})`);
+  }
+  assert.equal(createC172Pilot().userData.limbs.legs[0].thighLength, 0.44, 'Cessna proportions stay unchanged');
+});
