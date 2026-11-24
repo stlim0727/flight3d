@@ -449,7 +449,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   const colors = [];
   const groundColor = new THREE.Color();
   const rawHeights = [];
-  const appendVertex = ([localX, height, localZ, u, v, wet], rawHeight = height) => {
+  const appendVertex = ([localX, height, localZ, u, v, wet, sourceHeight], rawHeight = sourceHeight ?? height) => {
     const index = vertices.length / 3;
     vertices.push(localX, height, localZ);
     rawHeights.push(rawHeight);
@@ -487,7 +487,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
             break;
           }
           pieces ??= [triangle.map(index => [...vertices.slice(index * 3, index * 3 + 3),
-            mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0)])];
+            mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0), rawHeights[index]])];
           pieces = pieces.flatMap(piece => subtractRectangle(piece, area));
         }
         if (!pieces && runwayCutouts.length) {
@@ -498,7 +498,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
             && Math.max(...zs) >= cut.minZ && Math.min(...zs) <= cut.maxZ);
           if (touchesRunway) {
             pieces = [triangle.map(index => [...vertices.slice(index * 3, index * 3 + 3),
-              mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0)])];
+              mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0), rawHeights[index]])];
           }
         }
         if (pieces) for (const cut of runwayCutouts) {
@@ -515,12 +515,12 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
             // A center fan preserves the new edge segments when they are collinear.
             const center = appendVertex(piece[0].map((_, j) =>
               piece.reduce((sum, vertex) => sum + vertex[j], 0) / piece.length));
-            const polygon = stitched.map(appendVertex);
+            const polygon = stitched.map(vertex => appendVertex(vertex));
             for (let i = 0; i < polygon.length; i++) {
               indices.push(center, polygon[i], polygon[(i + 1) % polygon.length]);
             }
           } else {
-            const polygon = piece.map(appendVertex);
+            const polygon = piece.map(vertex => appendVertex(vertex));
             for (let i = 1; i < polygon.length - 1; i++) indices.push(polygon[0], polygon[i], polygon[i + 1]);
           }
         }

@@ -65,6 +65,7 @@ function assertRunwayClear(openWorld, terrain) {
   assert.ok(entry, 'runway tile must be loaded');
   const raycaster = new Raycaster();
   const down = new Vector3(0, -1, 0);
+  const rayOrigin = new Vector3();
   let checked = 0;
   for (const runway of terrain.runways) {
     const a = runway.ends[0].physical;
@@ -81,12 +82,19 @@ function assertRunwayClear(openWorld, terrain) {
       const sampled = openWorld.sample(px, pz);
       assert.ok(!sampled || sampled.height <= runwayElevationM + 1e-3,
         `runway ${runway.id} terrain sample ${sampled?.height} at ${px.toFixed(1)}, ${pz.toFixed(1)} must not rise above the pavement`);
+      raycaster.set(rayOrigin.set(px, 1000, pz), down);
       const hit = raycaster.intersectObject(entry.mesh).find(hit => hit.point.y > runwayElevationM + EXTERNAL_MESH_LIFT_M);
       assert.equal(hit, undefined,
         `runway ${runway.id} terrain triangle covers the pavement at ${px.toFixed(1)}, ${pz.toFixed(1)}`);
       checked++;
     }
   }
+  const centre = terrain.runways[0].centre;
+  raycaster.set(rayOrigin.set(centre.x, 1000, centre.z + 400), down);
+  assert.ok(raycaster.intersectObject(entry.mesh).length > 0, 'raycaster must hit terrain beside the runway');
+  const rawBeside = openWorld.sampleRaw(centre.x, centre.z + 25);
+  assert.ok(rawBeside !== undefined && Math.abs(rawBeside - demElevationM) < 0.5,
+    `clipped vertices must keep the raw DEM height, got ${rawBeside}`);
   assert.equal(checked, 202);
 }
 
