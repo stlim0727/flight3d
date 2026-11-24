@@ -30,7 +30,7 @@ export const CIVIL_SEAT_RECLINE_RAD = 0.18;
 const UPPER_ARM = 0.30;
 const FOREARM = 0.26;
 const THIGH = 0.44;
-const AIRLINE_THIGH = 0.56;
+const AIRLINE_THIGH = 0.46;
 const SHIN = 0.43;
 const GRIP_FROM_WRIST = 0.065;
 // Limbs may lengthen this much to reach a cockpit control that sits beyond a nominal reach.
@@ -97,8 +97,8 @@ export function createCessnaMaterials() {
 }
 
 export const CIVIL_PILOT_STYLES = Object.freeze({
-  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
-  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
+  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, bodyOffsetY: 0.08, legPoleX: 0.02, legPoleY: 1 },
+  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, bodyOffsetY: 0.08, legPoleX: 0.02, legPoleY: 1 },
   // Sits up and leans towards the Cessna's deep-set yoke.
   cessna: { outfit: 'cessna', recline: 0.02 },
 });
@@ -445,7 +445,7 @@ function createLeg(mats, style, side) {
   foot.add(mesh(new THREE.BoxGeometry(0.1, 0.075, 0.27), shoe, v(0, -0.035, -0.07)));
   foot.add(mesh(new THREE.SphereGeometry(0.05, 10, 8), shoe, v(0, -0.01, 0.0)));
   for (const segment of [thigh, shin, foot]) mergeByMaterial(segment, segment.name);
-  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN, poleY: style.legPoleY ?? 1 };
+  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN, poleX: style.legPoleX, poleY: style.legPoleY ?? 1 };
 }
 
 /** Builds the civil pilot hierarchy (no seat: the cockpit models provide their own). */
@@ -489,7 +489,7 @@ export function buildCivilPilotScene(styleName = 'airlineCaptain') {
 
   const visual = new THREE.Group();
   visual.name = 'Pilot_Visual';
-  visual.position.z = style.bodyOffsetZ ?? 0;
+  visual.position.set(0, style.bodyOffsetY ?? 0, style.bodyOffsetZ ?? 0);
   visual.add(seat, body, head);
   root.add(visual);
   const eye = EYE_IN_HEAD.clone().add(head.position);
@@ -581,7 +581,7 @@ export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLIN
 /** Poses one leg with the ankle at ankleTarget and the sole pointing along toeDirection. */
 export function poseCivilLeg(limb, side, ankleTarget, toeDirection) {
   hip.set(side * HIP_JOINT.x, HIP_JOINT.y, HIP_JOINT.z);
-  pole.set(side * 0.12, limb.poleY ?? 1, -0.7);
+  pole.set(side * (limb.poleX ?? 0.12), limb.poleY ?? 1, -0.7);
   const thighLength = limb.thighLength ?? THIGH;
   const shinLength = limb.shinLength ?? SHIN;
   const stretch = solveTwoBone(hip, ankleTarget, thighLength, shinLength, pole, joint, end);
@@ -619,6 +619,7 @@ function civilLimbsFromScene(scene, style) {
       foot: scene.getObjectByName(`${prefix}_Foot`),
       thighLength,
       shinLength: SHIN,
+      poleX: style?.legPoleX,
       poleY: style?.legPoleY ?? 1,
     };
   });

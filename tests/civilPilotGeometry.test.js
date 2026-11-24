@@ -145,7 +145,7 @@ test('hands rest on the thighs when the yokes are hidden', () => {
   poseCivilHands(captain, 'rest');
   const hand = handCentre(captain, -1);
   const local = hand.clone().sub(captain.position).divideScalar(captain.scale.x);
-  assert.ok(local.y < 0.25 && local.z > -0.45, `rest hand at ${local.toArray()}`);
+  assert.ok(local.y < 0.28 && local.z > -0.45, `rest hand at ${local.toArray()}`);
 });
 
 test('cessna pilot sits under the cockpit camera on the left seat and reaches the yoke', () => {
@@ -207,10 +207,12 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
     assert.ok(foot.position.z < -0.7, `${file} must bake feet onto the pedals`);
     const visual = gltf.scene.getObjectByName('Pilot_Visual');
     assert.ok(visual && visual.position.z < -0.1, `${file} must bake the forward seat offset`);
+    assert.ok(visual && visual.position.y > 0.05, `${file} must bake the vertical seat cushion offset`);
     assert.equal(applyCivilPilotGlb(pilot, gltf.scene), true, `${file} must supply the named IK nodes`);
     assert.equal(pilot.userData.activeScene.name, `${pilot.name}_GLB`);
     assert.match(pilot.name, /^Pilot_B737_/, 'GLB swap must not rename the mount group');
     assert.ok(pilot.userData.bodyOffset.z < -0.1, `${pilot.name} must keep the forward offset after swap`);
+    assert.ok(pilot.userData.bodyOffset.y > 0.05, `${pilot.name} must keep the vertical seat offset after swap`);
     assert.ok(countPilotMeshes(pilot) <= 32, `${pilot.name} draws ${countPilotMeshes(pilot)} meshes after swap`);
 
     const stretch = poseCivilHands(pilot);
@@ -225,15 +227,20 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
   assert.equal(firstOfficer.userData.head.visible, true, 'first officer stays visible from the captain seat');
 });
 
-test('B737 pilots use longer airline thighs, a narrower flatter stance and upturned thumbs', () => {
+test('B737 pilots use natural seated posture on the seat cushion with aligned knees and upturned thumbs', () => {
   const { captain, firstOfficer } = createB737Pilots();
   for (const pilot of [captain, firstOfficer]) {
     const leg = pilot.userData.limbs.legs[0];
-    assert.ok(leg.poleY < 0, `${pilot.name} knee pole must pull the knee down`);
+    assert.ok(leg.poleY > 0, `${pilot.name} knee pole must pull the knee upward`);
     assert.ok(pilot.userData.bodyOffset.z < -0.1, `${pilot.name} body is not forward of the seat back`);
+    assert.ok(pilot.userData.bodyOffset.y > 0.05, `${pilot.name} body must sit up on the seat cushion`);
     pilot.updateMatrixWorld(true);
-    const knee = pilot.localToWorld(leg.shin.position.clone());
-    assert.ok(knee.y < 0.58, `${pilot.name} knee sits too high (${knee.y.toFixed(3)} m)`);
+    const kneeL = pilot.localToWorld(leg.shin.position.clone());
+    const kneeR = pilot.localToWorld(pilot.userData.limbs.legs[1].shin.position.clone());
+    const kneeSpacing = Math.abs(kneeR.x - kneeL.x);
+    assert.ok(kneeSpacing < 0.15, `${pilot.name} knees must not splay wide (spacing=${kneeSpacing.toFixed(3)} m)`);
+    assert.ok(kneeL.y < 0.65, `${pilot.name} knee must stay below yoke (${kneeL.y.toFixed(3)} m)`);
+    assert.ok(kneeL.y >= 0.54, `${pilot.name} knee must sit above seat cushion (${kneeL.y.toFixed(3)} m)`);
     assert.ok(pilot.userData.targets.toeDirection.y > -0.2, 'feet sit nearly flat on the pedals');
     const footSpacing = pilot.userData.targets.ankles[1].x - pilot.userData.targets.ankles[0].x;
     assert.ok(footSpacing < 0.14, `feet are ${footSpacing.toFixed(3)} m apart`);
@@ -256,4 +263,5 @@ test('B737 pilots use longer airline thighs, a narrower flatter stance and uptur
   assert.equal(createC172Pilot().userData.limbs.legs[0].thighLength, 0.44, 'Cessna proportions stay unchanged');
   assert.equal(createC172Pilot().userData.limbs.legs[0].poleY, 1, 'Cessna knee pole stays unchanged');
   assert.equal(createC172Pilot().userData.bodyOffset.z, 0, 'Cessna stays in its original seat');
+  assert.equal(createC172Pilot().userData.bodyOffset.y, 0, 'Cessna stays in its original seat height');
 });
