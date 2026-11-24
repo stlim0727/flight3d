@@ -15,17 +15,17 @@ test('CameraSystem preferred start mode loads and saves to localStorage', () => 
 
   try {
     const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
-    // Default should be COCKPIT (0)
-    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.COCKPIT);
+    // Default should be CHASE (1)
+    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.CHASE);
 
-    // Save CHASE (1)
+    // Save COCKPIT (0)
     let notifiedMode = null;
     cam.onPreferredStartModeChange = (mode) => { notifiedMode = mode; };
-    cam.setPreferredStartMode(CameraSystem.MODES.CHASE);
+    cam.setPreferredStartMode(CameraSystem.MODES.COCKPIT);
 
-    assert.equal(store.get('flight3d.startCameraMode'), '1');
-    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.CHASE);
-    assert.equal(notifiedMode, CameraSystem.MODES.CHASE);
+    assert.equal(store.get('flight3d.startCameraMode'), '0');
+    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.COCKPIT);
+    assert.equal(notifiedMode, CameraSystem.MODES.COCKPIT);
 
     // Save WING (2)
     cam.setPreferredStartMode(CameraSystem.MODES.WING);
@@ -140,7 +140,7 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     const modal = new LobbyCameraModal(sim);
 
     // Initial label check
-    assert.match(elements.get('lobby-camera-btn-label').textContent, /조종석|Cockpit/);
+    assert.match(elements.get('lobby-camera-btn-label').textContent, /추적|Chase/);
 
     // Open modal
     modal.open();
@@ -161,13 +161,13 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     assert.equal(cam.cockpitUserOffset.y, 0);
     assert.equal(elements.get('lobby-pov-y-val').textContent, '0 cm');
 
-    // Change start mode to Chase (1)
+    // Change start mode to Cockpit (0)
     const startModeSelect = elements.get('lobby-camera-start-mode');
-    startModeSelect.value = '1';
+    startModeSelect.value = '0';
     startModeSelect.dispatchEvent({ type: 'change' });
 
-    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.CHASE);
-    assert.match(elements.get('lobby-camera-btn-label').textContent, /추적|Chase/);
+    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.COCKPIT);
+    assert.match(elements.get('lobby-camera-btn-label').textContent, /조종석|Cockpit/);
 
     // Close modal
     modal.close();

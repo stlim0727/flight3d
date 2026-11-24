@@ -142,9 +142,9 @@ export class LobbyCameraModal {
     if (!this.lobbyBtnLabel) return;
     const mode = typeof this.cameraSystem?.getPreferredStartMode === 'function'
       ? this.cameraSystem.getPreferredStartMode()
-      : CameraSystem.MODES.COCKPIT;
-    const modeKey = MODE_NAME_KEYS[mode] || 'cockpit';
-    const modeName = t(`ui.camera.name.${modeKey}`) || t(`ui.camera.${modeKey}`) || '조종석';
+      : CameraSystem.MODES.CHASE;
+    const modeKey = MODE_NAME_KEYS[mode] || 'chase';
+    const modeName = t(`ui.camera.name.${modeKey}`) || t(`ui.camera.${modeKey}`) || '추적';
     const labelPattern = t('ui.lobbyCamera.btn') || '카메라 · {mode} ▾';
     this.lobbyBtnLabel.textContent = labelPattern.replace('{mode}', modeName);
   }

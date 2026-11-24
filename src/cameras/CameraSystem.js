@@ -149,7 +149,7 @@ export class CameraSystem {
         }
       }
     } catch {}
-    return CameraSystem.MODES.COCKPIT;
+    return CameraSystem.MODES.CHASE;
   }
   setPreferredStartMode(mode) {
     try {
