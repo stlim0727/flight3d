@@ -5,12 +5,15 @@
 export class HeadTrackingUi {
   constructor(controller) {
     this.controller = controller;
-    this.collapsed = false;
+    this.collapsed = true;
 
     this.root = document.createElement('div');
     this.root.id = 'head-tracking-panel';
-    this.root.style.cssText = 'position:fixed;top:max(56px, calc(env(safe-area-inset-top, 0px) + 52px));'
-      + 'left:max(12px, env(safe-area-inset-left, 0px));z-index:60;display:flex;flex-direction:column;gap:6px;'
+    // Follow the measured bottom of the control rows (including demo/warning
+    // offsets) so the panel never covers the toolbar or POV actions.
+    this.root.style.cssText = 'position:fixed;'
+      + 'top:calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + 100px)) + var(--demo-guide-space, 0px) + 52px);'
+      + 'left:max(var(--edge-left, 12px), env(safe-area-inset-left, 0px));z-index:60;display:flex;flex-direction:column;gap:6px;'
       + 'padding:8px 10px;background:rgba(8,12,18,0.86);border:1px solid rgba(255,255,255,0.18);'
       + 'border-radius:8px;color:#e8eef7;font:12px/1.35 system-ui,sans-serif;max-width:min(280px,80vw);'
       + 'touch-action:manipulation;box-shadow:0 4px 16px rgba(0,0,0,0.35);';
@@ -27,7 +30,8 @@ export class HeadTrackingUi {
     this.collapseButton = document.createElement('button');
     this.collapseButton.type = 'button';
     this.collapseButton.setAttribute('aria-label', 'Toggle head tracking panel');
-    this.collapseButton.textContent = '−';
+    this.collapseButton.setAttribute('aria-expanded', 'false');
+    this.collapseButton.textContent = '+';
     this.collapseButton.style.cssText = 'width:20px;height:20px;line-height:18px;text-align:center;padding:0;'
       + 'border:1px solid rgba(255,255,255,0.25);border-radius:4px;background:rgba(255,255,255,0.08);'
       + 'color:inherit;cursor:pointer;font:inherit;font-size:14px;';
@@ -38,7 +42,7 @@ export class HeadTrackingUi {
 
     // Body container containing status and action buttons
     this.body = document.createElement('div');
-    this.body.style.cssText = 'display:flex;flex-direction:column;gap:6px;';
+    this.body.style.cssText = 'display:none;flex-direction:column;gap:6px;';
 
     this.status = document.createElement('div');
     this.status.textContent = 'Head tracking off';
@@ -62,6 +66,7 @@ export class HeadTrackingUi {
   toggleCollapse(force) {
     this.collapsed = typeof force === 'boolean' ? force : !this.collapsed;
     this.body.style.display = this.collapsed ? 'none' : 'flex';
+    this.collapseButton.setAttribute('aria-expanded', String(!this.collapsed));
     this.collapseButton.textContent = this.collapsed ? '+' : '−';
   }
 

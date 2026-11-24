@@ -215,7 +215,7 @@ describe('mobile head look', () => {
     assert.ok(turnedDir.x < neutralDir.x, 'positive head yaw must turn gear gaze to the left (-X)');
   });
 
-  it('creates HeadTrackingUi away from bottom throttle area and supports collapse', () => {
+  it('creates a compact HeadTrackingUi below the flight controls and supports collapse', () => {
     const elements = [];
     const previousDocument = globalThis.document;
     const mockDocument = {
@@ -242,25 +242,36 @@ describe('mobile head look', () => {
     Object.defineProperty(globalThis, 'document', { configurable: true, value: mockDocument });
 
     try {
+      let toggles = 0;
       const controller = {
         getStatus: () => ({ state: 'idle', message: 'Head tracking off' }),
-        toggle: () => {},
+        toggle: () => { toggles += 1; },
         reset: () => {},
         calibrate: () => {},
       };
       const ui = new HeadTrackingUi(controller);
 
-      assert.ok(ui.root.style.cssText.includes('top:'), 'UI must be positioned at top');
-      assert.ok(!ui.root.style.cssText.includes('bottom:12px'), 'UI must not sit at bottom-left throttle area');
+      const cssText = ui.root.style.cssText;
+      assert.match(cssText, /top:\s*calc\(var\(--flight-panels-top/, 'UI must follow the measured flight control rows');
+      assert.match(cssText, /--demo-guide-space/, 'UI must clear demo and warning notices');
+      assert.match(cssText, /left:\s*max\(var\(--edge-left/, 'UI must respect the safe left edge');
+      assert.ok(!cssText.includes('bottom:'), 'UI must not sit in the bottom throttle area');
 
-      // Test collapse toggle
+      // Starts folded so it cannot cover the toolbar until the pilot opens it.
+      assert.equal(ui.collapsed, true);
+      assert.ok(ui.body.style.cssText.includes('display:none'), 'UI body starts hidden');
+      ui.toggleCollapse(false);
       assert.equal(ui.collapsed, false);
-      ui.toggleCollapse();
+      assert.equal(ui.body.style.display, 'flex');
+      ui.toggleCollapse(true);
       assert.equal(ui.collapsed, true);
       assert.equal(ui.body.style.display, 'none');
+
       ui.toggleCollapse();
       assert.equal(ui.collapsed, false);
       assert.equal(ui.body.style.display, 'flex');
+      ui.toggleButton.on_click();
+      assert.equal(toggles, 1, 'enable button must reach the head tracking controller');
 
       const css = fs.readFileSync(new URL('../src/styles/lobby-and-overlays.css', import.meta.url), 'utf8');
       assert.ok(
