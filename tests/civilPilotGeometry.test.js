@@ -229,7 +229,11 @@ test('B737 pilots use longer airline thighs, a narrower flatter stance and uptur
   const { captain, firstOfficer } = createB737Pilots();
   for (const pilot of [captain, firstOfficer]) {
     const leg = pilot.userData.limbs.legs[0];
+    assert.ok(leg.poleY < 0, `${pilot.name} knee pole must pull the knee down`);
     assert.ok(pilot.userData.bodyOffset.z < -0.1, `${pilot.name} body is not forward of the seat back`);
+    pilot.updateMatrixWorld(true);
+    const knee = pilot.localToWorld(leg.shin.position.clone());
+    assert.ok(knee.y < 0.58, `${pilot.name} knee sits too high (${knee.y.toFixed(3)} m)`);
     assert.ok(pilot.userData.targets.toeDirection.y > -0.2, 'feet sit nearly flat on the pedals');
     const footSpacing = pilot.userData.targets.ankles[1].x - pilot.userData.targets.ankles[0].x;
     assert.ok(footSpacing < 0.14, `feet are ${footSpacing.toFixed(3)} m apart`);
@@ -242,7 +246,14 @@ test('B737 pilots use longer airline thighs, a narrower flatter stance and uptur
       box.union(node.geometry.boundingBox.clone().applyMatrix4(node.matrix));
     });
     assert.ok(box.max.z > 0.04, `${pilot.name} thumb must rise above the fist (z=${box.max.z.toFixed(3)})`);
+    const thumb = new THREE.Vector3(0, 0, 1).applyQuaternion(hand.getWorldQuaternion(new THREE.Quaternion()));
+    assert.ok(thumb.y > 0.95, `${pilot.name} thumb points sideways (y=${thumb.y.toFixed(3)})`);
   }
+  assert.ok(captain.userData.targets.grips[0].x <= -0.41, 'captain left hand grips the yoke from outside');
+  assert.ok(captain.userData.targets.grips[1].x >= -0.19, 'captain right hand grips the yoke from outside');
+  assert.ok(firstOfficer.userData.targets.grips[0].x <= 0.14, 'first officer left hand grips from outside');
+  assert.ok(firstOfficer.userData.targets.grips[1].x >= 0.37, 'first officer right hand grips from outside');
   assert.equal(createC172Pilot().userData.limbs.legs[0].thighLength, 0.44, 'Cessna proportions stay unchanged');
+  assert.equal(createC172Pilot().userData.limbs.legs[0].poleY, 1, 'Cessna knee pole stays unchanged');
   assert.equal(createC172Pilot().userData.bodyOffset.z, 0, 'Cessna stays in its original seat');
 });
