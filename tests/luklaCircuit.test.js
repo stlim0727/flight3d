@@ -123,13 +123,14 @@ describe('Lukla continuous circuit and truthful completion', () => {
 
   it('waits for the streamed VNLK region it explicitly requested before starting the demo', () => {
     let region = null;
+    let held = false;
     const calls = [];
     const { sim, director, scenario } = setup({ streamer: {
       regionFor: code => (code === 'VNLK' ? region : null),
       setHome: code => calls.push(['home', code]),
-      holdDestination: code => calls.push(['hold', code]),
+      holdDestination: code => { held = true; calls.push(['hold', code]); },
       ensure: code => calls.push(['ensure', code]),
-      releaseDestinationHold: () => calls.push(['release']),
+      releaseDestinationHold: () => { held = false; calls.push(['release']); },
     } });
     assert.ok(calls.some(([action, code]) => action === 'ensure' && code === 'VNLK'));
     assert.ok(calls.some(([action, code]) => action === 'hold' && code === 'VNLK'));
@@ -140,8 +141,9 @@ describe('Lukla continuous circuit and truthful completion', () => {
     director.update(0.1);
     assert.equal(director.waitingForTerrain, false);
     assert.equal(scenario.result.status, 'running');
-    assert.ok(calls.some(([action]) => action === 'release'), 'the destination hold must be released once ready');
-    assert.equal(sim.activeAirport, 'lukla');
+    assert.equal(held, true, 'VNLK stays pinned for the whole circuit');
+    director.stop();
+    assert.equal(held, false, 'the hold is released when the demo stops');
   });
 
   it('does not resurrect a cancelled pending demo when the terrain finishes loading', () => {

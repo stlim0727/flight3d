@@ -428,7 +428,6 @@ export class DemoFlightDirector {
       }
       return;
     }
-    this._releaseLuklaStream();
     this.sim.controls?.setParkingBrake?.(false);
 
     // Ensure audio starts on first user interaction or when allowed
