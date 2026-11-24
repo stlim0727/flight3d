@@ -299,6 +299,48 @@ function subtractRectangle(polygon, [west, north, east, south]) {
   return outside;
 }
 
+// A runway strip is a rotated rectangle, so the axis-aligned subtractRectangle
+// path cannot carve it out of a terrain triangle. Keep the half-plane outside
+// each edge; the centroid decides which side is the strip interior.
+function clipLine(polygon, nx, nz, limit) {
+  const clipped = [];
+  let a = polygon.at(-1);
+  for (const b of polygon) {
+    const da = nx * a[0] + nz * a[2] - limit;
+    const db = nx * b[0] + nz * b[2] - limit;
+    if ((da >= 0) !== (db >= 0)) {
+      const weight = da / (da - db);
+      clipped.push(a.map((value, index) => THREE.MathUtils.lerp(value, b[index], weight)));
+    }
+    if (db >= 0) clipped.push(b);
+    a = b;
+  }
+  return clipped;
+}
+
+function subtractConvexPolygon(polygon, cut) {
+  const cx = cut.reduce((sum, point) => sum + point[0], 0) / cut.length;
+  const cz = cut.reduce((sum, point) => sum + point[1], 0) / cut.length;
+  const outside = [];
+  let inside = polygon;
+  for (let i = 0; i < cut.length && inside.length; i++) {
+    const a = cut[i];
+    const b = cut[(i + 1) % cut.length];
+    let nx = b[1] - a[1];
+    let nz = -(b[0] - a[0]);
+    const offset = nx * a[0] + nz * a[1];
+    if (nx * cx + nz * cz > offset) {
+      nx = -nx;
+      nz = -nz;
+    }
+    const limit = nx * a[0] + nz * a[1];
+    const piece = clipLine(inside, nx, nz, limit);
+    if (piece.length >= 3) outside.push(piece);
+    inside = clipLine(inside, -nx, -nz, -limit);
+  }
+  return outside;
+}
+
 function projectLocalImagery(sources, coordinate) {
   return sources.map(source => {
     const { position, normal } = source.attributes;
@@ -392,7 +434,7 @@ function stitchLocalEdge(piece, local) {
 }
 
 export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, water, project,
-  protectedAreas = [], blendHeight, localSurface, level = zoom, subdivisions = segments }) {
+  protectedAreas = [], blendHeight, localSurface, runwayCutouts = [], level = zoom, subdivisions = segments }) {
   const bounds = projectedBounds(x, y, project, level);
   const segments = subdivisions;
   const stride = segments + 1;
@@ -401,7 +443,8 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
     west < bounds[2] && east > bounds[0] && north < bounds[3] && south > bounds[1]);
   const vertices = [];
   const indices = [];
-  const cellOffsets = localSurface && overlaps.length ? new Uint32Array(segments ** 2 + 1) : null;
+  const cellOffsets = (localSurface && overlaps.length) || runwayCutouts.length
+    ? new Uint32Array(segments ** 2 + 1) : null;
   const mapCoordinates = [];
   const colors = [];
   const groundColor = new THREE.Color();
@@ -447,9 +490,27 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
             mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0)])];
           pieces = pieces.flatMap(piece => subtractRectangle(piece, area));
         }
+        if (!pieces && runwayCutouts.length) {
+          const xs = triangle.map(index => vertices[index * 3]);
+          const zs = triangle.map(index => vertices[index * 3 + 2]);
+          const touchesRunway = runwayCutouts.some(cut =>
+            Math.max(...xs) >= cut.minX && Math.min(...xs) <= cut.maxX
+            && Math.max(...zs) >= cut.minZ && Math.min(...zs) <= cut.maxZ);
+          if (touchesRunway) {
+            pieces = [triangle.map(index => [...vertices.slice(index * 3, index * 3 + 3),
+              mapCoordinates[index * 2], 1 - mapCoordinates[index * 2 + 1], Number(vertices[index * 3 + 1] <= 0)])];
+          }
+        }
+        if (pieces) for (const cut of runwayCutouts) {
+          const xs = pieces.flatMap(piece => piece.map(vertex => vertex[0]));
+          const zs = pieces.flatMap(piece => piece.map(vertex => vertex[2]));
+          if (!xs.length || Math.max(...xs) < cut.minX || Math.min(...xs) > cut.maxX
+            || Math.max(...zs) < cut.minZ || Math.min(...zs) > cut.maxZ) continue;
+          pieces = pieces.flatMap(piece => subtractConvexPolygon(piece, cut.poly));
+        }
         if (!pieces) indices.push(...triangle);
         else for (const piece of pieces) {
-          const stitched = cellOffsets && stitchLocalEdge(piece, localSurface);
+          const stitched = cellOffsets && localSurface && stitchLocalEdge(piece, localSurface);
           if (stitched) {
             // A center fan preserves the new edge segments when they are collinear.
             const center = appendVertex(piece[0].map((_, j) =>
@@ -575,6 +636,54 @@ export class OpenWorldTerrain {
   coordinate(x, z) {
     const { latitude, longitude } = localToWgs84(x, z, this.origin);
     return wgs84ToTile(latitude, longitude, zoom);
+  }
+
+  /** Runway strips in render-local metres, cut out of terrain before it can cover pavement. */
+  runwayCutouts(bounds) {
+    const world = this.world;
+    if (!world?.regions?.size) return [];
+    const cutouts = [];
+    for (const [id, region] of world.regions) {
+      const runways = region.terrain?.runways;
+      if (!Array.isArray(runways) || !runways.length) continue;
+      const offset = world.offsets.get(id);
+      if (!offset) continue;
+      const extent = region.extent;
+      if (extent && (extent.minX + offset[0] > bounds[2] || extent.maxX + offset[0] < bounds[0]
+        || extent.minZ + offset[1] > bounds[3] || extent.maxZ + offset[1] < bounds[1])) continue;
+      for (const runway of runways) {
+        const a = runway.ends?.[0]?.physical;
+        const b = runway.ends?.[1]?.physical;
+        const width = runway.widthM;
+        if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(a.z)
+          || !Number.isFinite(b.x) || !Number.isFinite(b.z)
+          || !Number.isFinite(width) || width <= 0) continue;
+        const dx = b.x - a.x;
+        const dz = b.z - a.z;
+        const length = Math.hypot(dx, dz);
+        if (!(length > 1e-6)) continue;
+        // Inset leaves terrain beneath the pavement edge; the end overlap
+        // keeps threshold samples strictly inside the cutout.
+        const half = width / 2 - Math.min(0.25, width * 0.05);
+        if (!(half > 0)) continue;
+        const px = -dz / length * half;
+        const pz = dx / length * half;
+        const ux = dx / length, uz = dz / length;
+        const start = [a.x - ux, a.z - uz];
+        const finish = [b.x + ux, b.z + uz];
+        const poly = [
+          [start[0] + px, start[1] + pz], [start[0] - px, start[1] - pz],
+          [finish[0] - px, finish[1] - pz], [finish[0] + px, finish[1] + pz],
+        ].map(([px, pz]) => [px + offset[0], pz + offset[1]]);
+        const xs = poly.map(point => point[0]);
+        const zs = poly.map(point => point[1]);
+        const minX = Math.min(...xs), maxX = Math.max(...xs);
+        const minZ = Math.min(...zs), maxZ = Math.max(...zs);
+        if (maxX < bounds[0] || minX > bounds[2] || maxZ < bounds[1] || minZ > bounds[3]) continue;
+        cutouts.push({ poly, minX, maxX, minZ, maxZ });
+      }
+    }
+    return cutouts;
   }
 
   protects(x, z) {
@@ -1161,8 +1270,10 @@ export class OpenWorldTerrain {
         }
         return height;
       };
+      const bounds = projectedBounds(x, y, this.project);
+      const cutouts = this.runwayCutouts(bounds);
       const { geometry, cellOffsets } = buildOpenTerrainTile({
-        blendHeight, localSurface: local,
+        blendHeight, localSurface: local, runwayCutouts: cutouts,
         x, y, raster, east, south, southeast, water, project: this.project, protectedAreas: this.protectedAreas,
       });
       const detail = {
@@ -1176,8 +1287,7 @@ export class OpenWorldTerrain {
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = true;
-      const bounds = projectedBounds(x, y, this.project);
-      entry = { mesh, fullGeometry: geometry, cellOffsets, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
+      entry = { mesh, fullGeometry: geometry, cellOffsets, runwayCutouts: cutouts, detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
       if (this.localImagery) {
         const [west, north, eastEdge, southEdge] = bounds;
         const extent = local?.extent ?? (half > 0 ? { minX: -half, maxX: half, minZ: -half, maxZ: half } : null);
@@ -1243,7 +1353,9 @@ export class OpenWorldTerrain {
   }
 
   updateRenderGeometry(entry, key) {
-    const useReduced = this.reducedGeometry && key !== this.detailedKey;
+    // Reduced tiles span ~4x more ground per triangle and could bridge a narrow
+    // strip even after clipping, so keep the full mesh wherever a runway lives.
+    const useReduced = this.reducedGeometry && key !== this.detailedKey && !entry.runwayCutouts?.length;
     if (useReduced && entry.reducedGeometry === undefined) {
       entry.reducedGeometry = buildReducedTerrainGeometry(entry.fullGeometry);
     }
