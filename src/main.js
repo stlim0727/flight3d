@@ -730,6 +730,7 @@ class FlightSimulator {
   async fly() {
     if (this.multiplayer?.locked) return;
     if (this.airportLoading || this.startingFlight) return;
+    this.lobbyCameraModal?.close();
     this.replayDirector.stop();
 
     const pending = {
@@ -949,7 +950,16 @@ class FlightSimulator {
   /** Resume the held flight without applying pending menu choices or respawning. */
   resumeFlight() {
     if (this.airportLoading || this.startingFlight || this.isCrashed) return;
-    if (this.gameFlow.canResumeFromLobby()) this.gameFlow.enterFlight();
+    if (this.gameFlow.canResumeFromLobby()) {
+      this.lobbyCameraModal?.close();
+      if (this.cameraSystem && typeof this.cameraSystem.getPreferredStartMode === 'function') {
+        const preferred = this.cameraSystem.getPreferredStartMode();
+        if (typeof this.cameraSystem.setMode === 'function') {
+          this.cameraSystem.setMode(preferred, true);
+        }
+      }
+      this.gameFlow.enterFlight();
+    }
   }
 
   /** Keep the toggle's icon and accessible label in sync with the flow state. */
@@ -1309,7 +1319,10 @@ class FlightSimulator {
     }
 
     if (this.cameraSystem) {
-      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) {
+      const preferredMode = typeof this.cameraSystem.getPreferredStartMode === 'function'
+        ? this.cameraSystem.getPreferredStartMode()
+        : null;
+      if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT || preferredMode === CameraSystem.MODES.COCKPIT) {
         const interior = this.cockpitInteriorStatus();
         if (interior !== 'ready') {
           // This model's cabin has not arrived: hold the exterior and land back inside once it

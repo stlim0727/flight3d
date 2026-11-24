@@ -151,6 +151,15 @@ export class CameraSystem {
     } catch {}
     return CameraSystem.MODES.CHASE;
   }
+  hasCustomPreferredStartMode() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const stored = localStorage.getItem('flight3d.startCameraMode');
+        return stored !== null && stored !== '';
+      }
+    } catch {}
+    return false;
+  }
   setPreferredStartMode(mode) {
     try {
       if (typeof localStorage !== 'undefined') {
@@ -272,7 +281,11 @@ export class CameraSystem {
   completeCockpitEntry() {
     if (!this.pendingCockpitEntry) return false;
     this.pendingCockpitEntry = false;
-    return this._applyMode(CameraSystem.MODES.COCKPIT);
+    const applied = this._applyMode(CameraSystem.MODES.COCKPIT);
+    if (applied && this.lastTargetMesh) {
+      this.snapToTarget(this.lastTargetMesh);
+    }
+    return applied;
   }
   holdCockpitEntry() { this.pendingCockpitEntry = true; }
   releaseCockpitEntry() {

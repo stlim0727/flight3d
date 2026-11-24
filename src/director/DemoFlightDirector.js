@@ -523,7 +523,10 @@ export class DemoFlightDirector {
       this.sim.updateHUD();
     }
     if (this.sim?.cameraSystem && !this.sim.cameraSystem.userModeSelected && !this.userCameraOverridden && typeof this.sim.cameraSystem.setMode === 'function') {
-      this.sim.cameraSystem.setMode(CameraSystem.MODES.CHASE);
+      const startMode = typeof this.sim.cameraSystem.getPreferredStartMode === 'function'
+        ? this.sim.cameraSystem.getPreferredStartMode()
+        : CameraSystem.MODES.CHASE;
+      this.sim.cameraSystem.setMode(startMode);
     }
     this.currentStage = DemoFlightDirector.STAGES.IDLE;
     this.isBannerMinimized = false;

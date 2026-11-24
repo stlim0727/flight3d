@@ -234,3 +234,99 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     else globalThis.localStorage = previousLocalStorage;
   }
 });
+
+test('preset spawn applies custom preferred start mode and sets userModeSelected', async () => {
+  const previousLocalStorage = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+  };
+
+  try {
+    const { createPilotMissionSimulation } = await import('./helpers/pilotMissionFlight.js');
+    const sim = createPilotMissionSimulation({ aircraftId: 'C172' });
+    const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+    cam.loadAircraftConfig(sim.currentAircraftConfig);
+    sim.cameraSystem = cam;
+
+    // Initially unconfigured (default CHASE)
+    assert.equal(cam.hasCustomPreferredStartMode(), false);
+    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.CHASE);
+
+    // User chooses COCKPIT (0) in lobby
+    cam.setPreferredStartMode(CameraSystem.MODES.COCKPIT);
+    assert.equal(cam.hasCustomPreferredStartMode(), true);
+    assert.equal(cam.getPreferredStartMode(), CameraSystem.MODES.COCKPIT);
+
+    // Prior view was CHASE (e.g. from demo)
+    cam.setMode(CameraSystem.MODES.CHASE);
+    cam.userModeSelected = false;
+
+    // Spawning scenario inplay
+    sim.setPreset('runway');
+
+    assert.equal(cam.mode, CameraSystem.MODES.COCKPIT, 'should start in COCKPIT mode');
+    assert.equal(cam.userModeSelected, true, 'custom mode should set userModeSelected to avoid automated overrides');
+  } finally {
+    if (previousLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousLocalStorage;
+  }
+});
+
+test('resumeFlight from lobby applies updated preferred camera mode', async () => {
+  const previousLocalStorage = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+  };
+
+  try {
+    const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+    cam.setMode(CameraSystem.MODES.CHASE, true);
+
+    let modalClosed = false;
+    let enteredFlight = false;
+    const sim = {
+      airportLoading: false,
+      startingFlight: false,
+      isCrashed: false,
+      cameraSystem: cam,
+      lobbyCameraModal: { close: () => { modalClosed = true; } },
+      gameFlow: {
+        canResumeFromLobby: () => true,
+        enterFlight: () => { enteredFlight = true; },
+      },
+    };
+
+    // Simulate resumeFlight method logic from main.js
+    const resumeFlight = () => {
+      if (sim.airportLoading || sim.startingFlight || sim.isCrashed) return;
+      if (sim.gameFlow.canResumeFromLobby()) {
+        sim.lobbyCameraModal?.close();
+        if (sim.cameraSystem && typeof sim.cameraSystem.getPreferredStartMode === 'function') {
+          const preferred = sim.cameraSystem.getPreferredStartMode();
+          if (typeof sim.cameraSystem.setMode === 'function') {
+            sim.cameraSystem.setMode(preferred, true);
+          }
+        }
+        sim.gameFlow.enterFlight();
+      }
+    };
+
+    // Change preferred mode to COCKPIT
+    cam.setPreferredStartMode(CameraSystem.MODES.COCKPIT);
+
+    resumeFlight();
+
+    assert.equal(modalClosed, true);
+    assert.equal(enteredFlight, true);
+    assert.equal(cam.mode, CameraSystem.MODES.COCKPIT, 'resumed flight should switch to preferred start mode');
+  } finally {
+    if (previousLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousLocalStorage;
+  }
+});

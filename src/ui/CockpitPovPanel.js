@@ -27,6 +27,10 @@ export class CockpitPovPanel {
     this.initBindings();
   }
 
+  getAircraftId() {
+    return this.simulator?.currentAircraftId || this.cameraSystem?.aircraftConfig?.id || 'default';
+  }
+
   initBindings() {
     if (!this.panel) return;
 
@@ -52,7 +56,7 @@ export class CockpitPovPanel {
       const x = parseFloat(this.sliderX?.value || '0');
       const y = parseFloat(this.sliderY?.value || '0');
       const z = parseFloat(this.sliderZ?.value || '0');
-      this.cameraSystem?.setCockpitUserOffset?.(x, y, z);
+      this.cameraSystem?.setCockpitUserOffset?.(x, y, z, this.getAircraftId());
       this.updateOutputs();
     };
 
@@ -149,12 +153,12 @@ export class CockpitPovPanel {
     const x = parseFloat(this.sliderX?.value || '0');
     const y = parseFloat(this.sliderY?.value || '0');
     const z = parseFloat(this.sliderZ?.value || '0');
-    this.cameraSystem?.setCockpitUserOffset?.(x, y, z);
+    this.cameraSystem?.setCockpitUserOffset?.(x, y, z, this.getAircraftId());
     this.updateOutputs();
   }
 
   reset() {
-    this.cameraSystem?.resetCockpitUserOffset?.();
+    this.cameraSystem?.resetCockpitUserOffset?.(this.getAircraftId());
     if (this.sliderX) this.sliderX.value = '0';
     if (this.sliderY) this.sliderY.value = '0';
     if (this.sliderZ) this.sliderZ.value = '0';

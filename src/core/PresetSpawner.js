@@ -115,8 +115,11 @@ class PresetSpawnerMethods {
       if (!this.cameraSystem.userModeSelected && typeof this.cameraSystem.setMode === 'function') {
         const startMode = typeof this.cameraSystem.getPreferredStartMode === 'function'
           ? this.cameraSystem.getPreferredStartMode()
-          : CameraSystem.MODES.COCKPIT;
-        this.cameraSystem.setMode(startMode);
+          : CameraSystem.MODES.CHASE;
+        const isCustom = typeof this.cameraSystem.hasCustomPreferredStartMode === 'function'
+          ? this.cameraSystem.hasCustomPreferredStartMode()
+          : false;
+        this.cameraSystem.setMode(startMode, isCustom || startMode !== CameraSystem.MODES.CHASE);
       }
       if (typeof this.cameraSystem.resetLook === 'function') {
         this.cameraSystem.resetLook();
