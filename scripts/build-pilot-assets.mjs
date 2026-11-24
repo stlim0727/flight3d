@@ -10,8 +10,8 @@
  *    MBU-12/P oxygen mask, and flexible corrugated breathing hose
  *  - Independent Pilot_Head node for seamless 1st-person cockpit view occlusion
  *    and future dynamic G-force head tilt / look-at tracking.
- * Also generates the Boeing 737 captain and first officer as pilot-b737-*.glb,
- * with the seated yoke/pedal IK pose baked into their named limb nodes.
+ * Also generates the Boeing 737 captain/first officer and Cessna 172 pilot GLBs,
+ * with each seated yoke/pedal IK pose baked into their named limb nodes.
  */
 
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { buildF16PilotScene } from '../src/aircraft/pilotGeometry.js';
-import { createB737Pilots } from '../src/aircraft/civilPilotGeometry.js';
+import { createB737Pilots, createC172Pilot } from '../src/aircraft/civilPilotGeometry.js';
 import { validateGlbModel } from './validate-glb-mesh.mjs';
 
 // Polyfills required for Three.js GLTFExporter in Node.js
@@ -40,6 +40,7 @@ const OUTPUT_FILE = path.join(MODELS_DIR, 'pilot-f16.glb');
 const CIVIL_PILOTS = [
   { pilot: 'captain', file: 'pilot-b737-captain.glb' },
   { pilot: 'firstOfficer', file: 'pilot-b737-first-officer.glb' },
+  { pilot: 'c172', file: 'pilot-c172.glb' },
 ];
 
 /**
@@ -66,9 +67,9 @@ export async function exportPilotGlb(outputPath = OUTPUT_FILE) {
   return exportGlb(buildF16PilotScene().root, 'pilot-f16.glb', outputPath);
 }
 
-/** Exports the two 737 flight-deck pilots in their seated cockpit pose. */
+/** Exports the civil pilots in their seated cockpit poses. */
 export async function exportCivilPilotGlbs() {
-  const pilots = createB737Pilots();
+  const pilots = { ...createB737Pilots(), c172: createC172Pilot() };
   const results = {};
   for (const { pilot, file } of CIVIL_PILOTS) {
     results[pilot] = await exportGlb(

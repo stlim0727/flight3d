@@ -230,6 +230,55 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
   assert.equal(firstOfficer.userData.head.visible, true, 'first officer stays visible from the captain seat');
 });
 
+test('C172 pilot swaps to a validated GLB asset without losing yoke IK or head hiding', async () => {
+  const pilot = createC172Pilot();
+  assert.equal(pilot.name, 'Pilot_C172', 'GLB variant must not rename the mount group');
+  setCivilPilotView(pilot, true, true);
+  const proceduralUpperY = pilot.userData.limbs.arms[0].upper.position.y;
+  const proceduralHandZ = pilot.userData.limbs.arms[0].hand.position.z;
+  const proceduralFootZ = pilot.userData.limbs.legs[0].foot.position.z;
+  const proceduralBodyOffset = pilot.userData.bodyOffset.clone();
+
+  const file = 'public/models/pilot-c172.glb';
+  assert.ok(fs.existsSync(file), `${file} must exist on disk`);
+  const validation = await validateGlbFile(file);
+  assert.equal(validation.valid, true, `${file}: ${validation.errors?.join('; ')}`);
+  assert.ok(validation.stats.meshes >= 24, `${file} has ${validation.stats.meshes} meshes`);
+  for (const material of ['pilot-cessna-leather-jacket', 'pilot-cessna-scarf',
+    'pilot-cessna-leather-helmet', 'pilot-cessna-goggle-lens']) {
+    assert.ok(validation.stats.materials.includes(material), `${file} must contain ${material}`);
+  }
+
+  const buffer = fs.readFileSync(file);
+  const gltf = await parseGlbBuffer(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+  const upperArm = gltf.scene.getObjectByName('Pilot_Arm_L_Upper');
+  const hand = gltf.scene.getObjectByName('Pilot_Arm_L_Hand');
+  const foot = gltf.scene.getObjectByName('Pilot_Leg_L_Foot');
+  assert.ok(upperArm && hand && foot, `${file} must expose the named IK nodes`);
+  assert.ok(Math.abs(upperArm.position.y - proceduralUpperY) < 1e-4, `${file} must bake the seated shoulder joint`);
+  assert.ok(Math.abs(hand.position.z - proceduralHandZ) < 1e-4, `${file} must bake hands onto the yokes`);
+  assert.ok(Math.abs(foot.position.z - proceduralFootZ) < 1e-4, `${file} must bake feet onto the pedals`);
+  const visual = gltf.scene.getObjectByName('Pilot_Visual');
+  assert.ok(visual, `${file} must keep Pilot_Visual`);
+  assert.ok(visual.position.distanceTo(proceduralBodyOffset) < 1e-4, `${file} must bake the seat offset`);
+
+  assert.equal(applyCivilPilotGlb(pilot, gltf.scene), true, `${file} must supply the named IK nodes`);
+  assert.equal(pilot.userData.activeScene.name, `${pilot.name}_GLB`);
+  assert.equal(pilot.userData.bodyOffset.z, proceduralBodyOffset.z);
+  assert.equal(pilot.userData.bodyOffset.y, proceduralBodyOffset.y);
+  assert.ok(countPilotMeshes(pilot) <= 32, `${pilot.name} draws ${countPilotMeshes(pilot)} meshes after swap`);
+
+  const stretch = poseCivilHands(pilot);
+  assert.ok(stretch < 1.15, `${pilot.name} arms stretch ${stretch} after swap`);
+  pilot.userData.targets.grips.forEach((grip, i) => {
+    const distance = handCentre(pilot, i === 0 ? -1 : 1).distanceTo(grip);
+    assert.ok(distance < 0.035, `${pilot.name} GLB hand ${i} is ${distance.toFixed(3)} m from its yoke horn`);
+  });
+  assert.equal(pilot.userData.head.visible, false, 'own first-person view still hides the head');
+  setCivilPilotView(pilot, false, true);
+  assert.equal(pilot.userData.head.visible, true, 'head returns in exterior view');
+});
+
 test('B737 pilots use natural seated posture on the seat cushion with aligned knees and upturned thumbs', () => {
   const { captain, firstOfficer } = createB737Pilots();
   for (const pilot of [captain, firstOfficer]) {

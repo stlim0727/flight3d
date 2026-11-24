@@ -836,6 +836,7 @@ export function createC172Pilot() {
   const s = C172_PILOT_SCALE;
   return createCivilPilot('cessna', {
     name: 'Pilot_C172',
+    variant: 'c172',
     mounts: { cockpit: eyeAlignedMount(C172_PILOT_EYE, s, 'cessna') },
     targets: seatedTargets({
       scale: s,

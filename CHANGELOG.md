@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(aircraft):** export the Cessna 172 pilot as a GLB
+  - `npm run build:pilot` now writes `public/models/pilot-c172.glb` with the seated yoke/pedal IK pose baked into its named limb nodes.
+  - The C172 swaps to the GLB at runtime with the procedural pilot as fallback; the model joins the 3D asset gallery and is covered by `tests/civilPilotGeometry.test.js`.
 - **feat(demo):** add the F-16 Incheon → Gimpo sortie demo
   - Selecting the F-16 at Incheon now offers a second cinematic demo: runway takeoff, a heading-led transit to the streamed RKSS airport, RW14R interception, a 3° final and a braked rollout with manual handover on the runway.
   - The demo owns its destination: it mounts and reads the streamed Gimpo runway before releasing the takeoff, so no lobby destination choice is required. Stage captions are available in English and Korean.
