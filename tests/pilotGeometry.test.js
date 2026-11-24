@@ -202,4 +202,5 @@ test('public/models/pilot-f16.glb exists and passes mesh geometry validation', a
 
 test('getPilotModelUrl resolves default and custom variants', () => {
   assert.match(getPilotModelUrl('f16'), /models\/pilot-f16\.glb$/);
+  assert.match(getPilotModelUrl('c172'), /models\/pilot-c172\.glb$/);
 });
