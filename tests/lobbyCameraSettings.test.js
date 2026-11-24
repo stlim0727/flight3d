@@ -329,3 +329,55 @@ test('resumeFlight from lobby applies updated preferred camera mode and updates 
     else globalThis.localStorage = previousLocalStorage;
   }
 });
+
+test('resumeFlight preserves prior mode and auto camera state if lobby camera setting was not changed', async () => {
+  const previousLocalStorage = globalThis.localStorage;
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => store.get(key) ?? null,
+    setItem: (key, val) => store.set(key, String(val)),
+    removeItem: (key) => store.delete(key),
+  };
+
+  try {
+    const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+    cam.setMode(CameraSystem.MODES.WING);
+    cam.userModeSelected = false; // automated camera control active (e.g. demo / scenario)
+
+    // Hold sortie in lobby (enters pauseView)
+    assert.equal(cam.beginPauseView(), true);
+    assert.equal(cam.mode, CameraSystem.MODES.DRONE);
+    assert.ok(cam.pauseView);
+    assert.equal(cam.pauseView.mode, CameraSystem.MODES.WING);
+    assert.equal(cam.pauseView.userModeSelected, false);
+
+    let modalClosed = false;
+    let enteredFlight = false;
+    const sim = {
+      airportLoading: false,
+      startingFlight: false,
+      isCrashed: false,
+      cameraSystem: cam,
+      lobbyCameraModal: { close: () => { modalClosed = true; } },
+      gameFlow: {
+        canResumeFromLobby: () => true,
+        enterFlight: () => {
+          enteredFlight = true;
+          cam.endPauseView();
+        },
+      },
+    };
+
+    // Resuming WITHOUT changing lobby camera preference
+    SimulatorClass.prototype.resumeFlight.call(sim);
+
+    assert.equal(modalClosed, true);
+    assert.equal(enteredFlight, true);
+    assert.equal(cam.pauseView, null);
+    assert.equal(cam.mode, CameraSystem.MODES.WING, 'resumed flight should retain prior in-flight mode');
+    assert.equal(cam.userModeSelected, false, 'userModeSelected should remain false so auto-camera transitions continue to function');
+  } finally {
+    if (previousLocalStorage === undefined) delete globalThis.localStorage;
+    else globalThis.localStorage = previousLocalStorage;
+  }
+});
