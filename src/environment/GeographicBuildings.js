@@ -560,7 +560,9 @@ export function updateGeographicBuildings(sim, elapsed) {
     const airport = sim.currentAirport;
     sim.geographicBuildingLayer = new GeographicBuildings({
       origin, project, terrain,
-      exclude: (x, z) => airport?.hasModeledBuilding?.(x, z),
+      exclude: (x, z, corners) => airport?.hasModeledBuilding?.(x, z)
+        || sim.parisShowcase?.excludes?.(x, z)
+        || (corners?.some(({ x: cx, y: cz }) => sim.parisShowcase?.excludes?.(cx, cz)) ?? false),
       isRunwaySafetyArea: (x, z) => airport?.isRunwaySafetyArea?.(x, z),
     });
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;
