@@ -342,7 +342,19 @@ export function initFlightPanels({ onSelectCamera, onAdjustTrim, onToggleParking
   }
   const aircraft = ['btn-gear', 'btn-flaps-ret', 'btn-flaps-ext', 'btn-spoilers', 'btn-reverser']
     .map(id => document.getElementById(id));
-  bar.append(...aircraft);
+  const mapButton = document.createElement('button');
+  mapButton.id = 'btn-pilotage-map';
+  mapButton.className = 'btn';
+  mapButton.type = 'button';
+  mapButton.hidden = map.hidden;
+  mapButton.setAttribute('aria-controls', map.id);
+  mapButton.setAttribute('aria-expanded', String(map.open));
+  bindText(mapButton, () => t('ui.mapShortcut'), 'title');
+  bindText(mapButton, () => t('hud.map'), 'aria-label');
+  setToolbarIcon(mapButton, 'map');
+  mapButton.addEventListener('click', () => map.querySelector('summary').click());
+  map.addEventListener('toggle', () => mapButton.setAttribute('aria-expanded', String(map.open)));
+  bar.append(...aircraft, mapButton);
   // Trim and parking brake are aircraft controls, so their overflow button stays
   // beside the control group in both orientations. The row is anchored to the right
   // edge, so the aircraft actions that follow takeover unfold leftwards.

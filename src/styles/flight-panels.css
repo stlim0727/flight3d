@@ -495,7 +495,8 @@ body.demo-active #touch-controls-overlay {
   user-select: none;
 }
 body:not([data-flow="flight"]) #pilotage-map,
-#pilotage-map:not([open]) .map-fold,
+body:not([data-flow="flight"]) #btn-pilotage-map,
+#pilotage-map:not([open]) summary,
 #pilotage-map[open] .map-unfold { display: none; }
 #pilotage-map summary {
   display: flex;
