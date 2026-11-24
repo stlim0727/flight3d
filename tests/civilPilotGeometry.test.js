@@ -199,6 +199,12 @@ test('B737 pilots swap to validated GLB assets without losing yoke IK or head hi
 
     const buffer = fs.readFileSync(file);
     const gltf = await parseGlbBuffer(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+    const upperArm = gltf.scene.getObjectByName('Pilot_Arm_L_Upper');
+    const hand = gltf.scene.getObjectByName('Pilot_Arm_L_Hand');
+    const foot = gltf.scene.getObjectByName('Pilot_Leg_L_Foot');
+    assert.ok(upperArm.position.y > 0.4, `${file} must bake the seated shoulder joint`);
+    assert.ok(hand.position.z < -0.3, `${file} must bake hands onto the yokes`);
+    assert.ok(foot.position.z < -0.7, `${file} must bake feet onto the pedals`);
     assert.equal(applyCivilPilotGlb(pilot, gltf.scene), true, `${file} must supply the named IK nodes`);
     assert.equal(pilot.userData.activeScene.name, `${pilot.name}_GLB`);
     assert.match(pilot.name, /^Pilot_B737_/, 'GLB swap must not rename the mount group');

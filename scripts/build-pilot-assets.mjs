@@ -11,7 +11,7 @@
  *  - Independent Pilot_Head node for seamless 1st-person cockpit view occlusion
  *    and future dynamic G-force head tilt / look-at tracking.
  * Also generates the Boeing 737 captain and first officer as pilot-b737-*.glb,
- * exported from the same articulated hierarchy the flight deck mounts at runtime.
+ * with the seated yoke/pedal IK pose baked into their named limb nodes.
  */
 
 import fs from 'node:fs';
@@ -19,7 +19,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { buildF16PilotScene } from '../src/aircraft/pilotGeometry.js';
-import { buildCivilPilotScene } from '../src/aircraft/civilPilotGeometry.js';
+import { createB737Pilots } from '../src/aircraft/civilPilotGeometry.js';
 import { validateGlbModel } from './validate-glb-mesh.mjs';
 
 // Polyfills required for Three.js GLTFExporter in Node.js
@@ -38,8 +38,8 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 const MODELS_DIR = path.join(REPO_ROOT, 'public', 'models');
 const OUTPUT_FILE = path.join(MODELS_DIR, 'pilot-f16.glb');
 const CIVIL_PILOTS = [
-  { style: 'airlineCaptain', file: 'pilot-b737-captain.glb' },
-  { style: 'airlineFirstOfficer', file: 'pilot-b737-first-officer.glb' },
+  { pilot: 'captain', file: 'pilot-b737-captain.glb' },
+  { pilot: 'firstOfficer', file: 'pilot-b737-first-officer.glb' },
 ];
 
 /**
@@ -66,11 +66,16 @@ export async function exportPilotGlb(outputPath = OUTPUT_FILE) {
   return exportGlb(buildF16PilotScene().root, 'pilot-f16.glb', outputPath);
 }
 
-/** Exports the two 737 flight-deck pilots, keeping their named IK nodes. */
+/** Exports the two 737 flight-deck pilots in their seated cockpit pose. */
 export async function exportCivilPilotGlbs() {
+  const pilots = createB737Pilots();
   const results = {};
-  for (const { style, file } of CIVIL_PILOTS) {
-    results[style] = await exportGlb(buildCivilPilotScene(style).root, file, path.join(MODELS_DIR, file));
+  for (const { pilot, file } of CIVIL_PILOTS) {
+    results[pilot] = await exportGlb(
+      pilots[pilot].userData.activeScene,
+      file,
+      path.join(MODELS_DIR, file),
+    );
   }
   return results;
 }
