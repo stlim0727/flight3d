@@ -93,23 +93,23 @@ export class CameraSystem {
   isPovModified() { return isPovModified(this); }
   getPovIndicatorAngle() { return getPovIndicatorAngle(this); }
   resetPov() { this.resetLook(); }
-  setCockpitUserOffset(x, y, z) {
+  setCockpitUserOffset(x, y, z, targetAircraftId = this.aircraftConfig?.id || 'default') {
     if (typeof x === 'number' && !Number.isNaN(x)) this.cockpitUserOffset.x = x;
     if (typeof y === 'number' && !Number.isNaN(y)) this.cockpitUserOffset.y = y;
     if (typeof z === 'number' && !Number.isNaN(z)) this.cockpitUserOffset.z = z;
-    this.saveCockpitUserOffset();
+    this.saveCockpitUserOffset(targetAircraftId);
     if (typeof this.onCockpitUserOffsetChange === 'function') this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
   }
   getCockpitUserOffset() { return this.cockpitUserOffset.clone(); }
-  resetCockpitUserOffset() {
+  resetCockpitUserOffset(targetAircraftId = this.aircraftConfig?.id || 'default') {
     this.cockpitUserOffset.set(0, 0, 0);
-    this.saveCockpitUserOffset();
+    this.saveCockpitUserOffset(targetAircraftId);
     if (typeof this.onCockpitUserOffsetChange === 'function') this.onCockpitUserOffsetChange(this.getCockpitUserOffset());
   }
   isCockpitUserOffsetModified() { return this.cockpitUserOffset.lengthSq() > 1e-6; }
-  saveCockpitUserOffset() {
+  saveCockpitUserOffset(targetAircraftId = this.aircraftConfig?.id || 'default') {
     try {
-      const id = this.aircraftConfig?.id || 'default';
+      const id = targetAircraftId || 'default';
       if (typeof localStorage !== 'undefined') {
         localStorage.setItem(`flight3d.cockpitUserOffset.${id}`, JSON.stringify({
           x: Number(this.cockpitUserOffset.x.toFixed(4)),
@@ -119,9 +119,9 @@ export class CameraSystem {
       }
     } catch {}
   }
-  loadCockpitUserOffset() {
+  loadCockpitUserOffset(targetAircraftId = this.aircraftConfig?.id || 'default') {
     try {
-      const id = this.aircraftConfig?.id || 'default';
+      const id = targetAircraftId || 'default';
       if (typeof localStorage !== 'undefined') {
         const stored = localStorage.getItem(`flight3d.cockpitUserOffset.${id}`);
         if (stored) {

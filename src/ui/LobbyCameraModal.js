@@ -62,6 +62,10 @@ export class LobbyCameraModal {
   }
 
   getAircraftId() {
+    const hasHeldSortie = Boolean(this.simulator?.gameFlow?.canResumeFromLobby?.());
+    if (hasHeldSortie) {
+      return this.simulator?.currentAircraftId || 'C172';
+    }
     return this.simulator?.lobby?.aircraft || this.simulator?.currentAircraftId || 'C172';
   }
 
@@ -101,7 +105,8 @@ export class LobbyCameraModal {
       const x = parseFloat(this.sliderX?.value || '0');
       const y = parseFloat(this.sliderY?.value || '0');
       const z = parseFloat(this.sliderZ?.value || '0');
-      this.cameraSystem?.setCockpitUserOffset?.(x, y, z);
+      const aircraftId = this.getAircraftId();
+      this.cameraSystem?.setCockpitUserOffset?.(x, y, z, aircraftId);
       this.updateOutputs();
     };
 
@@ -201,12 +206,14 @@ export class LobbyCameraModal {
     const x = parseFloat(this.sliderX?.value || '0');
     const y = parseFloat(this.sliderY?.value || '0');
     const z = parseFloat(this.sliderZ?.value || '0');
-    this.cameraSystem?.setCockpitUserOffset?.(x, y, z);
+    const aircraftId = this.getAircraftId();
+    this.cameraSystem?.setCockpitUserOffset?.(x, y, z, aircraftId);
     this.updateOutputs();
   }
 
   resetToDefaults() {
-    this.cameraSystem?.resetCockpitUserOffset?.();
+    const aircraftId = this.getAircraftId();
+    this.cameraSystem?.resetCockpitUserOffset?.(aircraftId);
     if (this.sliderX) this.sliderX.value = '0';
     if (this.sliderY) this.sliderY.value = '0';
     if (this.sliderZ) this.sliderZ.value = '0';
@@ -229,11 +236,16 @@ export class LobbyCameraModal {
   open() {
     if (!this.dialog) return;
 
-    // Apply active aircraft switch to match chosen lobby aircraft
+    const hasHeldSortie = Boolean(this.simulator?.gameFlow?.canResumeFromLobby?.());
     const aircraftId = this.getAircraftId();
-    if (typeof this.simulator?.setAircraft === 'function' && this.simulator.currentAircraftId !== aircraftId) {
+
+    // Only switch the live simulation airframe when we are in a fresh lobby without a held sortie
+    if (!hasHeldSortie && typeof this.simulator?.setAircraft === 'function' && this.simulator.currentAircraftId !== aircraftId) {
       this.simulator.setAircraft(aircraftId);
     }
+
+    // Load offset for chosen aircraft
+    this.cameraSystem?.loadCockpitUserOffset?.(aircraftId);
 
     this.isOpen = true;
     this.dialog.hidden = false;
@@ -257,7 +269,8 @@ export class LobbyCameraModal {
       this.savedUserModeSelected = this.cameraSystem.userModeSelected;
       this.savedAutoSwitch = this.cameraSystem.autoSwitch;
       if (typeof this.cameraSystem.setMode === 'function') {
-        this.cameraSystem.setMode(CameraSystem.MODES.COCKPIT, false);
+        // Use isUserAction=true to bypass userModeSelected guard and enter cockpit view
+        this.cameraSystem.setMode(CameraSystem.MODES.COCKPIT, true);
       }
     }
 
@@ -279,7 +292,7 @@ export class LobbyCameraModal {
     // Restore prior camera mode and selection state
     if (this.cameraSystem && this.savedCameraMode !== null) {
       if (typeof this.cameraSystem.setMode === 'function') {
-        this.cameraSystem.setMode(this.savedCameraMode, false);
+        this.cameraSystem.setMode(this.savedCameraMode, true);
       }
       if (this.savedUserModeSelected !== null && this.savedUserModeSelected !== undefined) {
         this.cameraSystem.userModeSelected = this.savedUserModeSelected;

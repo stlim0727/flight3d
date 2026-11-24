@@ -201,6 +201,28 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     modal.close();
     assert.equal(elements.get('lobby-camera-modal').open, false);
     assert.equal(cam.userModeSelected, false);
+
+    // Test with held sortie (canResumeFromLobby = true): must NOT switch aircraft
+    setAircraftCalledWith = null;
+    sim.currentAircraftId = 'B738';
+    sim.lobby.aircraft = 'F16';
+    sim.gameFlow = { canResumeFromLobby: () => true };
+
+    modal.open();
+    assert.equal(setAircraftCalledWith, null, 'setAircraft should not be called when sortie is held');
+    assert.equal(modal.getAircraftId(), 'B738');
+    modal.close();
+
+    // Test manual camera mode selection (userModeSelected = true): must force COCKPIT preview and restore true
+    delete sim.gameFlow;
+    cam.setMode(CameraSystem.MODES.CHASE, true);
+    assert.equal(cam.userModeSelected, true);
+
+    modal.open();
+    assert.equal(cam.mode, CameraSystem.MODES.COCKPIT);
+    modal.close();
+    assert.equal(cam.mode, CameraSystem.MODES.CHASE);
+    assert.equal(cam.userModeSelected, true);
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
