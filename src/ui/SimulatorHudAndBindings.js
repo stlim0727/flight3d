@@ -238,7 +238,11 @@ class SimulatorHudAndBindingsMethods {
     if (map) {
       const available = this.currentAircraftId === 'C172' && this.lastPresetType === 'busan'
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
-      if (map.hidden === available) map.hidden = !available;
+      if (map.hidden === available) {
+        map.hidden = !available;
+        const mapButton = document.getElementById('btn-pilotage-map');
+        if (mapButton) mapButton.hidden = !available;
+      }
       if (!available && map.open) map.open = false;
       this.pilotageFlight = available;
       let layout = '';

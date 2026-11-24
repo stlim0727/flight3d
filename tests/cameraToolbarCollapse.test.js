@@ -216,7 +216,7 @@ test('camera toolbar collapse/expand toggle button lifecycle and interaction', (
     // inside it or when the game closes it (crash, leaving the flight).
     const map = elements.get('pilotage-map');
     const pilotToggle = () => {
-      mapSummary.click();
+      elements.get('btn-pilotage-map').click();
       map.open = !map.open;
       map.dispatchEvent({ type: 'toggle' });
     };

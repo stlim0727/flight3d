@@ -25,6 +25,7 @@ export const TOOLBAR_ICONS = Object.freeze({
   // Spoilers: the same airfoil family as the flap icon with its upper-surface
   // panel always drawn raised; the pressed button state shows whether they are out.
   spoilers: `${WING}<path d="M10 10.5 16 4"/>`,
+  map: '<path d="m2 5 7-3 6 3 7-3v17l-7 3-6-3-7 3zM9 2v17m6-14v17"/>',
   // Issue #880: the in-flight view menu trigger. The open panel lists every view by name.
   camera: '<path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h3l1.5-2.5h6L16.5 7h3A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.5"/>',
   'fullscreen-enter': '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
