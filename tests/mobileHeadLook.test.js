@@ -253,7 +253,8 @@ describe('mobile head look', () => {
 
       const cssText = ui.root.style.cssText;
       assert.match(cssText, /top:\s*calc\(var\(--flight-panels-top/, 'UI must follow the measured flight control rows');
-      assert.match(cssText, /--demo-guide-space/, 'UI must clear demo and warning notices');
+      assert.match(cssText, /--demo-guide-space/, 'UI must clear demo guide rows');
+      assert.match(cssText, /--flight-alert-space/, 'UI must drop with the POV row when flight warnings appear');
       assert.match(cssText, /left:\s*max\(var\(--edge-left/, 'UI must respect the safe left edge');
       assert.ok(!cssText.includes('bottom:'), 'UI must not sit in the bottom throttle area');
 

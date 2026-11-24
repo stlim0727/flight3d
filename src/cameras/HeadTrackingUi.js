@@ -9,10 +9,10 @@ export class HeadTrackingUi {
 
     this.root = document.createElement('div');
     this.root.id = 'head-tracking-panel';
-    // Follow the measured bottom of the control rows (including demo/warning
-    // offsets) so the panel never covers the toolbar or POV actions.
+    // Follow the POV action row, which drops for demo guides and flight alerts,
+    // so the panel never covers the toolbar or the gaze-exit button.
     this.root.style.cssText = 'position:fixed;'
-      + 'top:calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + 100px)) + var(--demo-guide-space, 0px) + 52px);'
+      + 'top:calc(var(--flight-panels-top, calc(var(--edge-top, 8px) + 100px)) + var(--demo-guide-space, 0px) + var(--flight-alert-space, 0px) + 52px);'
       + 'left:max(var(--edge-left, 12px), env(safe-area-inset-left, 0px));z-index:60;display:flex;flex-direction:column;gap:6px;'
       + 'padding:8px 10px;background:rgba(8,12,18,0.86);border:1px solid rgba(255,255,255,0.18);'
       + 'border-radius:8px;color:#e8eef7;font:12px/1.35 system-ui,sans-serif;max-width:min(280px,80vw);'
