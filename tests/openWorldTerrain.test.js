@@ -807,3 +807,30 @@ test('OpenWorldTerrain jeju frame protects only the airport precinct, leaving Ha
   openWorld.dispose();
 });
 
+test('tile protection requires one protected area to cover both corners', () => {
+  const tile = { x, y };
+  const probe = new OpenWorldTerrain({ origin });
+  const corners = [[x, y], [x + 1, y], [x, y + 1], [x + 1, y + 1]].map(([tx, ty]) => {
+    const { latitude, longitude } = tileToWgs84(tx, ty, 11);
+    return probe.project(latitude, longitude);
+  });
+  const west = Math.min(...corners.map(([px]) => px));
+  const north = Math.min(...corners.map(([, pz]) => pz));
+  const east = Math.max(...corners.map(([px]) => px));
+  const south = Math.max(...corners.map(([, pz]) => pz));
+
+  const split = new OpenWorldTerrain({ origin, protectedAreas: [
+    [west - 100, north - 100, west + 1, north + 1],
+    [east - 1, south - 1, east + 100, south + 100],
+  ] });
+  assert.equal(split.protects(west, north), true);
+  assert.equal(split.protects(east, south), true);
+  assert.equal(split.protectsTile(west, north, east, south), false);
+  assert.equal(split.readyForTile(tile, 11), false);
+
+  const covered = new OpenWorldTerrain({ origin, protectedAreas: [[west - 100, north - 100, east + 100, south + 100]] });
+  assert.equal(covered.protectsTile(west, north, east, south), true);
+  assert.equal(covered.readyForTile(tile, 11), true);
+  split.dispose();
+  covered.dispose();
+});
