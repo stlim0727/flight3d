@@ -121,11 +121,18 @@ describe('Lukla continuous circuit and truthful completion', () => {
     assert.equal(sim.controls.parkingBrake, false);
   });
 
-  it('waits for the streamed VNLK region before starting the demo', () => {
+  it('waits for the streamed VNLK region it explicitly requested before starting the demo', () => {
     let region = null;
+    const calls = [];
     const { sim, director, scenario } = setup({ streamer: {
       regionFor: code => (code === 'VNLK' ? region : null),
+      setHome: code => calls.push(['home', code]),
+      holdDestination: code => calls.push(['hold', code]),
+      ensure: code => calls.push(['ensure', code]),
+      releaseDestinationHold: () => calls.push(['release']),
     } });
+    assert.ok(calls.some(([action, code]) => action === 'ensure' && code === 'VNLK'));
+    assert.ok(calls.some(([action, code]) => action === 'hold' && code === 'VNLK'));
     assert.equal(director.waitingForTerrain, true);
     director.update(0.1);
     assert.equal(scenario.result.status, 'pending', 'no runway exists until the region streams in');
@@ -133,6 +140,7 @@ describe('Lukla continuous circuit and truthful completion', () => {
     director.update(0.1);
     assert.equal(director.waitingForTerrain, false);
     assert.equal(scenario.result.status, 'running');
+    assert.ok(calls.some(([action]) => action === 'release'), 'the destination hold must be released once ready');
     assert.equal(sim.activeAirport, 'lukla');
   });
 

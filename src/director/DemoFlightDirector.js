@@ -346,6 +346,7 @@ export class DemoFlightDirector {
     this.activeDemoAircraft = this.sim.currentAircraftId || 'B738';
 
     const airport = targetAirport || this.sim.activeAirport || (this.sim.luklaTerrain ? 'lukla' : 'coastal');
+    if (airport === 'lukla') this._prepareLuklaStream();
     const airportSwitch = (this.sim.setAirport && this.sim.activeAirport !== airport)
       ? this.sim.setAirport(airport)
       : null;
@@ -427,6 +428,7 @@ export class DemoFlightDirector {
       }
       return;
     }
+    this._releaseLuklaStream();
     this.sim.controls?.setParkingBrake?.(false);
 
     // Ensure audio starts on first user interaction or when allowed
@@ -473,6 +475,21 @@ export class DemoFlightDirector {
     }
   }
 
+
+  _prepareLuklaStream() {
+    const streamer = this.sim.airportStreamer;
+    if (!streamer || this._luklaStreamHeld) return;
+    streamer.setHome?.('VNLK');
+    streamer.holdDestination?.('VNLK');
+    streamer.ensure?.('VNLK');
+    this._luklaStreamHeld = true;
+  }
+
+  _releaseLuklaStream() {
+    if (!this._luklaStreamHeld) return;
+    this._luklaStreamHeld = false;
+    this.sim.airportStreamer?.releaseDestinationHold?.();
+  }
   stopForCrash(crashResult) {
     if (!this.isActive) return;
     this.getActiveScenario().recordFailure?.(crashResult);
@@ -489,6 +506,7 @@ export class DemoFlightDirector {
         ['pending', 'running'].includes(this.luklaScenario.result.status)) {
       this.luklaScenario.result.status = 'cancelled';
     }
+    this._releaseLuklaStream();
     this.waitingForTerrain = false;
     this.isActive = false;
     if (this.sim?.controls) {

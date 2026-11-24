@@ -11,9 +11,14 @@ const base = process.env.BASE_REV || 'origin/main';
 // Historical before/after evidence only: LuklaAirport.js is read from the git
 // snapshot so the old render can be compared. The review page's 'after' scene
 // uses the common streamed VNLK surface and never imports retired src classes.
-for (const name of ['Airport', 'LuklaAirport', 'IncheonPavement', 'Pavement']) {
+const baselineModules = new Set(['Airport', 'LuklaAirport', 'IncheonPavement', 'Pavement']);
+for (const name of baselineModules) {
   const source = execFileSync('git', ['show', `${base}:src/environment/${name}.js`], { encoding: 'utf8' })
-    .replaceAll(/from '\.\/([^']+)'/g, "from '/src/environment/$1'");
+    // Keep imports between extracted baseline modules on the baseline copy;
+    // only unrelated modules resolve to the current source tree.
+    .replaceAll(/from '\.\/([^']+)'/g, (match, imported) => (
+      baselineModules.has(imported) ? match : `from '/src/environment/${imported}'`
+    ));
   fs.writeFileSync(`${baseline}/${name}.js`, source);
 }
 const server = await createServer({
