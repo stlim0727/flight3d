@@ -238,7 +238,7 @@ class SimulatorHudAndBindingsMethods {
     if (map) {
       const busanCruise = this.lastPresetType === 'busan'
         || (this.lastPresetType === 'cruise' && this.activeMapPlace?.pointId === 'busan');
-      const available = this.currentAircraftId === 'C172' && busanCruise
+      const available = busanCruise
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) {
         map.hidden = !available;

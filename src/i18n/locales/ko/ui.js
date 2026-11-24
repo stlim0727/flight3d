@@ -221,7 +221,7 @@ export default {
   "toggle.pointer.lock.for.free.look": "자유 시선 포인터 고정 모드 토글 (Pointer Lock)",
   "change.time.dawn.noon.sunset.dusk.night": "시간대 변경 (새벽, 정오, 석양, 황혼, 야경)",
   "toggle.sound.muted": "소리 켜기 / 끄기 (Shift+M)",
-  "toggle.pilotage.map": "지도 펼치기 / 접기 (부산 C172 비행)",
+  "toggle.pilotage.map": "지도 펼치기 / 접기 (부산 순항)",
   "mobile.touchscreen.controls": "📱 모바일 / 터치스크린 온스크린 조작 가이드",
   "drag.to.control.pitch.and.roll.release": "터치 드래그로 피치(기수 올림/내림) 및 롤(좌우 선회) 조작. 놓으면 중앙 복귀",
   "drag.up.down.for.0.100.thrust": "위아래 슬라이더 드래그로 추력 0%~100% 조절 (TOGA, CLB, APP, IDLE 원터치 프리셋 지원)",
