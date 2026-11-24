@@ -71,6 +71,25 @@ export function eiffelCollisionSolids(base = { x: 0, y: 0, z: 0 }) {
       }
     }
   }
+  // Follow the four visible arches; the passage beneath them stays open.
+  const archCorner = y => {
+    const h = halfWidth(y);
+    return [[h, y, h], [-h, y, h], [-h, y, -h], [h, y, -h]];
+  };
+  const archSegments = 8;
+  for (let face = 0; face < 4; face++) {
+    const a = archCorner(8)[face], b = archCorner(8)[(face + 1) % 4];
+    for (let step = 0; step < archSegments; step++) {
+      const point = t => {
+        const [ax, , az] = a, [bx, , bz] = b;
+        return [ax * (1 - t) + bx * t, 8 + 24 * Math.sin(Math.PI * t), az * (1 - t) + bz * t];
+      };
+      const p0 = point(step / archSegments), p1 = point((step + 1) / archSegments);
+      solids.push(solid(`arch-${face}-${step}`, 'Eiffel Tower arch',
+        [base.x + (p0[0] + p1[0]) / 2, base.y + (p0[1] + p1[1]) / 2, base.z + (p0[2] + p1[2]) / 2],
+        [Math.abs(p1[0] - p0[0]) + 6, Math.abs(p1[1] - p0[1]) + 6, Math.abs(p1[2] - p0[2]) + 6]));
+    }
+  }
   for (const [bottom, top, width, part] of [
     [59, 115, 28, 'tower shaft'],
     [116, 276, 16, 'upper tower'],

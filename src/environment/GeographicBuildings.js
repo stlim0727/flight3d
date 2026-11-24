@@ -266,7 +266,7 @@ export class GeographicBuildings {
     this.project = project;
     this.terrain = terrain;
     this.isRunwaySafetyArea = isRunwaySafetyArea;
-    this.exclude = (x, z, footprint) => exclude?.(x, z)
+    this.exclude = (x, z, footprint = []) => exclude?.(x, z, footprint)
       || isRunwaySafetyArea?.(x, z)
       || footprint.some(point => isRunwaySafetyArea?.(point.x, point.y));
     this.archive = archive;

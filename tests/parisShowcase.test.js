@@ -11,6 +11,7 @@ import {
   eiffelCollisionSolids, validateEiffelKit,
 } from '../src/environment/ParisShowcase.js';
 import { wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
+import { GeographicBuildings } from '../src/environment/GeographicBuildings.js';
 
 const fakeKit = () => {
   const kit = new THREE.Group();
@@ -77,8 +78,9 @@ test('collision envelopes leave the arch open but cover legs, decks and antenna'
   assert.equal(hits(new THREE.Vector3(10, 45, -20)), false, 'no phantom solid under the arch');
   assert.equal(hits(new THREE.Vector3(10, 100, -20)), true, 'first deck is solid');
   assert.equal(hits(new THREE.Vector3(10 + 30, 35 + 57, -20)), true, 'first deck slab spans 74 m');
-});
+  assert.equal(hits(new THREE.Vector3(10, 35 + 32, -20 + 55.4)), true, 'lower arch member is solid');
 
+});
 test('showcase placement uses one ground height for visuals, exclusion and collision', () => {
   const showcase = new ParisShowcase(fakeKit(), PARIS_SHOWCASE_ORIGIN);
   assert.equal(showcase.ready, false);
@@ -98,6 +100,19 @@ test('showcase placement uses one ground height for visuals, exclusion and colli
   assert.equal(missing.place({ getHeight: () => undefined }), false);
   missing.dispose();
   showcase.dispose();
+});
+
+test('building exclusion receives the footprint corners', () => {
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project: () => [0, 0],
+    terrain: {},
+    archive: { getZxy: async () => null },
+    exclude: (x, z, corners) => Math.hypot(x, z) <= 75
+      || (corners?.some(point => Math.hypot(point.x, point.y) <= 75) ?? false),
+  });
+  assert.equal(layer.exclude(80, 62, [{ x: 60, y: 42 }, { x: 100, y: 82 }]), true);
+  layer.dispose();
 });
 
 test('shipped GLB contains all three named LOD meshes', () => {
