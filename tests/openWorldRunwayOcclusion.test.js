@@ -47,9 +47,11 @@ async function loadWorld({ mounted = true } = {}) {
     airport: airport(), overrides: {}, outsideHeight: () => demElevationM,
   });
   const region = { terrain, extent: terrain.extent, mounted, group: { visible: mounted } };
+  // A visible region without runways must not break tile loading.
+  const coastal = { terrain: {}, extent: { minX: -1e6, maxX: 1e6, minZ: -1e6, maxZ: 1e6 }, mounted: true, group: { visible: true } };
   const world = {
-    regions: new Map([['RKTH', region]]),
-    offsets: new Map([['RKTH', [0, 0]]]),
+    regions: new Map([['RKTH', region], ['coastal', coastal]]),
+    offsets: new Map([['RKTH', [0, 0]], ['coastal', [0, 0]]]),
   };
   const openWorld = new OpenWorldTerrain({
     origin, world,

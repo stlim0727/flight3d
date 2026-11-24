@@ -646,6 +646,7 @@ export class OpenWorldTerrain {
     const cutouts = [];
     for (const [id, region] of world.regions) {
       const runways = region.terrain?.runways;
+      if (!Array.isArray(runways) || !runways.length) continue;
       if (!this.runwayVisible(region)) continue;
       const offset = world.offsets.get(id);
       if (!offset) continue;
