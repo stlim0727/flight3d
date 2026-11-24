@@ -21,7 +21,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { setPilotCockpitMode } from './pilotGeometry.js';
+import { loadPilotModel, setPilotCockpitMode } from './pilotGeometry.js';
 
 // Torso leans back from vertical in the upright civil seats.
 export const CIVIL_SEAT_RECLINE_RAD = 0.18;
@@ -573,13 +573,71 @@ export function civilRestGrip(side) {
   return v(side * 0.12, 0.12, -0.3);
 }
 
+/** Rebuilds the IK limb references from a cloned civil pilot GLB hierarchy. */
+function civilLimbsFromScene(scene) {
+  const arms = [-1, 1].map(side => {
+    const prefix = `Pilot_Arm_${side > 0 ? 'R' : 'L'}`;
+    return {
+      arm: scene.getObjectByName(prefix),
+      upper: scene.getObjectByName(`${prefix}_Upper`),
+      fore: scene.getObjectByName(`${prefix}_Fore`),
+      hand: scene.getObjectByName(`${prefix}_Hand`),
+    };
+  });
+  const legs = [-1, 1].map(side => {
+    const prefix = `Pilot_Leg_${side > 0 ? 'R' : 'L'}`;
+    return {
+      leg: scene.getObjectByName(prefix),
+      thigh: scene.getObjectByName(`${prefix}_Thigh`),
+      shin: scene.getObjectByName(`${prefix}_Shin`),
+      foot: scene.getObjectByName(`${prefix}_Foot`),
+    };
+  });
+  return { arms, legs };
+}
+
 /**
- * Creates a mountable civil pilot.
+ * Replaces the procedural pilot with a cloned GLB template, keeping its named nodes usable by
+ * the yoke IK and first-person head visibility. Returns false if the template is unusable, so
+ * callers keep the procedural pilot as a fallback.
+ */
+export function applyCivilPilotGlb(pilot, template) {
+  if (!pilot?.userData || !template) return false;
+  const scene = template.clone(true);
+  const head = scene.getObjectByName('Pilot_Head');
+  const body = scene.getObjectByName('Pilot_Body');
+  const seat = scene.getObjectByName('Pilot_Seat');
+  const limbs = civilLimbsFromScene(scene);
+  const complete = head && body && seat
+    && limbs.arms.every(limb => limb.upper && limb.fore && limb.hand)
+    && limbs.legs.every(limb => limb.thigh && limb.shin && limb.foot);
+  if (!complete) return false;
+
+  const previous = pilot.userData.activeScene;
+  if (previous?.parent === pilot) pilot.remove(previous);
+  scene.name = `${pilot.name}_GLB`;
+  pilot.add(scene);
+  pilot.userData.activeScene = scene;
+  pilot.userData.head = head;
+  pilot.userData.body = body;
+  pilot.userData.seat = seat;
+  pilot.userData.limbs = limbs;
+  applyCivilPilotMount(pilot, pilot.userData.mountMode ?? 'exterior');
+  if (pilot.userData.isCockpit !== undefined) {
+    setPilotCockpitMode(pilot, pilot.userData.isCockpit, pilot.userData.showInterior, pilot.userData.cockpitOptions);
+  }
+  pilot.userData.onSwap?.();
+  return true;
+}
+
+/**
+ * Creates a mountable civil pilot. When variant is set, the matching GLB replaces the
+ * procedural hierarchy as soon as it loads; the procedural figure is the offline fallback.
  *
  * mounts: { cockpit: {position, scale}, exterior?: {position, scale} } in the parent frame.
  * targets (parent frame): { grips: [left, right], ankles: [left, right], toeDirection }.
  */
-export function createCivilPilot(styleName, { mounts, targets, name } = {}) {
+export function createCivilPilot(styleName, { mounts, targets, name, variant } = {}) {
   const { root, seat, body, head, limbs, style, eye } = buildCivilPilotScene(styleName);
   const group = new THREE.Group();
   group.name = name ?? `Pilot_${styleName}`;
@@ -594,7 +652,9 @@ export function createCivilPilot(styleName, { mounts, targets, name } = {}) {
   group.userData.mounts = mounts;
   group.userData.targets = targets;
   group.userData.gripOverride = null;
-  group.ready = Promise.resolve();
+  group.ready = variant && typeof window !== 'undefined'
+    ? loadPilotModel(variant).then(template => applyCivilPilotGlb(group, template)).catch(() => false)
+    : Promise.resolve();
   applyCivilPilotMount(group, 'exterior');
   return group;
 }
@@ -686,6 +746,7 @@ export function createB737Pilots() {
   const s = B737_PILOT_SCALE;
   const captain = createCivilPilot('airlineCaptain', {
     name: 'Pilot_B737_Captain',
+    variant: 'b737-captain',
     mounts: { cockpit: eyeAlignedMount(B737_CAPTAIN_EYE, s, 'airlineCaptain') },
     targets: seatedTargets({
       scale: s,
@@ -695,6 +756,7 @@ export function createB737Pilots() {
   });
   const firstOfficer = createCivilPilot('airlineFirstOfficer', {
     name: 'Pilot_B737_FirstOfficer',
+    variant: 'b737-first-officer',
     mounts: { cockpit: eyeAlignedMount(B737_FIRST_OFFICER_EYE, s, 'airlineFirstOfficer') },
     targets: seatedTargets({
       scale: s,

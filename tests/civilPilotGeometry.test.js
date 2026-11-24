@@ -1,7 +1,10 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
+import { validateGlbFile, parseGlbBuffer } from '../scripts/validate-glb-mesh.mjs';
 import {
+  applyCivilPilotGlb,
   buildCivilPilotScene,
   createB737Pilots,
   createC172Pilot,
@@ -176,4 +179,39 @@ test('aircraft models mount their pilots', () => {
   assert.ok(cessna.pilot.parent === cessna.group);
   cessna.setCockpitMode(false);
   assert.equal(cessna.pilot.userData.head.visible, true);
+});
+
+test('B737 pilots swap to validated GLB assets without losing yoke IK or head hiding', async () => {
+  const { captain, firstOfficer } = createB737Pilots();
+  setCivilPilotView(captain, true, true);
+  setCivilPilotView(firstOfficer, true, true, { ownView: false });
+
+  for (const [pilot, file] of [
+    [captain, 'public/models/pilot-b737-captain.glb'],
+    [firstOfficer, 'public/models/pilot-b737-first-officer.glb'],
+  ]) {
+    assert.ok(fs.existsSync(file), `${file} must exist on disk`);
+    const validation = await validateGlbFile(file);
+    assert.equal(validation.valid, true, `${file}: ${validation.errors?.join('; ')}`);
+    assert.ok(validation.stats.meshes >= 24, `${file} has ${validation.stats.meshes} meshes`);
+    assert.ok(validation.stats.materials.includes('pilot-airline-uniform'));
+    assert.ok(validation.stats.materials.includes('pilot-airline-gold'));
+
+    const buffer = fs.readFileSync(file);
+    const gltf = await parseGlbBuffer(buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength));
+    assert.equal(applyCivilPilotGlb(pilot, gltf.scene), true, `${file} must supply the named IK nodes`);
+    assert.equal(pilot.userData.activeScene.name, `${pilot.name}_GLB`);
+    assert.match(pilot.name, /^Pilot_B737_/, 'GLB swap must not rename the mount group');
+    assert.ok(countPilotMeshes(pilot) <= 32, `${pilot.name} draws ${countPilotMeshes(pilot)} meshes after swap`);
+
+    const stretch = poseCivilHands(pilot);
+    assert.ok(stretch < 1.15, `${pilot.name} arms stretch ${stretch} after swap`);
+    pilot.userData.targets.grips.forEach((grip, i) => {
+      const distance = handCentre(pilot, i === 0 ? -1 : 1).distanceTo(grip);
+      assert.ok(distance < 0.035, `${pilot.name} GLB hand ${i} is ${distance.toFixed(3)} m from its yoke horn`);
+    });
+  }
+
+  assert.equal(captain.userData.head.visible, false, 'own first-person view still hides the captain head');
+  assert.equal(firstOfficer.userData.head.visible, true, 'first officer stays visible from the captain seat');
 });

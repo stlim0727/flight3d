@@ -39,6 +39,9 @@ export class Boeing737 {
       // Captain (the player's seat) and first officer sit in the interior deck.
       this.pilots = createB737Pilots();
       this.cockpit.group.add(this.pilots.captain, this.pilots.firstOfficer);
+      for (const pilot of [this.pilots.captain, this.pilots.firstOfficer]) {
+        pilot.userData.onSwap = () => applyFlatShading(pilot, this.flatShading);
+      }
       this.pilotYokeBindings = null;
       const prevOnModelReady = this.cockpit.onModelReady;
       this.cockpit.onModelReady = () => {
