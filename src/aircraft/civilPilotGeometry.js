@@ -30,7 +30,7 @@ export const CIVIL_SEAT_RECLINE_RAD = 0.18;
 const UPPER_ARM = 0.30;
 const FOREARM = 0.26;
 const THIGH = 0.44;
-const AIRLINE_THIGH = 0.56;
+const AIRLINE_THIGH = 0.46;
 const SHIN = 0.43;
 const GRIP_FROM_WRIST = 0.065;
 // Limbs may lengthen this much to reach a cockpit control that sits beyond a nominal reach.
@@ -97,8 +97,8 @@ export function createCessnaMaterials() {
 }
 
 export const CIVIL_PILOT_STYLES = Object.freeze({
-  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
-  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, legPoleY: -0.05 },
+  airlineCaptain: { outfit: 'airline', sleeveStripes: 4, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, bodyOffsetY: 0.08, legPoleX: 0.02, legPoleY: 1 },
+  airlineFirstOfficer: { outfit: 'airline', sleeveStripes: 3, recline: CIVIL_SEAT_RECLINE_RAD, thighLength: AIRLINE_THIGH, bodyOffsetZ: -0.15, bodyOffsetY: 0.08, legPoleX: 0.02, legPoleY: 1 },
   // Sits up and leans towards the Cessna's deep-set yoke.
   cessna: { outfit: 'cessna', recline: 0.02 },
 });
@@ -181,6 +181,17 @@ export function mergeByMaterial(root, prefix) {
     root.add(out);
   }
   return root;
+}
+
+/** Local-space centre of a hand's merged meshes; puts the fist on its grip target. */
+function handGripOffset(hand) {
+  const box = new THREE.Box3();
+  hand.traverse(node => {
+    if (!node.isMesh) return;
+    node.geometry.computeBoundingBox();
+    box.union(node.geometry.boundingBox.clone().applyMatrix4(node.matrix));
+  });
+  return box.isEmpty() ? new THREE.Vector3() : box.getCenter(new THREE.Vector3());
 }
 
 function buildAirlineTorso(torso, mats) {
@@ -417,6 +428,7 @@ function createArm(mats, style, side) {
   addHand(hand, mats, outfit, side);
 
   for (const segment of [upper, fore, hand]) mergeByMaterial(segment, segment.name);
+  hand.userData.gripOffset = handGripOffset(hand);
   return { arm, upper, fore, hand };
 }
 
@@ -445,7 +457,7 @@ function createLeg(mats, style, side) {
   foot.add(mesh(new THREE.BoxGeometry(0.1, 0.075, 0.27), shoe, v(0, -0.035, -0.07)));
   foot.add(mesh(new THREE.SphereGeometry(0.05, 10, 8), shoe, v(0, -0.01, 0.0)));
   for (const segment of [thigh, shin, foot]) mergeByMaterial(segment, segment.name);
-  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN, poleY: style.legPoleY ?? 1 };
+  return { leg, thigh, shin, foot, thighLength, shinLength: SHIN, poleX: style.legPoleX, poleY: style.legPoleY ?? 1 };
 }
 
 /** Builds the civil pilot hierarchy (no seat: the cockpit models provide their own). */
@@ -489,7 +501,7 @@ export function buildCivilPilotScene(styleName = 'airlineCaptain') {
 
   const visual = new THREE.Group();
   visual.name = 'Pilot_Visual';
-  visual.position.z = style.bodyOffsetZ ?? 0;
+  visual.position.set(0, style.bodyOffsetY ?? 0, style.bodyOffsetZ ?? 0);
   visual.add(seat, body, head);
   root.add(visual);
   const eye = EYE_IN_HEAD.clone().add(head.position);
@@ -553,10 +565,10 @@ const wristTarget = new THREE.Vector3();
 const shoulder = new THREE.Vector3();
 const hip = new THREE.Vector3();
 const pole = new THREE.Vector3();
-const handForward = new THREE.Vector3();
-const handUp = new THREE.Vector3();
+const handY = new THREE.Vector3();
 const handRight = new THREE.Vector3();
 const handBasis = new THREE.Matrix4();
+const handOffset = new THREE.Vector3();
 
 /** Poses one arm so its fist closes on gripTarget (pilot frame, real metres). */
 export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLINE_RAD) {
@@ -567,21 +579,25 @@ export function poseCivilArm(limb, side, gripTarget, recline = CIVIL_SEAT_RECLIN
   const stretch = solveTwoBone(shoulder, wristTarget, UPPER_ARM, FOREARM, pole, joint, end);
   aimSegment(limb.upper, shoulder, joint, UPPER_ARM);
   aimSegment(limb.fore, joint, end, FOREARM);
-  limb.hand.position.copy(end);
-  // Twist the fist around the forearm so the upturned thumb stays vertical on the yoke horn.
-  handForward.set(0, 1, 0).applyQuaternion(limb.fore.quaternion);
-  handUp.copy(UP).addScaledVector(handForward, -UP.dot(handForward)).normalize();
-  handRight.crossVectors(handForward, handUp).normalize();
-  handUp.crossVectors(handRight, handForward).normalize();
-  handBasis.makeBasis(handRight, handForward, handUp);
+  // Fist wraps along the horizontal yoke horn; the thumb axis stays world-up.
+  handY.set(side, 0, 0);
+  handRight.crossVectors(handY, UP).normalize();
+  handBasis.makeBasis(handRight, handY, UP);
   limb.hand.quaternion.setFromRotationMatrix(handBasis);
+  const offset = limb.hand.userData.gripOffset;
+  if (offset) {
+    handOffset.copy(offset).applyQuaternion(limb.hand.quaternion);
+    limb.hand.position.copy(gripTarget).sub(handOffset);
+  } else {
+    limb.hand.position.copy(end);
+  }
   return stretch;
 }
 
 /** Poses one leg with the ankle at ankleTarget and the sole pointing along toeDirection. */
 export function poseCivilLeg(limb, side, ankleTarget, toeDirection) {
   hip.set(side * HIP_JOINT.x, HIP_JOINT.y, HIP_JOINT.z);
-  pole.set(side * 0.12, limb.poleY ?? 1, -0.7);
+  pole.set(side * (limb.poleX ?? 0.12), limb.poleY ?? 1, -0.7);
   const thighLength = limb.thighLength ?? THIGH;
   const shinLength = limb.shinLength ?? SHIN;
   const stretch = solveTwoBone(hip, ankleTarget, thighLength, shinLength, pole, joint, end);
@@ -602,11 +618,13 @@ export function civilRestGrip(side) {
 function civilLimbsFromScene(scene, style) {
   const arms = [-1, 1].map(side => {
     const prefix = `Pilot_Arm_${side > 0 ? 'R' : 'L'}`;
+    const hand = scene.getObjectByName(`${prefix}_Hand`);
+    if (hand) hand.userData.gripOffset = handGripOffset(hand);
     return {
       arm: scene.getObjectByName(prefix),
       upper: scene.getObjectByName(`${prefix}_Upper`),
       fore: scene.getObjectByName(`${prefix}_Fore`),
-      hand: scene.getObjectByName(`${prefix}_Hand`),
+      hand,
     };
   });
   const thighLength = style?.thighLength ?? THIGH;
@@ -619,6 +637,7 @@ function civilLimbsFromScene(scene, style) {
       foot: scene.getObjectByName(`${prefix}_Foot`),
       thighLength,
       shinLength: SHIN,
+      poleX: style?.legPoleX,
       poleY: style?.legPoleY ?? 1,
     };
   });
