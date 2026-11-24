@@ -13,7 +13,7 @@ test('every gear state maps to a drawn icon, damage included', () => {
 test('camera views keep their text labels; gear, flaps, spoilers, fullscreen and the camera menu are drawn', () => {
   assert.deepEqual(Object.keys(TOOLBAR_ICONS).sort(), [
     'camera', 'flaps', 'fullscreen-enter', 'fullscreen-exit', 'gear-down', 'gear-fail', 'gear-transit', 'gear-up',
-    'spoilers',
+    'map', 'spoilers',
   ]);
 });
 
