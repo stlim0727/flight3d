@@ -221,7 +221,7 @@ export default {
   "toggle.pointer.lock.for.free.look": "Toggle pointer lock for free look",
   "change.time.dawn.noon.sunset.dusk.night": "Change time (dawn, noon, sunset, dusk, night)",
   "toggle.sound.muted": "Toggle sound on / off (Shift+M)",
-  "toggle.pilotage.map": "Unfold / fold map (Busan C172 flight)",
+  "toggle.pilotage.map": "Unfold / fold map (Busan cruise)",
   "mobile.touchscreen.controls": "📱 Mobile / touchscreen controls",
   "drag.to.control.pitch.and.roll.release": "Drag to control pitch and roll. Release to center",
   "drag.up.down.for.0.100.thrust": "Drag up / down for 0–100% thrust (TOGA, CLB, APP, IDLE presets)",
