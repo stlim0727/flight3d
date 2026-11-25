@@ -24,7 +24,7 @@ import { bindMapAttribution } from './mapAttribution.js';
 import { SoutheastAtlas } from './SoutheastAtlas.js';
 import { RegionalChart } from './RegionalChart.js';
 import { insideSoutheastAtlas } from '../geospatial/busanChart.js';
-import { chartSceneFrame } from '../geospatial/regionalChart.js';
+import { chartSceneFrame, chartSceneOrigin } from '../geospatial/regionalChart.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -242,8 +242,8 @@ class SimulatorHudAndBindingsMethods {
       const busanCruise = this.lastPresetType === 'busan'
         || (this.lastPresetType === 'cruise' && this.activeMapPlace?.pointId === 'busan');
       // Any real region has a chart; fictional arenas have no geodesy to draw.
-      const chartFrame = chartSceneFrame(this);
-      const available = Boolean(chartFrame)
+      const chartOrigin = chartSceneOrigin(this);
+      const available = Boolean(chartOrigin)
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) {
         map.hidden = !available;
@@ -262,19 +262,23 @@ class SimulatorHudAndBindingsMethods {
         }
       }
       this.setPilotageLayout(layout);
-      if (available && map.open) {
-        if (!this.pilotageChart) {
-          // The paper is chosen where it unfolds: the Southeast atlas inside its
-          // printed area, otherwise a chart centred on the aircraft.
-          this.pilotageChart = insideSoutheastAtlas(chartFrame.toWgs(this.position.x, this.position.z))
+      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+        if (this.pilotageFrame?.origin !== chartOrigin || this.chartBusanCruise !== busanCruise) {
+          this.pilotageChart?.hide();
+          this.pilotageFrame = chartSceneFrame(this);
+          this.chartBusanCruise = busanCruise;
+          // Keep the printed atlas on its original Busan cruise. Airport starts
+          // in the same area still need their runway-scale map.
+          this.pilotageChart = busanCruise && insideSoutheastAtlas(this.pilotageFrame.toWgs(this.position.x, this.position.z))
             ? (this.busanChart ??= new SoutheastAtlas(map))
             : (this.regionalChart ??= new RegionalChart(map));
           this.pilotageChart.show();
         }
-        this.pilotageChart.update(this.position, this.quaternion, chartFrame);
+        this.pilotageChart.update(this.position, this.quaternion, this.pilotageFrame);
       } else if (this.pilotageChart) {
         this.pilotageChart.hide();
         this.pilotageChart = null;
+        this.pilotageFrame = null;
       }
     }
     this.updateAutopilotUI();

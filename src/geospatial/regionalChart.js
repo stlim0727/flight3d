@@ -4,13 +4,14 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { isWaterPolygon } from './overtureWater.js';
-import { realOffsetInIncheonFrame, sceneOrigin } from './airportGeodesy.js';
+import { realOffsetInIncheonFrame, worldPositionToWgs84 } from './airportGeodesy.js';
 import { projectToLocal } from './incheon.js';
 import { applyAirportOverrides } from '../config/airportOverrides.js';
-import { localToWgs84, tileToWgs84, tilesForBbox, wgs84ToLocal } from './TileCoordinateSystem.js';
+import { localToWgs84, tileToWgs84, wgs84ToTile, wgs84ToLocal } from './TileCoordinateSystem.js';
 
 /** Water tiles share the open-world terrain's zoom, so the view has often fetched them already. */
 export const CHART_WATER_ZOOM = 11;
+export const CHART_TILE_LIMIT = 64;
 /** Smallest ground area the paper shows, east-west by north-south. */
 export const CHART_SPAN_M = Object.freeze([40000, 28000]);
 /** The paper re-centres once the aircraft leaves this share of the half-extent. */
@@ -24,17 +25,14 @@ const CHARTED_TYPES = new Set(['large_airport', 'medium_airport', 'small_airport
 
 // Arenas authored without geodesy. The generated valley keeps the previous
 // world anchor, so the active airport, not the anchor, rules it out.
-const FICTIONAL_AIRPORTS = new Set(['coastal', 'neon', 'valley']);
+const FICTIONAL_AIRPORTS = new Set(['coastal', 'neon', 'valley', 'generated-valley']);
 
 /**
  * Tangent-plane origin of the scenery when the flight is in a real region,
  * else null. A null origin keeps the chart menu hidden and starts no requests.
- * A custom map origin is always real; otherwise the anchor must be.
  */
 export function chartSceneOrigin({ activeAirport, world } = {}) {
-  if (!world || activeAirport === 'generated-valley') return null;
-  if (!world.customOrigin && FICTIONAL_AIRPORTS.has(activeAirport)) return null;
-  return sceneOrigin(world.anchor, world.customOrigin);
+  return FICTIONAL_AIRPORTS.has(activeAirport) ? null : world?.activeOrigin ?? null;
 }
 
 /**
@@ -47,9 +45,9 @@ export function chartSceneFrame(sim) {
   const { anchor, customOrigin } = sim.world;
   return {
     origin,
-    anchor,
-    toWgs: (x, z) => localToWgs84(x, z, origin),
-    placeAirport: sceneAirportPlacement(anchor, customOrigin),
+    // Invert the same tangent plane as the local terrain (especially at Lukla).
+    toWgs: (x, z) => worldPositionToWgs84(anchor, x, z, origin),
+    placeAirport: sceneAirportPlacement(anchor, origin, customOrigin),
   };
 }
 
@@ -102,7 +100,26 @@ export function chartWaterTiles(projection, width, height, metersPerPixel, zoom 
     .map(([east, south]) => projection.unproject(east, south));
   const lats = corners.map(point => point.latitude);
   const lons = corners.map(point => point.longitude);
-  return tilesForBbox([Math.min(...lons), Math.min(...lats), Math.max(...lons), Math.max(...lats)], zoom);
+  const south = Math.min(...lats), north = Math.max(...lats);
+  if (south > 85.0511 || north < -85.0511) return [];
+  // Crossing the date line takes the short arc from the last tile column to the first.
+  const crossesDateLine = Math.max(...lons) - Math.min(...lons) > 180;
+  const west = crossesDateLine ? Math.min(...lons.filter(lon => lon >= 0)) : Math.min(...lons);
+  const east = crossesDateLine ? Math.max(...lons.filter(lon => lon < 0)) : Math.max(...lons);
+  // Mercator tiles shrink at high latitudes. Keep one sheet within the tile budget.
+  for (let level = zoom; level >= 0; level--) {
+    const count = 2 ** level;
+    const nw = wgs84ToTile(north, west, level);
+    const se = wgs84ToTile(south, east, level);
+    const columns = (se.x - nw.x + count) % count + 1;
+    if (columns * (se.y - nw.y + 1) > CHART_TILE_LIMIT) continue;
+    const tiles = [];
+    for (let i = 0; i < columns; i++) {
+      for (let y = nw.y; y <= se.y; y++) tiles.push({ x: (nw.x + i) % count, y, zoom: level });
+    }
+    return tiles;
+  }
+  return [];
 }
 
 /**
@@ -151,9 +168,7 @@ function endPoint(end) {
  * pre-distorted for that), so the chart repeats that placement before
  * inverting the scene plane. A custom origin streams in its own plane.
  */
-export function sceneAirportPlacement(anchor, customOrigin = null) {
-  const origin = sceneOrigin(anchor, customOrigin);
-  if (!origin) return null;
+function sceneAirportPlacement(anchor, origin, customOrigin) {
   if (origin === customOrigin) return point => point;
   const [ox, oz] = realOffsetInIncheonFrame(anchor);
   return point => {

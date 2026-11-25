@@ -1,8 +1,7 @@
 import data from '../geospatial/southeastAtlas.json' with { type: 'json' };
 import { Vector3 } from 'three';
-import { getLanguage } from '../i18n/index.js';
+import { getLanguage, t } from '../i18n/index.js';
 import { chartAircraft, chartPoint, SOUTHEAST_ATLAS_BOUNDS } from '../geospatial/busanChart.js';
-import { t } from '../i18n/index.js';
 
 // Natural Earth 1:10m admin-1 boundaries, roads and river centerlines.
 // Coordinates are simplified for the printed regional scale, in WGS84.

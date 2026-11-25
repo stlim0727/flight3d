@@ -3,12 +3,11 @@ import { getLanguage, t } from '../i18n/index.js';
 import { overtureBase } from '../geospatial/overtureWater.js';
 import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
 import {
-  AIRPORT_RADIUS_KM, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartMetersPerPixel,
+  AIRPORT_RADIUS_KM, CHART_TILE_LIMIT, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartMetersPerPixel,
   chartNeedsRecenter, chartProjection, chartScaleBar, chartTileTransform, chartWaterTiles,
   decodeWaterRings, formatChartPosition,
 } from '../geospatial/regionalChart.js';
 
-const TILE_LIMIT = 64;
 const RETRY_MS = 10000;
 const TIMEOUT_MS = 8000;
 const LAND = '#ece2c6';
@@ -125,6 +124,7 @@ export class RegionalChart {
     let airports = { runways: [], labels: [] };
     try {
       const manifest = await this.loadManifest();
+      if (session.signal.aborted || projection !== this.projection) return;
       const { latitude, longitude } = projection.center;
       const list = await this.findAirports(manifest, { latitude, longitude, radiusKm: AIRPORT_RADIUS_KM });
       airports = chartAirports(list, projection, place);
@@ -151,13 +151,16 @@ export class RegionalChart {
       this.tiles.set(tile.key, entry);
       const signal = AbortSignal.any([session.signal, AbortSignal.timeout(TIMEOUT_MS)]);
       Promise.resolve()
-        .then(() => this.waterSource.getZxy(tile.zoom, tile.x, tile.y, signal))
+        .then(() => {
+          signal.throwIfAborted();
+          return this.waterSource.getZxy(tile.zoom, tile.x, tile.y, signal);
+        })
         .then(result => {
           if (this.tiles.get(tile.key) !== entry) return;
           entry.path = result?.data ? ringsPath(decodeWaterRings(result.data)) : null;
           entry.state = 'ready';
           this.version++;
-        }, () => {
+        }).catch(() => {
           if (this.tiles.get(tile.key) !== entry) return;
           if (session.signal.aborted) {
             this.tiles.delete(tile.key);
@@ -168,11 +171,11 @@ export class RegionalChart {
           this.version++;
         });
     }
-    if (this.tiles.size <= TILE_LIMIT) return;
+    if (this.tiles.size <= CHART_TILE_LIMIT) return;
     const visible = new Set(this.view.map(tile => tile.key));
     const stale = [...this.tiles].filter(([key, entry]) => !visible.has(key) && entry.state !== 'loading')
       .sort((a, b) => a[1].used - b[1].used);
-    for (const [key] of stale.slice(0, this.tiles.size - TILE_LIMIT)) this.tiles.delete(key);
+    for (const [key] of stale.slice(0, this.tiles.size - CHART_TILE_LIMIT)) this.tiles.delete(key);
   }
 
   print(width, height, ratio) {

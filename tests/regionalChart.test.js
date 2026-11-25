@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
-  AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, realOffsetInIncheonFrame, sceneOrigin, scenePositionToWgs84,
+  AIRPORT_ORIGINS, RUNWAY_THRESHOLDS, realOffsetInIncheonFrame,
   worldPositionToWgs84,
 } from '../src/geospatial/airportGeodesy.js';
 import { APPROACH_DATA } from '../src/config/approachData.js';
@@ -31,22 +31,27 @@ function indexAirport(icao) {
   return tile.airports.find(airport => airport.icao === icao);
 }
 
+function makeFrame(anchor, customOrigin = null) {
+  const world = new UnifiedWorld(anchor);
+  world.customOrigin = customOrigin;
+  return chartSceneFrame({ activeAirport: anchor, world });
+}
+
 test('scene geodesy inverts the frame each real region is drawn in', () => {
   for (const id of ['incheon', 'jeju', 'lukla']) {
     const { x, z } = APPROACH_DATA[id].threshold;
-    const position = scenePositionToWgs84(id, x, z);
+    const position = makeFrame(id).toWgs(x, z);
     assert.ok(distanceKm(position, RUNWAY_THRESHOLDS[id]) * 1000 < 0.01, `${id} threshold`);
-    assert.equal(sceneOrigin(id), AIRPORT_ORIGINS[id]);
+    assert.equal(makeFrame(id).origin, AIRPORT_ORIGINS[id]);
   }
   const { x, z } = APPROACH_DATA.incheon.threshold;
-  assert.deepEqual(scenePositionToWgs84('incheon', x, z), worldPositionToWgs84('incheon', x, z));
+  assert.deepEqual(makeFrame('incheon').toWgs(x, z), worldPositionToWgs84('incheon', x, z));
   // The shared Incheon plane is rotated at Lukla; the chart must not use it there.
   const lukla = APPROACH_DATA.lukla.threshold;
   assert.ok(distanceKm(worldPositionToWgs84('lukla', lukla.x, lukla.z), RUNWAY_THRESHOLDS.lukla) * 1000 > 50);
 
   const jfk = { latitude: 40.6413, longitude: -73.7781 };
-  assert.deepEqual(scenePositionToWgs84('incheon', 0, 0, jfk), localToWgs84(0, 0, jfk));
-  for (const id of ['coastal', 'neon', 'valley', 'unknown']) assert.equal(scenePositionToWgs84(id, 1, 2), null, id);
+  assert.deepEqual(makeFrame('incheon', jfk).toWgs(0, 0), localToWgs84(0, 0, jfk));
 });
 
 test('chart is offered in real regions and never in fictional arenas', () => {
@@ -61,7 +66,10 @@ test('chart is offered in real regions and never in fictional arenas', () => {
   assert.equal(chartSceneOrigin({ activeAirport: 'generated-valley', world: new UnifiedWorld('incheon') }), null);
   const custom = new UnifiedWorld('incheon');
   custom.customOrigin = Object.freeze({ latitude: 40.6413, longitude: -73.7781 });
-  assert.equal(chartSceneOrigin({ activeAirport: 'coastal', world: custom }), custom.customOrigin);
+  assert.equal(chartSceneOrigin({ activeAirport: 'incheon', world: custom }), custom.customOrigin);
+  for (const activeAirport of ['coastal', 'neon', 'valley']) {
+    assert.equal(chartSceneOrigin({ activeAirport, world: custom }), null);
+  }
   assert.equal(chartSceneOrigin({ activeAirport: 'generated-valley', world: custom }), null);
   assert.equal(chartSceneOrigin({ activeAirport: 'incheon' }), null);
 });
@@ -86,7 +94,7 @@ test('aircraft on a scene runway sits on the charted runway with its heading', (
     ['KJFK', 'incheon', { latitude: 40.64, longitude: -73.78 }, null],
   ];
   for (const [icao, anchor, customOrigin] of cases) {
-    const frame = chartSceneFrame({ activeAirport: anchor, world: { anchor, customOrigin } });
+    const frame = makeFrame(anchor, customOrigin);
     const airport = applyAirportOverrides(indexAirport(icao));
     const center = frame.toWgs(...streamedWorld(airport, anchor, customOrigin));
     const projection = chartProjection(center);
@@ -115,7 +123,7 @@ test('aircraft on a scene runway sits on the charted runway with its heading', (
 
 test('Lukla and distant starts chart the real runway direction', () => {
   for (const [icao, anchor, customOrigin] of [['VNLK', 'lukla', null], ['KJFK', 'incheon', { latitude: 40.64, longitude: -73.78 }]]) {
-    const frame = chartSceneFrame({ activeAirport: anchor, world: { anchor, customOrigin } });
+    const frame = makeFrame(anchor, customOrigin);
     const indexed = indexAirport(icao);
     const projection = chartProjection(indexed);
     const { runways } = chartAirports([indexed], projection, frame.placeAirport);
@@ -131,7 +139,7 @@ test('Lukla and distant starts chart the real runway direction', () => {
 
 test('built-in scene thresholds land on the charted runway ends', () => {
   for (const [id, icao] of [['incheon', 'RKSI'], ['jeju', 'RKPC'], ['lukla', 'VNLK']]) {
-    const frame = chartSceneFrame({ activeAirport: id, world: { anchor: id, customOrigin: null } });
+    const frame = makeFrame(id);
     const projection = chartProjection(RUNWAY_THRESHOLDS[id]);
     const { runways } = chartAirports([indexAirport(icao)], projection, frame.placeAirport);
     const nearest = Math.min(...runways.flatMap(r => [Math.hypot(...r.from), Math.hypot(...r.to)]));
@@ -142,7 +150,7 @@ test('built-in scene thresholds land on the charted runway ends', () => {
 test('Busan keeps the Southeast atlas in the Incheon plane', () => {
   const spawn = regionalCruiseSpawn(REGIONAL_CRUISES.busan, 'C172');
   const forward = { x: spawn.vx, z: spawn.vz };
-  const toWgs = (x, z) => scenePositionToWgs84('incheon', x, z);
+  const { toWgs } = makeFrame('incheon');
   assert.deepEqual(chartAircraft(spawn, forward, 0, toWgs), chartAircraft(spawn, forward, 0));
   assert.ok(insideSoutheastAtlas(toWgs(spawn.x, spawn.z)));
   assert.ok(!insideSoutheastAtlas(RUNWAY_THRESHOLDS.incheon));
@@ -167,6 +175,17 @@ test('paper scale, re-centring and water tiles cover the unfolded view', () => {
     assert.equal(chartNeedsRecenter([0, -height * m * 0.3], width, height, m), true);
     assert.equal(chartNeedsRecenter([NaN, 0], width, height, m), true);
   }
+});
+
+test('date-line charts wrap adjacent columns and high-latitude sheets bound tile requests', () => {
+  for (const latitude of [0, 83]) {
+    const tiles = chartWaterTiles(chartProjection({ latitude, longitude: 179.99 }), 800, 500, 56);
+    assert.ok(tiles.length > 0 && tiles.length <= 64);
+    const columns = new Set(tiles.map(tile => tile.x));
+    assert.ok(columns.has(0) && columns.has(2 ** tiles[0].zoom - 1));
+    assert.equal(new Set(tiles.map(tile => [tile.x, tile.y].join('/'))).size, tiles.length);
+  }
+  assert.deepEqual(chartWaterTiles(chartProjection({ latitude: 89.9, longitude: 0 }), 800, 500, 56), []);
 });
 
 test('tile transform maps tile units onto the projected corners', () => {
