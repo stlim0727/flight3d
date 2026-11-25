@@ -72,7 +72,9 @@ export function applyMode(cs, m) {
   cs.mode = cs.autoSwitch ? cs.constructor.MODES.CHASE : m;
   cs.resetLook({ keepGaze: true });
   if (cs.camera) {
-    cs.camera.near = (cs.mode === cs.constructor.MODES.COCKPIT) ? 0.08 : 0.25;
+    cs.camera.near = (cs.mode === cs.constructor.MODES.COCKPIT)
+      ? (cs.logarithmicDepthBuffer !== false ? 0.08 : 0.20)
+      : 0.25;
     if (typeof cs.camera.updateProjectionMatrix === 'function') cs.camera.updateProjectionMatrix();
   }
   if (cs.mode === cs.constructor.MODES.FLYBY) {

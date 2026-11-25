@@ -515,7 +515,7 @@ class SimulatorHudAndBindingsMethods {
     const select = document.getElementById('render-quality');
     if (select) select.value = this.renderQuality;
     try { localStorage.setItem(RENDER_QUALITY_KEY, this.renderQuality); } catch { /* Session-only setting. */ }
-    if (prevPreset && prevPreset.antialias !== preset.antialias) {
+    if (prevPreset && (prevPreset.antialias !== preset.antialias || prevPreset.logarithmicDepthBuffer !== preset.logarithmicDepthBuffer)) {
       this.showToast?.(() => t('quality.antialias.restart.hint'));
     }
   }

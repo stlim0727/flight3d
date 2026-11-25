@@ -45,6 +45,12 @@ test('lower tiers reduce real geometry and framebuffer work', () => {
     assert.ok(current.waterSegments < previous.waterSegments, `${tiers[i]} water density`);
     assert.ok(current.maxPixels <= previous.maxPixels, `${tiers[i]} framebuffer budget`);
   }
+  assert.equal(RENDER_QUALITY.high.logarithmicDepthBuffer, true);
+  assert.equal(RENDER_QUALITY.balanced.logarithmicDepthBuffer, true);
+  assert.equal(RENDER_QUALITY.performance.logarithmicDepthBuffer, false);
+  assert.equal(RENDER_QUALITY.ultraLow.logarithmicDepthBuffer, false);
+  assert.equal(RENDER_QUALITY.balanced.shadowMapSize, 2048);
+  assert.ok(RENDER_QUALITY.balanced.farShadowMapSize <= 1024, 'balanced uses efficient farShadowMapSize');
   const balanced = renderPixelRatio('balanced', 1440, 900, 1);
   const performance = renderPixelRatio('performance', 1440, 900, 1);
   assert.ok(performance < balanced, 'performance renders fewer physical pixels on a 1440x900 desktop');
