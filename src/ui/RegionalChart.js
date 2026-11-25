@@ -1,9 +1,11 @@
 import { Vector3 } from 'three';
 import { getLanguage, t } from '../i18n/index.js';
 import { overtureBase } from '../geospatial/overtureWater.js';
+import { ATLAS_ZOOM, atlasOnSheet, decodeAtlasTile, regionalAtlas } from '../geospatial/regionalAtlas.js';
+import { chartRunwayBoxes, layoutAtlasNames, overlaps, projectAtlas } from './regionalChartNames.js';
 import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
 import {
-  AIRPORT_RADIUS_KM, CHART_TILE_LIMIT, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartMetersPerPixel,
+  AIRPORT_RADIUS_KM, CHART_TILE_LIMIT, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartBounds, chartMetersPerPixel,
   chartNeedsRecenter, chartProjection, chartScaleBar, chartTileTransform, chartWaterTiles,
   decodeWaterRings, formatChartPosition,
 } from '../geospatial/regionalChart.js';
@@ -34,12 +36,18 @@ function ringsPath(rings) {
  * only while the paper is shown and are dropped when it folds.
  */
 export class RegionalChart {
-  constructor(map, { waterSource = overtureBase, loadManifest = loadAirportManifest, findAirports = findAirportsInRegion } = {}) {
+  constructor(map, { waterSource = overtureBase, atlasSource = regionalAtlas, loadManifest = loadAirportManifest, findAirports = findAirportsInRegion } = {}) {
     this.canvas = map.querySelector('canvas');
     this.aircraft = map.querySelector('.map-aircraft');
     this.status = map.querySelector('.map-area');
     this.credit = map.querySelector('.map-credit');
     this.waterSource = waterSource;
+    this.atlasSource = atlasSource;
+    this.atlasTiles = new Map();
+    this.nameLayer = document.createElement('div');
+    this.nameLayer.className = 'map-names';
+    this.canvas.after(this.nameLayer);
+    this.names = [];
     this.loadManifest = loadManifest;
     this.findAirports = findAirports;
     this.forward = new Vector3();
@@ -58,8 +66,8 @@ export class RegionalChart {
     this.session = new AbortController();
     this.key = null;
     this.nextUpdate = 0;
-    this.credit.textContent = 'Overture · OSM · OurAirports';
-    this.credit.href = 'https://docs.overturemaps.org/attribution/';
+    this.credit.textContent = 'Natural Earth · © OSM · ⓘ';
+    this.credit.href = `${import.meta.env?.BASE_URL ?? '/'}data/regional-chart/credits.html`;
   }
 
   /** Folding drops in-flight requests; the next unfold centres on the aircraft again. */
@@ -70,6 +78,14 @@ export class RegionalChart {
     this.projection = null;
     this.airports = null;
     this.frame = null;
+    this.atlasTiles.clear();
+    this.atlasExtent = null;
+    this.atlasData = null;
+    this.projectedAtlas = null;
+    this.atlasLayoutExtent = null;
+    this.nameAtlas = null;
+    this.names = [];
+    this.nameLayer.replaceChildren();
   }
 
   update(position, quaternion, frame) {
@@ -93,24 +109,62 @@ export class RegionalChart {
     this.heading = mark.heading;
     this.metersPerPixel = m;
     this.requestTiles(width, height, m, now);
+    const extent = [width, height, this.projection.center.latitude, this.projection.center.longitude].join('/');
+    if (extent !== this.atlasExtent) {
+      this.atlasExtent = extent;
+      this.loadAtlas(chartWaterTiles(this.projection, width, height, m, ATLAS_ZOOM));
+    }
 
     const language = getLanguage();
     const ratio = window.devicePixelRatio || 1;
     const { latitude, longitude } = this.projection.center;
     const key = [width, height, ratio, language, latitude, longitude, this.version].join('/');
     if (key !== this.key) {
-      this.print(width, height, ratio);
+      this.print(width, height, ratio, mark.point);
       this.key = key;
     }
-    const loading = this.airports === null || this.view.some(tile => this.tiles.get(tile.key)?.state === 'loading');
+    const loading = this.airports === null || [...this.atlasTiles.values()].some(entry => !entry.features && !entry.failed) ||
+      this.view.some(tile => this.tiles.get(tile.key)?.state === 'loading');
     this.status.textContent = loading ? t('map.chart.loading') : formatChartPosition(here);
 
     const x = width / 2 + mark.point[0] / m;
     const y = height / 2 + mark.point[1] / m;
+    const aircraftBox = { x, y, halfWidth: 13, halfHeight: 13 };
+    for (const name of this.names) name.element.hidden = overlaps(name, aircraftBox);
     this.aircraft.hidden = x < 0 || x > width || y < 0 || y > height;
     this.aircraft.style.left = x + 'px';
     this.aircraft.style.top = y + 'px';
     this.aircraft.style.transform = `translate(-50%, -50%) rotate(${mark.heading}rad)`;
+  }
+
+  async loadAtlas(tiles) {
+    const previous = this.atlasTiles;
+    const current = new Map();
+    const session = this.session;
+    this.atlasTiles = current;
+    for (const tile of tiles) {
+      const key = `${tile.zoom}/${tile.x}/${tile.y}`;
+      let entry = previous.get(key);
+      if (!entry || entry.failed) {
+        entry = {};
+        const signal = AbortSignal.any([session.signal, AbortSignal.timeout(TIMEOUT_MS)]);
+        entry.ready = this.atlasSource.getZxy(tile.zoom, tile.x, tile.y, signal)
+          .then(result => { entry.features = decodeAtlasTile(result?.data, tile); })
+          .catch(error => {
+            entry.failed = true;
+            if (!session.signal.aborted) console.warn('[RegionalChart] atlas tile unavailable', key, error);
+          });
+      }
+      current.set(key, entry);
+    }
+    const entries = [...current.values()];
+    const visible = () => entries.flatMap(entry => entry.features ?? []);
+    this.atlasData = visible();
+    if (entries.every(entry => entry.features)) return;
+    await Promise.all(entries.map(entry => entry.ready));
+    if (session.signal.aborted || this.atlasTiles !== current) return;
+    this.atlasData = visible();
+    this.version++;
   }
 
   recenter(center) {
@@ -178,7 +232,40 @@ export class RegionalChart {
     for (const [key] of stale.slice(0, this.tiles.size - CHART_TILE_LIMIT)) this.tiles.delete(key);
   }
 
-  print(width, height, ratio) {
+  layoutNames(ctx, width, height, screen, [x, y], placed, x0) {
+    const language = getLanguage();
+    if (this.nameAtlas === this.projectedAtlas && this.nameLanguage === language &&
+        this.nameAirports === this.airports) return;
+    const runwayBoxes = chartRunwayBoxes(this.airports?.runways ?? [], screen, this.metersPerPixel);
+    const reserved = [
+      ...runwayBoxes, ...placed.map(p => ({ ...p, halfWidth: p.radius, halfHeight: p.size / 2 + 3 })),
+      { x: (x0 + width) / 2, y: 20, halfWidth: (width - x0) / 2 + 3, halfHeight: 20 },
+    ];
+    // isPointInPath takes canvas coordinates. Our atlas paths and label boxes
+    // are in CSS pixels, including on high-DPR phones.
+    ctx.save();
+    ctx.resetTransform();
+    this.names = layoutAtlasNames(this.projectedAtlas, { ctx, width, height, language, reserved,
+      aircraft: { x, y, halfWidth: 13, halfHeight: 13 } });
+    ctx.restore();
+    this.nameLayer.replaceChildren(...this.names.map(name => {
+      const span = document.createElement('span');
+      span.textContent = name.text;
+      span.style.font = name.font;
+      span.style.left = name.x + 'px';
+      span.style.top = name.y + 'px';
+      name.element = span;
+      if (name.dot && runwayBoxes.some(b => overlaps(b, { x: name.dot[0], y: name.dot[1], halfWidth: 2, halfHeight: 2 }))) {
+        delete name.dot;
+      }
+      return span;
+    }));
+    this.nameAtlas = this.projectedAtlas;
+    this.nameLanguage = language;
+    this.nameAirports = this.airports;
+  }
+
+  print(width, height, ratio, aircraftPoint) {
     this.canvas.setAttribute('aria-label', t('ui.regionalChart'));
     this.canvas.width = Math.round(width * ratio);
     this.canvas.height = Math.round(height * ratio);
@@ -186,6 +273,13 @@ export class RegionalChart {
     ctx.scale(ratio, ratio);
     const m = this.metersPerPixel;
     const cx = width / 2, cy = height / 2;
+    const screen = ([east, south]) => [cx + east / m, cy + south / m];
+    if (this.atlasLayoutExtent !== this.atlasExtent || this.atlasLayoutData !== this.atlasData) {
+      const features = atlasOnSheet(this.atlasData ?? [], chartBounds(this.projection, width * m, height * m));
+      this.projectedAtlas = projectAtlas(features, point => screen(this.projection.project(point)));
+      this.atlasLayoutExtent = this.atlasExtent;
+      this.atlasLayoutData = this.atlasData;
+    }
 
     // Unloaded and failed tiles keep the canvas hatch, so missing data never reads as land.
     // All land goes down before any water, so a tile edge never paints land over its neighbour's sea.
@@ -215,6 +309,12 @@ export class RegionalChart {
         ctx.restore();
       }
     }
+
+    ctx.strokeStyle = '#765d46';
+    ctx.lineWidth = 1.35;
+    ctx.setLineDash([5, 2]);
+    ctx.stroke(this.projectedAtlas.borders);
+    ctx.setLineDash([]);
 
     const { runways = [], labels = [] } = this.airports ?? {};
     ctx.save();
@@ -257,6 +357,14 @@ export class RegionalChart {
     // Scale bar beside the north arrow, clear of overlays on the paper's left edge.
     const scale = chartScaleBar(m, Math.min(140, width / 4));
     const x0 = width - 40 - scale.pixels, y0 = 20;
+    this.layoutNames(ctx, width, height, screen, screen(aircraftPoint), placed, x0);
+    ctx.fillStyle = INK;
+    for (const { dot } of this.names) {
+      if (!dot) continue;
+      ctx.beginPath();
+      ctx.arc(...dot, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.strokeStyle = INK;
     ctx.lineWidth = 2;
     ctx.beginPath();

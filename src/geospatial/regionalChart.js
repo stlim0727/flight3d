@@ -13,7 +13,7 @@ import { localToWgs84, tileToWgs84, wgs84ToTile, wgs84ToLocal } from './TileCoor
 export const CHART_WATER_ZOOM = 11;
 export const CHART_TILE_LIMIT = 64;
 /** Smallest ground area the paper shows, east-west by north-south. */
-export const CHART_SPAN_M = Object.freeze([40000, 28000]);
+export const CHART_SPAN_M = Object.freeze([60000, 42000]);
 /** The paper re-centres once the aircraft leaves this share of the half-extent. */
 export const RECENTER_FRACTION = 0.55;
 /** Airports are looked up within this radius of the chart centre. */
@@ -92,20 +92,26 @@ export function chartNeedsRecenter(point, width, height, metersPerPixel) {
   return Math.abs(point[0]) > halfX * RECENTER_FRACTION || Math.abs(point[1]) > halfY * RECENTER_FRACTION;
 }
 
-/** Web Mercator water tiles under the paper, with a one-tenth margin. */
-export function chartWaterTiles(projection, width, height, metersPerPixel, zoom = CHART_WATER_ZOOM) {
-  const halfX = width * metersPerPixel * 0.55;
-  const halfY = height * metersPerPixel * 0.55;
+/** WGS84 sheet bounds including a one-tenth margin. West > east spans the date line. */
+export function chartBounds(projection, widthM, heightM) {
+  const halfX = widthM * 0.55;
+  const halfY = heightM * 0.55;
   const corners = [[-halfX, -halfY], [halfX, -halfY], [-halfX, halfY], [halfX, halfY]]
     .map(([east, south]) => projection.unproject(east, south));
   const lats = corners.map(point => point.latitude);
   const lons = corners.map(point => point.longitude);
   const south = Math.min(...lats), north = Math.max(...lats);
-  if (south > 85.0511 || north < -85.0511) return [];
   // Crossing the date line takes the short arc from the last tile column to the first.
   const crossesDateLine = Math.max(...lons) - Math.min(...lons) > 180;
   const west = crossesDateLine ? Math.min(...lons.filter(lon => lon >= 0)) : Math.min(...lons);
   const east = crossesDateLine ? Math.max(...lons.filter(lon => lon < 0)) : Math.max(...lons);
+  return { north, south, east, west };
+}
+
+/** Web Mercator water tiles under the paper, with a one-tenth margin. */
+export function chartWaterTiles(projection, width, height, metersPerPixel, zoom = CHART_WATER_ZOOM) {
+  const { north, south, east, west } = chartBounds(projection, width * metersPerPixel, height * metersPerPixel);
+  if (south > 85.0511 || north < -85.0511) return [];
   // Mercator tiles shrink at high latitudes. Keep one sheet within the tile budget.
   for (let level = zoom; level >= 0; level--) {
     const count = 2 ** level;

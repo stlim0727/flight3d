@@ -1,7 +1,7 @@
 export default {
   "ui.mapShortcut": "Unfold / fold map (M)",
   "ui.busanChart": "Regional chart of South Gyeongsang, Busan and Ulsan with aircraft position and heading",
-  "ui.regionalChart": "Chart of the coastline, airports and runways around the aircraft with its position and heading",
+  "ui.regionalChart": "North-up chart of regions, cities, coastline, airports and runways with aircraft position and heading",
   "map.chart.loading": "Loading chart…",
   "ui.mapMark": "Mark as next checkpoint",
   "ui.mapCheckpoint": "Checkpoint · {name}",
