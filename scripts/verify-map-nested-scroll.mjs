@@ -44,6 +44,7 @@ await withBrowserSession({ width: 390, height: 844, mobile: true, deviceScaleFac
   }
   assert.ok(await evaluate("document.getElementById('lobby-map-search').checkVisibility()"), 'mobile map dialog did not open');
   assert.ok(await evaluate("document.getElementById('lobby-map-dialog').open"), 'location picker must open as a modal');
+  assert.ok(await evaluate("document.getElementById('lobby-destination').checkVisibility()"), 'destination selector must be reachable in the modal');
   await settle();
   await settle();
   const state = () => evaluate(`(() => {

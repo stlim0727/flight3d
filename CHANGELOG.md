@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 - **feat(map-ui):** open the location picker as a full-screen map dialog
-  - Choose location now opens a native modal with a large map, a Google-Maps-style search dropdown and single-line saved/default bookmark rows instead of expanding the lobby card.
+  - Choose location now opens a native modal with a large map, a Google-Maps-style search dropdown, the destination selector and single-line saved/default bookmark rows instead of expanding the lobby card.
   - Selecting a result, marker or bookmark applies the same flight plan and closes the dialog; the native dialog keeps focus handling and Escape-to-close. Covered by `npm run test:map-scroll` and 390×844/1440×900 Chrome screenshots.
 - **fix(map-ui):** let the lobby panel scroll from the map on touch screens
   - A one-finger vertical drag on the map now scrolls the surrounding lobby panel instead of being swallowed by the map's `touch-action: none`; one-finger horizontal drags still pan the map, and two-finger gestures still pan and zoom it.
