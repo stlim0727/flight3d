@@ -22,6 +22,22 @@ export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 /** Airports that keep their own sky time (Neon is always night), so the lobby clock picker is locked. */
 const FIXED_TIME_AIRPORTS = new Set(['neon', 'valley']);
+const hasRunways = place => Boolean(place?.runways?.length);
+
+/** Show a reason line under a locked control, or hide it when nothing is locked. */
+function setReason(element, key, params) {
+  if (!element) return;
+  element.hidden = !key;
+  if (key) bindText(element, () => t(key, params));
+  else bindText(element, () => '');
+}
+
+/** Point a locked control at the line that explains why it is locked. */
+function describeLock(control, reasonElement, locked) {
+  if (!control) return;
+  if (locked && reasonElement?.id) control.setAttribute('aria-describedby', reasonElement.id);
+  else control.removeAttribute?.('aria-describedby');
+}
 
 function formatFlightTime(hours, deviceTime = false) {
   if (deviceTime) return t('lobby.time.now');
@@ -90,6 +106,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const aircraftSummary = document.getElementById('lobby-aircraft-summary');
   const aircraftPicker = document.getElementById('lobby-aircraft-picker');
   const placeSummary = document.getElementById('lobby-place-summary');
+  const mapPlaceStatus = document.getElementById('lobby-map-place-status');
+  const startReason = document.getElementById('lobby-start-reason');
+  const aircraftReason = document.getElementById('lobby-aircraft-reason');
+  const timeReason = document.getElementById('lobby-time-reason');
   const missionSummary = document.getElementById('lobby-mission-summary');
   const mapDialog = document.getElementById('lobby-map-dialog');
   const mapDialogClose = document.getElementById('lobby-map-dialog-close');
@@ -429,30 +449,42 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         if (!projected) continue;
         const marker = document.createElementNS(svgNamespace, 'g');
         const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
-        marker.setAttribute('class', `lobby-map-marker${active ? ' active' : ''}`);
+        // Runway places can take off and land; everything else starts in cruise.
+        const landable = hasRunways(place);
+        marker.setAttribute('class', `lobby-map-marker${landable ? '' : ' cruise-only'}${active ? ' active' : ''}`);
         marker.setAttribute('transform', `translate(${projected.x.toFixed(2)} ${projected.y.toFixed(2)})`);
         marker.dataset.mapX = projected.x.toFixed(2);
         marker.dataset.mapY = projected.y.toFixed(2);
         marker.dataset.placeKind = place.kind;
         marker.dataset.placeId = place.id;
+        marker.dataset.landable = String(landable);
         const hit = document.createElementNS(svgNamespace, 'circle');
         hit.setAttribute('class', 'lobby-map-marker-hit');
         hit.setAttribute('cx', '0');
-        hit.setAttribute('cy', '-9');
+        hit.setAttribute('cy', landable ? '-9' : '0');
         hit.setAttribute('r', '11');
-        const pin = document.createElementNS(svgNamespace, 'path');
-        pin.setAttribute('class', 'lobby-map-marker-pin');
-        pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
-        const dot = document.createElementNS(svgNamespace, 'circle');
-        dot.setAttribute('class', 'lobby-map-marker-dot');
-        dot.setAttribute('cx', '0');
-        dot.setAttribute('cy', '-12');
-        dot.setAttribute('r', '2.6');
-        const title = document.createElementNS(svgNamespace, 'title');
-        title.textContent = place.label;
         marker.append(hit);
-        marker.append(pin);
-        marker.append(dot);
+        if (landable) {
+          const pin = document.createElementNS(svgNamespace, 'path');
+          pin.setAttribute('class', 'lobby-map-marker-pin');
+          pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
+          const dot = document.createElementNS(svgNamespace, 'circle');
+          dot.setAttribute('class', 'lobby-map-marker-dot');
+          dot.setAttribute('cx', '0');
+          dot.setAttribute('cy', '-12');
+          dot.setAttribute('r', '2.6');
+          marker.append(pin);
+          marker.append(dot);
+        } else {
+          const ring = document.createElementNS(svgNamespace, 'circle');
+          ring.setAttribute('class', 'lobby-map-marker-pin');
+          ring.setAttribute('cx', '0');
+          ring.setAttribute('cy', '0');
+          ring.setAttribute('r', '4.5');
+          marker.append(ring);
+        }
+        const title = document.createElementNS(svgNamespace, 'title');
+        title.textContent = `${place.label} · ${t(landable ? 'lobby.map.landable' : 'lobby.map.cruiseOnly')}`;
         marker.append(title);
         mapMarkers.append(marker);
       }
@@ -816,6 +848,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     timeChips.append(chip);
   }
   timeSelect?.parentElement?.append(timeChips);
+  if (timeReason) timeSelect?.parentElement?.append(timeReason);
 
   const tabs = [...document.querySelectorAll('.lobby-tab')];
   function selectTab(selected, focus = false) {
@@ -969,13 +1002,23 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (place) return place.label;
       return regionalCruise(preset) ? t(`regional.cruise.${preset}`) : t(REGION_NAME_KEYS[airport] ?? airport);
     });
+    if (place) {
+      setReason(mapPlaceStatus, hasRunways(place) ? 'lobby.map.place.landable' : 'lobby.map.place.cruiseOnly', { place: place.label });
+      mapPlaceStatus?.classList.toggle('cruise-only', !hasRunways(place));
+    } else {
+      setReason(mapPlaceStatus, null);
+    }
     const aircraft = getAircraft?.() ?? 'B738';
     if (aircraftSummary) bindText(aircraftSummary, () => AIRCRAFT_REGISTRY[aircraft]?.name ?? aircraft);
+    const lockedAircraft = requiredAircraft(getPreset()) ?? (airport === 'valley' ? aircraft : null);
+    setReason(aircraftReason, lockedAircraft ? 'lobby.reason.aircraftLocked' : null,
+      { aircraft: AIRCRAFT_REGISTRY[lockedAircraft]?.name ?? lockedAircraft });
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
       const el = document.getElementById(id);
       if (!el) continue;
       el.classList.toggle('active', key === aircraft);
-      el.disabled = airport === 'valley' || Boolean(requiredAircraft(getPreset()));
+      el.disabled = Boolean(lockedAircraft);
+      describeLock(el, aircraftReason, el.disabled);
     }
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       if (type === 'demo') continue;
@@ -1162,6 +1205,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     updateBackButton();
     const end = document.getElementById('btn-lobby-end');
     if (end) end.hidden = !canEnd();
+    const cruiseOnly = Boolean(place && !hasRunways(plannedAirport));
+    setReason(startReason, cruiseOnly ? 'lobby.reason.cruiseOnly' : null);
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       if (type === 'demo') continue;
       const button = document.getElementById(scenario.lobbyButtonId);
@@ -1170,7 +1215,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       button.classList.toggle('active', isSelected);
       if (button.dataset.startLabel) {
         button.setAttribute('aria-pressed', String(isSelected));
-        button.disabled = Boolean(place && type !== 'cruise' && !plannedAirport?.runways?.length);
+        button.disabled = cruiseOnly && type !== 'cruise';
+        describeLock(button, startReason, button.disabled);
       }
       button.style.display = '';
     }
@@ -1185,6 +1231,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
     if (timeSelect) {
       timeSelect.disabled = FIXED_TIME_AIRPORTS.has(airport);
+      setReason(timeReason, timeSelect.disabled ? 'lobby.reason.timeFixed' : null);
+      describeLock(timeSelect, timeReason, timeSelect.disabled);
       // The clock is continuous (and float-modulo noisy after restore), so show
       // the nearest preset option rather than requiring an exact value match.
       // Distance wraps at midnight so 23:50 shows 22:30, not 06:30.
@@ -1206,6 +1254,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         chip.classList.toggle('active', on);
         chip.setAttribute('aria-pressed', String(on));
         chip.disabled = timeSelect.disabled;
+        describeLock(chip, timeReason, chip.disabled);
       }
     }
   }

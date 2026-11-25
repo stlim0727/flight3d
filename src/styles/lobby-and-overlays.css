@@ -534,6 +534,56 @@ dialog.lobby-map-dialog::backdrop {
 .lobby-map-marker-dot { fill: #fff; }
 .lobby-map-marker-hit { fill: transparent; stroke: none; pointer-events: all; }
 .lobby-map-marker.active .lobby-map-marker-pin { fill: #ea4335; }
+/* Cruise-only places: a small grey dot, so runway pins stand out. */
+.lobby-map-marker.cruise-only .lobby-map-marker-pin { fill: #5f6368; stroke-width: 1.6px; }
+.lobby-map-marker.cruise-only.active .lobby-map-marker-pin { fill: #ea4335; }
+.lobby-map-legend {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  max-width: calc(100% - 72px);
+  margin: 0;
+  padding: 4px 8px;
+  list-style: none;
+  color: #3c4043;
+  background: rgba(255, 255, 255, .92);
+  border-radius: 6px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .2);
+  font-size: 10px;
+  line-height: 1.2;
+  pointer-events: none;
+}
+.lobby-map-legend li { display: flex; align-items: center; gap: 4px; }
+.lobby-map-legend svg { width: 12px; height: 14px; flex: 0 0 auto; overflow: visible; }
+.lobby-map-legend-pin { fill: #4285f4; stroke: #fff; stroke-width: 1.2px; }
+.lobby-map-legend-ring { fill: #5f6368; stroke: #fff; stroke-width: 1.6px; }
+.lobby-map-place-status {
+  margin: 0;
+  padding: 6px 10px;
+  color: #bfdbfe;
+  background: rgba(37, 99, 235, .16);
+  border: 1px solid rgba(96, 165, 250, .35);
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.lobby-map-place-status.cruise-only {
+  color: #e2e8f0;
+  background: rgba(100, 116, 139, .2);
+  border-color: rgba(148, 163, 184, .35);
+}
+.lobby-map-place-status[hidden], .lobby-reason[hidden] { display: none; }
+/* Why a lobby control is locked; sits directly under that control. */
+.lobby-reason {
+  display: block;
+  margin: calc(4px * var(--ui-scale, 1)) 0 0;
+  color: #fbbf24;
+  font-size: calc(11px * var(--ui-scale, 1));
+  line-height: 1.35;
+}
 .lobby-map-status-row {
   display: flex;
   align-items: center;

@@ -324,6 +324,7 @@
               <button id="lobby-aircraft-c172" class="btn btn-aircraft"><span data-i18n="aircraft.c172">🛩️ Cessna 172</span><small class="spec-badge" data-spec-aircraft="C172"></small></button>
               <button id="lobby-aircraft-f16" class="btn btn-aircraft"><span><!-- Temaki fighter-jet icon, CC0 --><svg class="aircraft-icon" viewBox="0 0 48 48" aria-hidden="true"><path fill="currentColor" d="M46 26a2 2 0 0 0-2 2v3l-12-9v-4.52a2.49 2.49 0 0 0-4-1.97v-4.88a3 3 0 0 0-.21-1.11L25.1.74a1.18 1.18 0 0 0-2.19 0l-2.7 8.78a3 3 0 0 0-.21 1.11v4.88a2.49 2.49 0 0 0-4 1.97V22L4 31v-3a2 2 0 0 0-4 0v14a2 2 0 0 0 4 0v-2l16-4v5l-4.45 3.81A1.87 1.87 0 0 0 16.87 48l7.12-1l7.14 1a1.87 1.87 0 0 0 1.32-3.19L28 41v-5l16 4v2a2 2 0 1 0 4 0V28a2 2 0 0 0-2-2"/></svg><span data-i18n="aircraft.f16">F-16 Fighting Falcon</span></span><small class="spec-badge" data-spec-aircraft="F16"></small></button>
             </div>
+            <p id="lobby-aircraft-reason" class="lobby-reason" aria-live="polite" hidden></p>
           </details>
           <div class="lobby-group" role="group" aria-labelledby="lobby-start-label">
             <span id="lobby-start-label" class="lobby-label" data-i18n="lobby.map.state">시작 상태</span>
@@ -332,6 +333,7 @@
               <button id="lobby-preset-cru" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.cruiseStart"><span data-i18n="lobby.cruiseStart">순항 중</span></button>
               <button id="lobby-preset-app" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.approachStart"><span data-i18n="lobby.approachStart">착륙 접근</span></button>
             </div>
+            <p id="lobby-start-reason" class="lobby-reason" aria-live="polite" hidden></p>
           </div>
           <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure lobby-map-launcher">
             <summary aria-haspopup="dialog" aria-controls="lobby-map-dialog"><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span><span class="lobby-map-launch-glyph" aria-hidden="true">↗</span></summary>
@@ -406,6 +408,7 @@
                 <option value="19.5">19:30</option>
                 <option value="22.5">22:30</option>
               </select>
+              <span id="lobby-time-reason" class="lobby-reason" aria-live="polite" hidden></span>
             </label>
             <span class="lobby-label" data-i18n="lobby.briefingTitle">Dispatch briefing</span>
             <section id="lobby-briefing" class="lobby-briefing" aria-live="polite"></section>
@@ -563,7 +566,12 @@
             <button type="button" id="lobby-map-zoom-in" aria-label="Zoom in" data-i18n-aria-label="lobby.map.zoomIn" data-i18n-title="lobby.map.zoomIn" title="Zoom in">+</button>
             <button type="button" id="lobby-map-zoom-out" aria-label="Zoom out" data-i18n-aria-label="lobby.map.zoomOut" data-i18n-title="lobby.map.zoomOut" title="Zoom out">−</button>
           </div>
+          <ul class="lobby-map-legend" aria-label="Map legend" data-i18n-aria-label="lobby.map.legend">
+            <li><svg viewBox="-8 -21 16 22" aria-hidden="true"><path class="lobby-map-legend-pin" d="M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z"/><circle cx="0" cy="-12" r="2.6" fill="#fff"/></svg><span data-i18n="lobby.map.landable">이착륙 가능</span></li>
+            <li><svg viewBox="-8 -8 16 16" aria-hidden="true"><circle class="lobby-map-legend-ring" cx="0" cy="0" r="4.5"/></svg><span data-i18n="lobby.map.cruiseOnly">순항 시작만</span></li>
+          </ul>
         </div>
+        <p id="lobby-map-place-status" class="lobby-map-place-status" aria-live="polite" hidden></p>
         <div class="lobby-map-saved">
           <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.savedPlaces">Saved places</span><div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div></div>
           <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.suggestedPlaces">Default bookmarks</span><div id="lobby-map-default-bookmarks" class="lobby-map-bookmarks"></div></div>

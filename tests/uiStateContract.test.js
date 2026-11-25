@@ -38,6 +38,7 @@ class MockElement {
   }
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k] ?? null; }
+  removeAttribute(k) { delete this.attributes[k]; }
   addEventListener(evt, fn) {
     if (!this.listeners[evt]) this.listeners[evt] = [];
     this.listeners[evt].push(fn);
@@ -548,6 +549,83 @@ test('UI State Contract: an airport without runways never offers a runway start'
     assert.equal(plan?.state, 'cruise');
     assert.equal(plan?.runwayKey, '');
     assert.equal(elements.get('lobby-map-runway').value, '');
+  } finally {
+    globalThis.document = originalDoc;
+  }
+});
+
+test('UI State Contract: map pins tell runway airports from cruise-only places and locked starts say why', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  for (const [id, label] of [['lobby-preset-rwy', 'lobby.takeoff'], ['lobby-preset-cru', 'lobby.cruiseStart'], ['lobby-preset-app', 'lobby.approachStart']]) {
+    const button = new MockElement(id, 'button');
+    button.dataset.startLabel = label;
+    button.style = {};
+    elements.set(id, button);
+  }
+  for (const id of ['lobby-start-reason', 'lobby-map-place-status']) elements.set(id, new MockElement(id, 'p'));
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({
+      airports: [
+        { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451,
+          runways: [{ id: '1', ends: [{ ident: '15R', headingDegT: 150 }, { ident: '33L', headingDegT: 330 }] }] },
+        { code: 'ZZZZ', iata: '', name: 'No Runways Field', latitude: 37, longitude: 127, runways: [] },
+      ],
+      points: [{ id: 'sea-point', label: 'Open Sea', latitude: 36, longitude: 125 }],
+    });
+    const marker = id => elements.get('lobby-map-markers').children.find(child => child.dataset.placeId === id);
+    const markerClasses = id => marker(id).getAttribute('class').split(/\s+/);
+    assert.equal(marker('RKSI').dataset.landable, 'true');
+    assert.ok(!markerClasses('RKSI').includes('cruise-only'));
+    assert.ok(marker('RKSI').children.some(child => child.tagName === 'PATH'), 'runway airports keep the pin');
+    for (const id of ['ZZZZ', 'sea-point']) {
+      assert.equal(marker(id).dataset.landable, 'false', `${id} is cruise-only`);
+      assert.ok(markerClasses(id).includes('cruise-only'), `${id} draws the cruise-only marker`);
+      assert.ok(!marker(id).children.some(child => child.tagName === 'PATH'), `${id} has no runway pin`);
+    }
+    assert.match(marker('ZZZZ').children.at(-1).textContent, new RegExp(t('lobby.map.cruiseOnly')));
+
+    const start = elements.get('lobby-start-reason');
+    const status = elements.get('lobby-map-place-status');
+    const takeoff = elements.get('lobby-preset-rwy');
+    const approach = elements.get('lobby-preset-app');
+    const cruise = elements.get('lobby-preset-cru');
+    assert.equal(start.hidden, true, 'no reason before a cruise-only place is chosen');
+    assert.equal(status.hidden, true, 'no place status before a map place is chosen');
+
+    const pick = code => {
+      elements.get('lobby-map-search').value = code.toLowerCase();
+      screen.setMapSearchState('ready');
+      const button = elements.get('lobby-map-results').children.find(child => child.dataset.placeId === code);
+      assert.ok(button, `${code} is searchable`);
+      elements.get('lobby-map-results').listeners.click[0]({ target: { closest: () => button } });
+      screen.refresh();
+    };
+
+    pick('ZZZZ');
+    assert.equal(takeoff.disabled, true);
+    assert.equal(approach.disabled, true);
+    assert.equal(cruise.disabled, false);
+    assert.equal(start.hidden, false);
+    assert.equal(start.textContent, t('lobby.reason.cruiseOnly'));
+    assert.equal(takeoff.getAttribute('aria-describedby'), 'lobby-start-reason');
+    assert.equal(cruise.getAttribute('aria-describedby'), null, 'the open cruise start is not described as locked');
+    assert.equal(status.hidden, false);
+    assert.equal(status.textContent, t('lobby.map.place.cruiseOnly', { place: 'No Runways Field' }));
+    assert.equal(status.classList.contains('cruise-only'), true);
+
+    pick('RKSI');
+    assert.equal(takeoff.disabled, false);
+    assert.equal(start.hidden, true);
+    assert.equal(takeoff.getAttribute('aria-describedby'), null);
+    assert.equal(status.textContent, t('lobby.map.place.landable', { place: 'Incheon International Airport' }));
+    assert.equal(status.classList.contains('cruise-only'), false);
   } finally {
     globalThis.document = originalDoc;
   }
