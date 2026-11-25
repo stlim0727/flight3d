@@ -412,6 +412,7 @@ export default {
   "lobby.map.savedPlaces": "Saved places",
   "lobby.map.suggestedPlaces": "Default bookmarks",
   "lobby.map.pickPoint": "Choose an airport or pick a point on the map.",
+  "lobby.map.dialogHint": "Search a place or drop a pin on the map",
   "lobby.map.resetView": "Full map",
   "lobby.map.zoomIn": "Zoom in",
   "lobby.map.zoomOut": "Zoom out",
