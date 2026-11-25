@@ -51,3 +51,26 @@ export function worldPositionToWgs84(anchor, x, z, customOrigin = null) {
   const offset = realOffsetInIncheonFrame(anchor);
   return offset ? localToWgs84(x + offset[0], z + offset[1], AIRPORT_ORIGINS.incheon) : null;
 }
+
+/**
+ * Tangent-plane origin the scenery around the aircraft is drawn in: the custom
+ * map origin, else the real anchor's own origin. Fictional anchors have none.
+ */
+export function sceneOrigin(anchor, customOrigin = null) {
+  if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
+    return customOrigin;
+  }
+  return Object.hasOwn(AIRPORT_ORIGINS, anchor) ? AIRPORT_ORIGINS[anchor] : null;
+}
+
+/**
+ * Latitude/longitude of a world position as the scenery shows it. Terrain,
+ * water and runways near a real anchor are placed in that anchor's tangent
+ * plane, so a chart compared with the view must invert the same plane.
+ * `worldPositionToWgs84` keeps the shared Incheon plane for cross-region
+ * guidance; at Lukla that plane is rotated about 21 degrees from the scenery.
+ */
+export function scenePositionToWgs84(anchor, x, z, customOrigin = null) {
+  const origin = sceneOrigin(anchor, customOrigin);
+  return origin ? localToWgs84(x, z, origin) : null;
+}

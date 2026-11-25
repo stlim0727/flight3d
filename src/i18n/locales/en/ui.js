@@ -1,6 +1,8 @@
 export default {
   "ui.mapShortcut": "Unfold / fold map (M)",
   "ui.busanChart": "Regional chart of South Gyeongsang, Busan and Ulsan with aircraft position and heading",
+  "ui.regionalChart": "Chart of the coastline, airports and runways around the aircraft with its position and heading",
+  "map.chart.loading": "Loading chart…",
   "ui.mapMark": "Mark as next checkpoint",
   "ui.mapCheckpoint": "Checkpoint · {name}",
   "ui.mapNorthUp": "North up",
@@ -221,7 +223,7 @@ export default {
   "toggle.pointer.lock.for.free.look": "Toggle pointer lock for free look",
   "change.time.dawn.noon.sunset.dusk.night": "Change time (dawn, noon, sunset, dusk, night)",
   "toggle.sound.muted": "Toggle sound on / off (Shift+M)",
-  "toggle.pilotage.map": "Unfold / fold map (Busan cruise)",
+  "toggle.pilotage.map": "Unfold / fold map (real regions)",
   "mobile.touchscreen.controls": "📱 Mobile / touchscreen controls",
   "drag.to.control.pitch.and.roll.release": "Drag to control pitch and roll. Release to center",
   "drag.up.down.for.0.100.thrust": "Drag up / down for 0–100% thrust (TOGA, CLB, APP, IDLE presets)",

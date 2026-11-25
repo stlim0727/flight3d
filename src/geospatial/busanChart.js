@@ -9,13 +9,25 @@ export function chartPoint({ latitude, longitude }) {
   return wgs84ToLocal(latitude, longitude, origin);
 }
 
-export function chartAircraft({ x, z }, forward, previousHeading) {
-  const point = chartPoint(localToWgs84(x, z, INCHEON_PATCH.origin));
+/** WGS84 box the Southeast atlas paper is fitted to. */
+export const SOUTHEAST_ATLAS_BOUNDS = Object.freeze({ west: 127.53, north: 35.96, east: 129.52, south: 34.49 });
+
+export function insideSoutheastAtlas(position) {
+  const { west, north, east, south } = SOUTHEAST_ATLAS_BOUNDS;
+  return Boolean(position) && position.longitude >= west && position.longitude <= east
+    && position.latitude >= south && position.latitude <= north;
+}
+
+const incheonSceneWgs84 = (x, z) => localToWgs84(x, z, INCHEON_PATCH.origin);
+
+/** `toWgs` inverts the scenery frame; Busan cruises fly in the Incheon plane. */
+export function chartAircraft({ x, z }, forward, previousHeading, toWgs = incheonSceneWgs84) {
+  const point = chartPoint(toWgs(x, z));
   const length = Math.hypot(forward.x, forward.z);
   let heading = previousHeading;
   if (length > 1e-5) {
-    const ahead = chartPoint(localToWgs84(x + 10 * forward.x / length,
-      z + 10 * forward.z / length, INCHEON_PATCH.origin));
+    const ahead = chartPoint(toWgs(x + 10 * forward.x / length,
+      z + 10 * forward.z / length));
     heading = Math.atan2(ahead[0] - point[0], point[1] - ahead[1]);
   }
   return { point, heading };
