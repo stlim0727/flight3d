@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
 import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
-import { t } from '../src/i18n/index.js';
+import { getLanguage, t } from '../src/i18n/index.js';
+import { airportDisplayName } from '../src/config/airportProfile.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
 
 class MockElement {
@@ -567,29 +569,38 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
   globalThis.document = mockDoc;
   try {
     let plan = null;
+    let aircraft = 'B738';
     const screen = initLobbyScreen({
-      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => aircraft,
       getMapPlan: () => plan, onMapPlan: value => { plan = value; },
     });
-    screen.setMapPlaces({
-      airports: [
-        { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451,
-          runways: [{ id: '1', ends: [{ ident: '15R', headingDegT: 150 }, { ident: '33L', headingDegT: 330 }] }] },
-        { code: 'ZZZZ', iata: '', name: 'No Runways Field', latitude: 37, longitude: 127, runways: [] },
-      ],
-      points: [{ id: 'sea-point', label: 'Open Sea', latitude: 36, longitude: 125 }],
-    });
+    const runway = (lengthM, surface = 'ASP') => ({ id: '1', lengthM, surface, ends: [{ ident: '09', headingDegT: 90 }, { ident: '27', headingDegT: 270 }] });
+    const airports = [
+      { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451, runways: [runway(3750)] },
+      { code: 'RKSS', iata: 'GMP', name: 'Seoul Gimpo International Airport', latitude: 37.5583, longitude: 126.7906, runways: [runway(3600)] },
+      { code: 'RKSW', iata: 'SWU', name: 'Suwon Airport', latitude: 37.2394, longitude: 127.007, runways: [runway(2743)] },
+      { code: 'XSHT', iata: '', name: 'Short Field Airport', latitude: 36.5, longitude: 127.5, runways: [runway(1100)] },
+      { code: 'ZZZZ', iata: '', name: 'No Runways Field', latitude: 37, longitude: 127, runways: [] },
+    ];
+    screen.setMapPlaces({ airports, points: [{ id: 'sea-point', label: 'Open Sea', latitude: 36, longitude: 125 }] });
+    const nameOf = code => airportDisplayName(airports.find(airport => airport.code === code), getLanguage());
     const marker = id => elements.get('lobby-map-markers').children.find(child => child.dataset.placeId === id);
     const markerClasses = id => marker(id).getAttribute('class').split(/\s+/);
-    assert.equal(marker('RKSI').dataset.landable, 'true');
-    assert.ok(!markerClasses('RKSI').includes('cruise-only'));
-    assert.ok(marker('RKSI').children.some(child => child.tagName === 'PATH'), 'runway airports keep the pin');
-    for (const id of ['ZZZZ', 'sea-point']) {
-      assert.equal(marker(id).dataset.landable, 'false', `${id} is cruise-only`);
+    assert.equal(marker('RKSI').dataset.tier, 'full');
+    assert.ok(markerClasses('RKSI').includes('full'), 'full-scenery airports get the gold-centre pin');
+    assert.equal(marker('RKSS').dataset.tier, 'runway');
+    for (const id of ['RKSI', 'RKSS']) {
+      assert.equal(marker(id).dataset.landable, 'true');
+      assert.ok(!markerClasses(id).includes('cruise-only'));
+      assert.ok(marker(id).children.some(child => child.tagName === 'PATH'), `${id} keeps the pin`);
+    }
+    for (const id of ['RKSW', 'XSHT', 'ZZZZ', 'sea-point']) {
+      assert.equal(marker(id).dataset.landable, 'false', `${id} is cruise-only for the B737`);
       assert.ok(markerClasses(id).includes('cruise-only'), `${id} draws the cruise-only marker`);
       assert.ok(!marker(id).children.some(child => child.tagName === 'PATH'), `${id} has no runway pin`);
     }
-    assert.match(marker('ZZZZ').children.at(-1).textContent, new RegExp(t('lobby.map.cruiseOnly')));
+    assert.equal(marker('RKSW').children.at(-1).textContent, `${nameOf('RKSW')} · ${t('lobby.map.tier.cruise')}`);
+    assert.equal(marker('RKSS').children.at(-1).textContent, `${nameOf('RKSS')} · ${t('lobby.map.tier.runway')}`);
 
     const start = elements.get('lobby-start-reason');
     const status = elements.get('lobby-map-place-status');
@@ -617,15 +628,39 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
     assert.equal(takeoff.getAttribute('aria-describedby'), 'lobby-start-reason');
     assert.equal(cruise.getAttribute('aria-describedby'), null, 'the open cruise start is not described as locked');
     assert.equal(status.hidden, false);
-    assert.equal(status.textContent, t('lobby.map.place.cruiseOnly', { place: 'No Runways Field' }));
+    assert.equal(status.textContent, nameOf('ZZZZ'), 'the status line is just the place name');
     assert.equal(status.classList.contains('cruise-only'), true);
 
     pick('RKSI');
     assert.equal(takeoff.disabled, false);
     assert.equal(start.hidden, true);
     assert.equal(takeoff.getAttribute('aria-describedby'), null);
-    assert.equal(status.textContent, t('lobby.map.place.landable', { place: 'Incheon International Airport' }));
+    assert.equal(status.textContent, nameOf('RKSI'));
     assert.equal(status.classList.contains('cruise-only'), false);
+
+    pick('RKSS');
+    assert.equal(takeoff.disabled, false);
+    assert.equal(plan.state, 'runway');
+    assert.equal(status.textContent, nameOf('RKSS'));
+
+    pick('RKSW');
+    assert.equal(plan.state, 'cruise', 'a military airfield never plans a runway start');
+    assert.equal(takeoff.disabled, true);
+    assert.equal(start.textContent, t('lobby.reason.military'));
+    assert.equal(status.textContent, nameOf('RKSW'));
+
+    // A short field opens for the Cessna and closes again for the B737.
+    aircraft = 'C172';
+    pick('XSHT');
+    assert.equal(takeoff.disabled, false);
+    assert.equal(plan.state, 'runway');
+    const b737 = AIRCRAFT_REGISTRY.B738.name;
+    aircraft = 'B738';
+    screen.refresh();
+    assert.equal(plan.state, 'cruise', 'switching to an aircraft the runway cannot take drops the runway plan');
+    assert.equal(takeoff.disabled, true);
+    assert.equal(start.textContent, t('lobby.reason.runwayTooShort', { length: '1,100', min: '1,800', aircraft: b737 }));
+    assert.equal(status.textContent, nameOf('XSHT'));
   } finally {
     globalThis.document = originalDoc;
   }

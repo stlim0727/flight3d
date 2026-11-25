@@ -560,6 +560,8 @@ dialog.lobby-map-dialog::backdrop {
 .lobby-map-legend svg { width: 12px; height: 14px; flex: 0 0 auto; overflow: visible; }
 .lobby-map-legend-pin { fill: #4285f4; stroke: #fff; stroke-width: 1.2px; }
 .lobby-map-legend-ring { fill: #5f6368; stroke: #fff; stroke-width: 1.6px; }
+/* Full-scenery airports: a gold centre on the runway pin. */
+.lobby-map-legend-full, .lobby-map-marker.full .lobby-map-marker-dot { fill: #fbbf24; }
 .lobby-map-place-status {
   margin: 0;
   padding: 6px 10px;

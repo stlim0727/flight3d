@@ -14,6 +14,7 @@ import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, special
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
 import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth } from './mapBrowser.js';
 import { tilesForViewBox } from './lobbyMapTiles.js';
+import { airportDisplayName, airportProfile } from '../config/airportProfile.js';
 const MAP_SEARCH_LIMIT = 20;
 const BUILTIN_REGION_AIRPORT_CODES = Object.freeze({ incheon: 'RKSI', jeju: 'RKPC' });
 const AIRCRAFT_BUTTONS = { B738: 'lobby-aircraft-b738', C172: 'lobby-aircraft-c172', F16: 'lobby-aircraft-f16' };
@@ -22,7 +23,22 @@ export const LOBBY_AIRCRAFT_IDS = Object.keys(AIRCRAFT_BUTTONS);
 const LANGUAGE_BUTTONS = { en: 'lobby-lang-en', ko: 'lobby-lang-ko' };
 /** Airports that keep their own sky time (Neon is always night), so the lobby clock picker is locked. */
 const FIXED_TIME_AIRPORTS = new Set(['neon', 'valley']);
-const hasRunways = place => Boolean(place?.runways?.length);
+const POINT_PROFILE = Object.freeze({ tier: 'cruise', reason: 'point', landable: false, tooShort: false });
+
+/** What a map place offers the current aircraft; points and unknowns start in cruise only. */
+function mapPlaceProfile(place, aircraft) {
+  if (!place) return null;
+  if (place.kind === 'point' || place.kind === 'region') return POINT_PROFILE;
+  return airportProfile(place, aircraft);
+}
+
+/** Reason line under the locked takeoff/approach buttons. */
+function startReasonKey(profile) {
+  if (profile.tooShort) return 'lobby.reason.runwayTooShort';
+  if (profile.reason === 'military') return 'lobby.reason.military';
+  if (profile.reason === 'unpaved') return 'lobby.reason.unpaved';
+  return 'lobby.reason.cruiseOnly';
+}
 
 /** Show a reason line under a locked control, or hide it when nothing is locked. */
 function setReason(element, key, params) {
@@ -101,6 +117,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   let suppressClickUntil = 0;
   let mapSelectionBusy = false;
   let customPoint = null;
+  let normalizingMapPlan = false;
   const mapStatus = document.getElementById('lobby-map-search-status');
   const mapSearchRetry = document.getElementById('lobby-map-search-retry');
   const aircraftSummary = document.getElementById('lobby-aircraft-summary');
@@ -166,7 +183,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   function airportStartState(airport) {
-    if (!airport?.runways?.length) return 'cruise';
+    if (!airport || !airportProfile(airport, getAircraft?.()).landable) return 'cruise';
     const state = getPreset();
     if (regionalCruise(state)) return 'cruise';
     return ['runway', 'cruise', 'approach'].includes(state) ? state : 'runway';
@@ -449,15 +466,19 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         if (!projected) continue;
         const marker = document.createElementNS(svgNamespace, 'g');
         const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
-        // Runway places can take off and land; everything else starts in cruise.
-        const landable = hasRunways(place);
-        marker.setAttribute('class', `lobby-map-marker${landable ? '' : ' cruise-only'}${active ? ' active' : ''}`);
+        // Pins mark places this aircraft can take off from and land at; a
+        // gold centre marks full scenery. Everything else is a cruise-only dot.
+        const profile = mapPlaceProfile(place, getAircraft?.());
+        const landable = profile.landable;
+        const tierClass = profile.tier === 'full' && landable ? ' full' : (landable ? '' : ' cruise-only');
+        marker.setAttribute('class', `lobby-map-marker${tierClass}${active ? ' active' : ''}`);
         marker.setAttribute('transform', `translate(${projected.x.toFixed(2)} ${projected.y.toFixed(2)})`);
         marker.dataset.mapX = projected.x.toFixed(2);
         marker.dataset.mapY = projected.y.toFixed(2);
         marker.dataset.placeKind = place.kind;
         marker.dataset.placeId = place.id;
         marker.dataset.landable = String(landable);
+        marker.dataset.tier = profile.tier;
         const hit = document.createElementNS(svgNamespace, 'circle');
         hit.setAttribute('class', 'lobby-map-marker-hit');
         hit.setAttribute('cx', '0');
@@ -472,7 +493,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
           dot.setAttribute('class', 'lobby-map-marker-dot');
           dot.setAttribute('cx', '0');
           dot.setAttribute('cy', '-12');
-          dot.setAttribute('r', '2.6');
+          dot.setAttribute('r', profile.tier === 'full' ? '3.2' : '2.6');
           marker.append(pin);
           marker.append(dot);
         } else {
@@ -484,7 +505,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
           marker.append(ring);
         }
         const title = document.createElementNS(svgNamespace, 'title');
-        title.textContent = `${place.label} · ${t(landable ? 'lobby.map.landable' : 'lobby.map.cruiseOnly')}`;
+        const name = place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label;
+        const tierKey = !landable ? 'lobby.map.tier.cruise' : (profile.tier === 'full' ? 'lobby.map.tier.full' : 'lobby.map.tier.runway');
+        title.textContent = `${name} · ${t(tierKey)}`;
         marker.append(title);
         mapMarkers.append(marker);
       }
@@ -914,7 +937,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     button?.addEventListener('click', () => {
       const place = currentMapPlace();
       if (button.dataset.startLabel && place) {
-        if (type !== 'cruise' && !place.runways?.length) return;
+        if (type !== 'cruise' && !mapPlaceProfile(place, getAircraft?.()).landable) return;
         mapStateSelect.value = type;
         emitMapPlan();
       } else if (button.dataset.startLabel) {
@@ -997,16 +1020,40 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
     renderMapBrowser();
     const place = currentMapPlace();
+    const placeName = () => (place?.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place?.label);
     if (placeSummary) bindText(placeSummary, () => {
       const preset = getPreset();
-      if (place) return place.label;
+      if (place) return placeName();
       return regionalCruise(preset) ? t(`regional.cruise.${preset}`) : t(REGION_NAME_KEYS[airport] ?? airport);
     });
+    const placeProfile = mapPlaceProfile(place, getAircraft?.() ?? 'B738');
+    const runwayParams = () => ({
+      place: placeName(),
+      length: (placeProfile?.longestRunwayM ?? 0).toLocaleString('en-US'),
+      min: (placeProfile?.minRunwayM ?? 0).toLocaleString('en-US'),
+      aircraft: AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name ?? getAircraft?.() ?? 'B738',
+    });
     if (place) {
-      setReason(mapPlaceStatus, hasRunways(place) ? 'lobby.map.place.landable' : 'lobby.map.place.cruiseOnly', { place: place.label });
-      mapPlaceStatus?.classList.toggle('cruise-only', !hasRunways(place));
+      // Just the place name; why a start is locked is said under the start buttons.
+      if (mapPlaceStatus) {
+        mapPlaceStatus.hidden = false;
+        bindText(mapPlaceStatus, placeName);
+      }
+      mapPlaceStatus?.classList.toggle('cruise-only', !placeProfile.landable);
     } else {
       setReason(mapPlaceStatus, null);
+    }
+    // A saved takeoff/approach plan can outlive the aircraft or rules that allowed
+    // it (e.g. switching to the B737 at a short field); fall back to cruise.
+    if (place && !placeProfile.landable && ['runway', 'approach'].includes(mapStateSelect?.value) && !normalizingMapPlan) {
+      normalizingMapPlan = true;
+      try {
+        mapStateSelect.value = 'cruise';
+        emitMapPlan();
+      } finally {
+        normalizingMapPlan = false;
+      }
+      return;
     }
     const aircraft = getAircraft?.() ?? 'B738';
     if (aircraftSummary) bindText(aircraftSummary, () => AIRCRAFT_REGISTRY[aircraft]?.name ?? aircraft);
@@ -1205,8 +1252,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     updateBackButton();
     const end = document.getElementById('btn-lobby-end');
     if (end) end.hidden = !canEnd();
-    const cruiseOnly = Boolean(place && !hasRunways(plannedAirport));
-    setReason(startReason, cruiseOnly ? 'lobby.reason.cruiseOnly' : null);
+    const cruiseOnly = Boolean(place && !placeProfile.landable);
+    setReason(startReason, cruiseOnly ? startReasonKey(placeProfile) : null, runwayParams());
     for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
       if (type === 'demo') continue;
       const button = document.getElementById(scenario.lobbyButtonId);
