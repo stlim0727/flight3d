@@ -4,6 +4,7 @@ import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
 import { DEFAULT_AIRPORT } from '../src/config/flightSelection.js';
 import { SPAWN_SCENARIOS } from '../src/config/scenarioRegistry.js';
 import { setLanguage, t } from '../src/i18n/index.js';
+import { cruisePlaces } from '../src/config/mapFlightPlaces.js';
 
 class MockElement {
   constructor(id = '', tag = 'div') {
@@ -494,6 +495,39 @@ test('special regions render in default bookmarks and search results, invoke onA
     assert.equal(refreshedDefaults.find(btn => btn.dataset.placeId === 'RKSI').classList.contains('active'), false);
   } finally {
     setLanguage('ko');
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
+
+test('Paris Eiffel Tower default bookmark selects the showcase cruise point', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    for (const id of ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure']) {
+      elements.set(id, new MockElement(id, 'select'));
+    }
+    globalThis.document = mockDocument;
+    setLanguage('en');
+
+    let mapPlan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDemoProfile: () => null, getMapPlan: () => mapPlan,
+      onMapPlan: plan => { mapPlan = plan; }, onAirport: () => {}, onPreset: () => {},
+      onTime: () => {}, onAircraft: () => {}, onDemoProfile: () => {}, onFly: () => {},
+    });
+    screen.setMapPlaces({ airports: [], points: cruisePlaces() });
+
+    const parisButton = elements.get('lobby-map-default-bookmarks').children
+      .find(button => button.dataset.placeId === 'paris-eiffel');
+    assert.ok(parisButton, 'Eiffel Tower appears among the default bookmarks');
+    assert.equal(parisButton.textContent, 'Paris · Eiffel Tower');
+    parisButton.click();
+    assert.equal(mapPlan?.state, 'cruise');
+    assert.equal(mapPlan.pointId, 'paris-eiffel');
+  } finally {
+    setLanguage('en');
     if (originalDoc === undefined) delete globalThis.document;
     else globalThis.document = originalDoc;
   }

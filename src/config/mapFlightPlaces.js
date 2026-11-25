@@ -5,14 +5,32 @@ import { registerExternalDestinations } from './externalDestinations.js';
 import { applyAirportOverrides } from './airportOverrides.js';
 import { REGIONAL_CRUISES } from './regionalCruises.js';
 import { haversineDistanceM, JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { PARIS_SHOWCASE } from './parisShowcase.js';
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 
 const DEFAULT_AIRPORT_BOOKMARKS = ['RKSI', 'RKSS', 'RKPC', 'RKPK'];
-const DEFAULT_POINT_BOOKMARKS = ['jamsil', 'suwon', 'busan'];
+const DEFAULT_POINT_BOOKMARKS = ['jamsil', 'suwon', 'busan', 'paris-eiffel'];
+// Global cruise point for the Paris showcase. The start sits at the showcase
+// route's downstream end (~90 m AGL over the Seine), heading toward Pont d'Iéna
+// and the tower; its distant coordinates trigger a custom tangent-plane origin.
+const GLOBAL_CRUISE_PLACES = Object.freeze([
+  Object.freeze({
+    id: 'paris-eiffel',
+    label: 'Paris · Eiffel Tower',
+    ko: '파리 · 에펠탑',
+    en: 'Paris · Eiffel Tower',
+    aliases: ['Paris', 'Eiffel Tower', '에펠탑', '파리'],
+    latitude: PARIS_SHOWCASE.route[0].latitude,
+    longitude: PARIS_SHOWCASE.route[0].longitude,
+    headingDeg: 276,
+    altitudeM: 120,
+    airport: 'incheon',
+  }),
+]);
 const KOREA_CENTRE = Object.freeze({ latitude: 36.4, longitude: 127.9, radiusKm: 700 });
 
 export function cruisePlaces() {
-  return Object.entries(REGIONAL_CRUISES).map(([id, place]) => Object.freeze({
+  return [...Object.entries(REGIONAL_CRUISES).map(([id, place]) => Object.freeze({
     id,
     label: id === 'jamsil' ? 'Seoul · Jamsil' : place.en ?? place.ko ?? id,
     ko: place.ko ?? '',
@@ -23,7 +41,7 @@ export function cruisePlaces() {
     headingDeg: place.headingDeg,
     altitudeM: place.altitudeM,
     airport: place.airport,
-  }));
+  })), ...GLOBAL_CRUISE_PLACES];
 }
 
 
