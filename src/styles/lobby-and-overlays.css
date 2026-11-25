@@ -308,14 +308,27 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-map-browser { display: grid; gap: calc(8px * var(--ui-scale, 1)); min-width: 0; }
 .lobby-map-toolbar { display: flex; gap: calc(6px * var(--ui-scale, 1)); position: relative; }
 .lobby-map-toolbar::before {
-  content: '⌕';
+  content: '';
   position: absolute;
-  left: 12px;
+  left: 14px;
   top: 50%;
-  transform: translateY(-52%);
-  color: #5f6368;
-  font-size: 20px;
-  line-height: 1;
+  width: 12px;
+  height: 12px;
+  margin-top: -9px;
+  border: 2px solid #5f6368;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.lobby-map-toolbar::after {
+  content: '';
+  position: absolute;
+  left: 26px;
+  top: calc(50% + 5px);
+  width: 7px;
+  height: 2px;
+  background: #5f6368;
+  border-radius: 2px;
+  transform: rotate(45deg);
   pointer-events: none;
 }
 .lobby-map-toolbar input {
@@ -393,6 +406,7 @@ body[data-flow="paused"] #pause-menu { display: flex; }
 .lobby-map-marker { cursor: pointer; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45)); }
 .lobby-map-marker-pin { fill: #4285f4; stroke: #fff; stroke-width: 1.2px; }
 .lobby-map-marker-dot { fill: #fff; }
+.lobby-map-marker-hit { fill: transparent; stroke: none; pointer-events: all; }
 .lobby-map-marker.active .lobby-map-marker-pin { fill: #ea4335; }
 .lobby-map-status-row {
   display: flex;
@@ -1365,21 +1379,27 @@ body[data-flow="lobby"] .menu-toggle {
   font-size: 11px;
 }
 .compact-ui .lobby-card #lobby-map-overview {
-  min-height: 28px;
-  padding: 3px 8px;
+  min-height: 36px;
+  padding: 3px 10px;
   font-size: 11px;
 }
 .compact-ui .lobby-card #lobby-map-search-retry {
-  min-height: 28px;
-  padding: 2px 8px;
+  min-height: 36px;
+  padding: 2px 10px;
   font-size: 10px;
 }
 .compact-ui .lobby-card .lobby-map-toolbar input {
-  min-height: 38px;
+  min-height: 44px;
 }
 .compact-ui .lobby-card .lobby-map-toolbar .btn-bookmark {
-  min-height: 38px;
-  padding: 0 12px;
+  min-height: 44px;
+  padding: 0 14px;
+}
+.compact-ui .lobby-map-zoom { bottom: 28px; }
+.compact-ui .lobby-map-zoom button {
+  width: 44px;
+  height: 44px;
+  font-size: 22px;
 }
 .compact-ui .lobby-card .lobby-header { gap: 8px; }
 .compact-ui .lobby-header-actions { gap: 6px; }

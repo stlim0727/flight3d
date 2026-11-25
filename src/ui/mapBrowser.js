@@ -56,3 +56,12 @@ export function fitMapViewBoxToAspect(viewBox, aspect) {
   const nextY = Math.max(0, Math.min(MAP_HEIGHT - nextHeight, centerY - nextHeight / 2));
   return `${nextX.toFixed(2)} ${nextY.toFixed(2)} ${nextWidth.toFixed(2)} ${nextHeight.toFixed(2)}`;
 }
+
+/**
+ * Keep map markers at a readable, tappable size at every zoom. Marker paths are
+ * 14 SVG units wide, so a 160-unit viewBox width draws them about 29 px across
+ * in the lobby's 334 px mobile map; the same ratio holds when zoomed in.
+ */
+export function markerScaleForViewBoxWidth(width) {
+  return Number.isFinite(width) && width > 0 ? Math.max(width / 160, 0.001) : 0.001;
+}

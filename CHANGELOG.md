@@ -1,6 +1,9 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(map-ui):** make the lobby map usable with touch on phones
+  - Airport and cruise pins keep the same on-screen size at every zoom and carry a 44 px invisible tap circle, so they can be selected from the world overview instead of shrinking to a few pixels.
+  - Mobile zoom, search and bookmark controls now use 44 px touch targets; the missing search glyph is drawn in CSS. Covered by `tests/mapBrowser.test.js` and a 390×844 Chrome check.
 - **feat(aircraft):** export the Cessna 172 pilot as a GLB
   - `npm run build:pilot` now writes `public/models/pilot-c172.glb` with the seated yoke/pedal IK pose baked into its named limb nodes.
   - The C172 swaps to the GLB at runtime with the procedural pilot as fallback; the model joins the 3D asset gallery and is covered by `tests/civilPilotGeometry.test.js`.

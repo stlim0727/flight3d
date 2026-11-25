@@ -12,7 +12,7 @@ import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../con
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
-import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect } from './mapBrowser.js';
+import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth } from './mapBrowser.js';
 import { tilesForViewBox } from './lobbyMapTiles.js';
 const MAP_SEARCH_LIMIT = 20;
 const BUILTIN_REGION_AIRPORT_CODES = Object.freeze({ incheon: 'RKSI', jeju: 'RKPC' });
@@ -281,7 +281,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   };
   const updatePinScale = () => {
     if (!mapMarkers?.children) return;
-    const scale = Math.max(0.001, Math.min(2, svgViewBox().width / 220));
+    const scale = markerScaleForViewBoxWidth(svgViewBox().width);
     for (const marker of mapMarkers.children) {
       const x = marker.dataset?.mapX;
       const y = marker.dataset?.mapY;
@@ -409,6 +409,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         marker.dataset.mapY = projected.y.toFixed(2);
         marker.dataset.placeKind = place.kind;
         marker.dataset.placeId = place.id;
+        const hit = document.createElementNS(svgNamespace, 'circle');
+        hit.setAttribute('class', 'lobby-map-marker-hit');
+        hit.setAttribute('cx', '0');
+        hit.setAttribute('cy', '-9');
+        hit.setAttribute('r', '11');
         const pin = document.createElementNS(svgNamespace, 'path');
         pin.setAttribute('class', 'lobby-map-marker-pin');
         pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
@@ -419,6 +424,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         dot.setAttribute('r', '2.6');
         const title = document.createElementNS(svgNamespace, 'title');
         title.textContent = place.label;
+        marker.append(hit);
         marker.append(pin);
         marker.append(dot);
         marker.append(title);
