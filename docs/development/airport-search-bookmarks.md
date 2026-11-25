@@ -8,9 +8,10 @@ bookmarks. All three feed the same selection path as the existing map selects.
 `airportSearch.js` filters the loaded `mapPlaces` catalog. It normalizes case,
 accents, punctuation and spacing, then ranks exact ICAO/IATA codes, code
 prefixes, name/label prefixes, token prefixes and substrings. Korean and English
-labels both work; an empty query returns no results. The catalog comes from the
-committed OurAirports index plus `REGIONAL_CRUISES`, so no airport code is
-hand-authored in the UI.
+labels both work; an empty query returns no results. Airport rows come from the
+committed OurAirports index and regional cruise points from `REGIONAL_CRUISES`;
+`mapFlightPlaces.js` additionally curates the global `paris-eiffel` point. No
+airport code is hand-authored in the UI.
 
 ## Selection flow
 

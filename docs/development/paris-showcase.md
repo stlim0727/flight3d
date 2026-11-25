@@ -10,6 +10,9 @@ origin within 25 km of the tower; no new airport or built-in map is required.
   declarative z13/z14 imagery inset around the tower and bridge. The inset is
   handed to the existing `OpenWorldTerrain` screen-error/detail scheduler;
   z11 tiles stay on screen while detail loads.
+- `src/config/mapFlightPlaces.js` — the `paris-eiffel` default cruise bookmark
+  starts at the downstream end of the route above the Seine; its distance from
+  Korea produces the custom origin that activates the showcase.
 - `src/environment/ParisShowcase.js` — lazily fetches
   `public/models/landmarks/eiffel-tower.glb`, seats it on `terrain.getHeight()`
   for both rendering and collision, and adds the bridge deck and two quay

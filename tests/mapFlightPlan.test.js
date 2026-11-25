@@ -5,6 +5,7 @@ import {
   takeoffSpawnPlan, cruiseSpawnPlan, approachSpawnPlan, resolveMapFlightPlan,
 } from '../src/config/mapFlightPlan.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { isParisShowcaseOrigin } from '../src/config/parisShowcase.js';
 import { defaultMapBookmarks, cruisePlaces, mapCruisePoint, mapPlanRegion, mapPlanCustomOrigin, mapPlanLabel, specialRegionPlaces } from '../src/config/mapFlightPlaces.js';
 
 const close = (actual, expected, epsilon = 1e-9, label = 'value') => {
@@ -284,8 +285,27 @@ test('map cruise uses airport elevation or a default altitude for a custom point
 test('default bookmarks include indexed major airports and regional cities', () => {
   const airports = [{ code: 'RKSS', name: 'Gimpo' }, { code: 'OTHER', name: 'Other' }];
   assert.deepEqual(defaultMapBookmarks({ airports, points: cruisePlaces() }).map(({ kind, id }) => [kind, id]), [
-    ['airport', 'RKSS'], ['point', 'jamsil'], ['point', 'suwon'], ['point', 'busan'],
+    ['airport', 'RKSS'], ['point', 'jamsil'], ['point', 'suwon'], ['point', 'busan'], ['point', 'paris-eiffel'],
   ]);
+});
+
+test('Paris Eiffel Tower bookmark starts the showcase cruise at a custom origin', () => {
+  const points = cruisePlaces();
+  const paris = points.find(point => point.id === 'paris-eiffel');
+  assert.ok(paris, 'map catalog includes the Eiffel Tower cruise point');
+  assert.equal(paris.label, 'Paris · Eiffel Tower');
+  assert.ok(isParisShowcaseOrigin(paris));
+
+  const plan = { state: 'cruise', pointId: paris.id };
+  const origin = mapPlanCustomOrigin(plan, { points }, 'incheon');
+  assert.ok(isParisShowcaseOrigin(origin));
+  assert.deepEqual(origin, { latitude: paris.latitude, longitude: paris.longitude });
+
+  const spawn = cruiseSpawnPlan({ ...paris, origin });
+  close(spawn.x, 0, 1e-6, 'Paris cruise spawns at its custom origin x=0');
+  close(spawn.z, 0, 1e-6, 'Paris cruise spawns at its custom origin z=0');
+  assert.equal(spawn.y, paris.altitudeM);
+  assert.equal(spawn.headingDeg, 276);
 });
 
 test('specialRegionPlaces exposes non-Korea and fictional free-flight regions for default bookmarks', () => {
@@ -300,6 +320,7 @@ test('specialRegionPlaces exposes non-Korea and fictional free-flight regions fo
       ['point', 'jamsil'],
       ['point', 'suwon'],
       ['point', 'busan'],
+      ['point', 'paris-eiffel'],
       ['region', 'lukla'],
       ['region', 'neon'],
       ['region', 'coastal'],
