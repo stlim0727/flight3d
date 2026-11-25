@@ -4,6 +4,7 @@
 - **fix(map-ui):** let the lobby panel scroll from the map on touch screens
   - A one-finger vertical drag on the map now scrolls the surrounding lobby panel instead of being swallowed by the map's `touch-action: none`; one-finger horizontal drags still pan the map, and two-finger gestures still pan and zoom it.
   - Covered by `npm run test:map-scroll` in 390×844 hardware Chrome.
+  - The browser check rejects SwiftShader before launching Chrome, so software rendering cannot be used as evidence.
 - **fix(map-ui):** make the lobby map usable with touch on phones
   - Airport and cruise pins keep the same on-screen size at every zoom and carry a 44 px invisible tap circle, so they can be selected from the world overview instead of shrinking to a few pixels.
   - Mobile zoom, search and bookmark controls now use 44 px touch targets; the missing search glyph is drawn in CSS. Covered by `tests/mapBrowser.test.js` and a 390×844 Chrome check.

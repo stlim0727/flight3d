@@ -4,7 +4,16 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
-import { withBrowserSession } from './lib/browserHarness.mjs';
+import { withBrowserSession, detectGpuAngle } from './lib/browserHarness.mjs';
+
+// Fail before the harness launches Chrome: a GPU preflight inside the session
+// would be too late to prevent an unauthorized software-rendered browser.
+const gpuAngle = detectGpuAngle();
+if (gpuAngle === 'swiftshader' || process.env.FORCE_GPU === '0') {
+  throw new Error('Hardware GPU acceleration is required; software rendering is not valid evidence');
+}
+process.env.GPU_ANGLE = gpuAngle;
+console.log('Detected GPU angle:', gpuAngle);
 
 const artifacts = path.resolve('.cache/map-nested-scroll');
 await mkdir(artifacts, { recursive: true });
