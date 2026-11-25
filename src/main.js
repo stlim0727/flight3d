@@ -1275,6 +1275,7 @@ class FlightSimulator {
    */
   applyFixedPose(pose) {
     if (!pose) return;
+    this.demoDirector?.stop();
     this.freezePhysics = Boolean(pose.freeze);
     if (this.gameFlow.state === FLOW.LOBBY) {
       this.gameFlow.enterFlight();
@@ -1292,12 +1293,17 @@ class FlightSimulator {
     this.position.set(targetX, targetY, targetZ);
     this.linearVelocity.set(0, 0, 0);
     this.angularVelocity.set(0, 0, 0);
+    const headingDeg = (pose.heading % 360 + 360) % 360;
     if (this.telemetry) {
       this.telemetry.iasKnots = 0;
       this.telemetry.tasKnots = 0;
       this.telemetry.altitudeM = targetY;
+      this.telemetry.altitudeFt = targetY * 3.28084;
+      this.telemetry.headingDeg = headingDeg;
+      this.telemetry.compassDegrees = headingDeg;
+      this.telemetry.onGround = Boolean(ground !== 0 && Math.abs(targetY - ground) < 5);
     }
-    const yaw = -((pose.heading % 360) * Math.PI / 180);
+    const yaw = -(headingDeg * Math.PI / 180);
     this.quaternion.setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ'));
 
     this.aircraft.group.position.copy(this.position);
@@ -1312,8 +1318,25 @@ class FlightSimulator {
       this.cameraSystem.snapToTarget(this.aircraft.group);
     }
 
+    this.updateFlightDisplays?.(true);
+
     this.ensureGeographicLayers?.().then(mod => {
       mod.updateOpenWorldTerrain?.(this);
+      if (pose.alt === null) {
+        const resolvedGround = this.currentTerrain?.getHeight?.(targetX, targetZ);
+        if (Number.isFinite(resolvedGround) && resolvedGround !== 0) {
+          const newY = resolvedGround + (this.gear?.cgGroundHeightM ?? 3.5);
+          this.position.y = newY;
+          this.aircraft.group.position.y = newY;
+          this.aircraft.group.updateMatrixWorld(true);
+          this.renderPose.reset(this.position, this.quaternion);
+          if (this.telemetry) {
+            this.telemetry.altitudeM = newY;
+            this.telemetry.altitudeFt = newY * 3.28084;
+          }
+          this.updateFlightDisplays?.(true);
+        }
+      }
     });
   }
 
