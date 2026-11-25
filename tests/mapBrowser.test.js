@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
+import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
 
 test('projection covers airports worldwide and keeps south below north', () => {
   const gimpo = projectToMap(37.5583, 126.791);
@@ -47,4 +47,18 @@ test('aspect fitting keeps a square phone map centred and inside bounds', () => 
   assert.deepEqual(square.slice(0, 2), [256, 256]);
   assert.ok(square[0] + square[2] <= MAP_WIDTH && square[1] + square[3] <= MAP_HEIGHT);
   assert.equal(fitMapViewBoxToAspect('not a viewBox', 1), 'not a viewBox');
+});
+
+test('map markers stay readable and tappable from overview to deep zoom', () => {
+  const mapWidthPx = 334;
+  const pinUnits = 14;
+  const hitUnits = 22;
+  for (const viewBoxWidth of [MAP_WIDTH, MAP_WIDTH / 64, MAP_WIDTH / 4096]) {
+    const scale = markerScaleForViewBoxWidth(viewBoxWidth);
+    const pinPx = scale * pinUnits / viewBoxWidth * mapWidthPx;
+    const hitPx = scale * hitUnits / viewBoxWidth * mapWidthPx;
+    assert.ok(pinPx > 28 && pinPx < 31, `pin should stay ~29 px at ${viewBoxWidth}`);
+    assert.ok(hitPx >= 44, `hit target should stay tappable at ${viewBoxWidth}`);
+  }
+  assert.ok(markerScaleForViewBoxWidth(NaN) > 0, 'invalid widths must not collapse markers');
 });
