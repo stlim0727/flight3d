@@ -16,8 +16,8 @@ const WATER = '#a9c5cb';
 const RUNWAY = '#352c25';
 const AIRPORT_INK = '#7b2d63';
 const INK = '#372e25';
-// Overlap neighbouring tiles by a hair so antialiased seams do not show.
-const SEAM = 0.002;
+// Overlap neighbouring land quads by a few pixels so antialiased seams do not show.
+const SEAM = 0.01;
 
 function ringsPath(rings) {
   const path = new Path2D();
@@ -185,22 +185,32 @@ export class RegionalChart {
     const cx = width / 2, cy = height / 2;
 
     // Unloaded and failed tiles keep the canvas hatch, so missing data never reads as land.
-    for (const tile of this.view) {
-      const entry = this.tiles.get(tile.key);
-      if (entry?.state !== 'ready') continue;
-      ctx.save();
-      ctx.transform(1 / m, 0, 0, 1 / m, cx, cy);
-      ctx.transform(...chartTileTransform(this.projection, tile.x, tile.y, tile.zoom ?? CHART_WATER_ZOOM));
-      ctx.beginPath();
-      ctx.rect(-SEAM, -SEAM, 1 + 2 * SEAM, 1 + 2 * SEAM);
-      ctx.fillStyle = LAND;
-      ctx.fill();
-      ctx.clip();
-      if (entry.path) {
-        ctx.fillStyle = WATER;
-        ctx.fill(entry.path, 'nonzero');
+    // All land goes down before any water, so a tile edge never paints land over its neighbour's sea.
+    const ready = this.view.filter(tile => this.tiles.get(tile.key)?.state === 'ready');
+    for (const pass of ['land', 'water']) {
+      for (const tile of ready) {
+        const { path } = this.tiles.get(tile.key);
+        if (pass === 'water' && !path) continue;
+        const transform = chartTileTransform(this.projection, tile.x, tile.y, tile.zoom ?? CHART_WATER_ZOOM);
+        ctx.save();
+        ctx.transform(1 / m, 0, 0, 1 / m, cx, cy);
+        ctx.transform(...transform);
+        ctx.beginPath();
+        ctx.rect(-SEAM, -SEAM, 1 + 2 * SEAM, 1 + 2 * SEAM);
+        if (pass === 'land') {
+          ctx.fillStyle = LAND;
+          ctx.fill();
+        } else {
+          ctx.clip();
+          ctx.fillStyle = WATER;
+          ctx.fill(path, 'nonzero');
+          // Polygons are cut at the tile edge; a same-colour rim closes the antialiased seam.
+          ctx.strokeStyle = WATER;
+          ctx.lineWidth = 1.5 * m / Math.hypot(transform[0], transform[1]);
+          ctx.stroke(path);
+        }
+        ctx.restore();
       }
-      ctx.restore();
     }
 
     const { runways = [], labels = [] } = this.airports ?? {};
@@ -241,8 +251,9 @@ export class RegionalChart {
       ctx.fillText(code, px, py);
     }
 
+    // Scale bar beside the north arrow, clear of overlays on the paper's left edge.
     const scale = chartScaleBar(m, Math.min(140, width / 4));
-    const x0 = 14, y0 = 20;
+    const x0 = width - 40 - scale.pixels, y0 = 20;
     ctx.strokeStyle = INK;
     ctx.lineWidth = 2;
     ctx.beginPath();
