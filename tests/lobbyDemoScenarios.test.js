@@ -5,6 +5,7 @@ import { DEFAULT_AIRPORT } from '../src/config/flightSelection.js';
 import { SPAWN_SCENARIOS } from '../src/config/scenarioRegistry.js';
 import { setLanguage, t } from '../src/i18n/index.js';
 import { cruisePlaces } from '../src/config/mapFlightPlaces.js';
+import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
 
 class MockElement {
   constructor(id = '', tag = 'div') {
@@ -51,6 +52,7 @@ class MockElement {
   };
   setAttribute(k, v) { this.attributes[k] = String(v); }
   getAttribute(k) { return this.attributes[k]; }
+  removeAttribute(k) { delete this.attributes[k]; }
   addEventListener(evt, fn) {
     if (!this.listeners[evt]) this.listeners[evt] = [];
     this.listeners[evt].push(fn);
@@ -159,6 +161,7 @@ function setupMockDOM() {
     'lobby-map-default-bookmarks', 'lobby-map-bookmark-toggle', 'lobby-map-overview',
     'lobby-aircraft-b738', 'lobby-aircraft-c172', 'lobby-aircraft-f16',
     'lobby-lang-en', 'lobby-lang-ko',
+    'lobby-time-reason', 'lobby-aircraft-reason', 'lobby-start-reason', 'lobby-map-place-status',
   ];
   for (const id of commonIds) {
     const tag = id.includes('select') ? 'select' : id.includes('search') ? 'input' : id.includes('btn') || id.includes('preset') || id.includes('aircraft') || id.includes('lang') || id.includes('pilot') || id.includes('gyro') || id.includes('settings') || id.includes('toggle') || id.includes('overview') ? 'button' : 'div';
@@ -334,13 +337,57 @@ test('time-of-day picker is locked at fixed-time airports (Neon, Valley)', () =>
     const chips = timeGroup.children.find(c => c.classList.contains('lobby-time-chips')).children;
     assert.equal(chips.length, 3);
 
+    const timeReason = elements.get('lobby-time-reason');
     for (const [id, locked] of [['incheon', false], ['neon', true], ['valley', true], ['coastal', false]]) {
       airport = id;
       screen.refresh();
       assert.equal(timeSelect.disabled, locked, `${id} select`);
       assert.ok(chips.every(chip => chip.disabled === locked), `${id} chips`);
+      assert.equal(timeReason.hidden, !locked, `${id} reason visibility`);
+      assert.equal(timeReason.textContent, locked ? t('lobby.reason.timeFixed') : '', `${id} reason text`);
+      assert.equal(timeSelect.getAttribute('aria-describedby'), locked ? 'lobby-time-reason' : undefined, `${id} select describedby`);
     }
+    assert.equal(timeGroup.children.at(-1), timeReason, 'the reason sits after the quick-pick chips');
   } finally {
+    if (originalDoc === undefined) delete globalThis.document;
+    else globalThis.document = originalDoc;
+  }
+});
+
+test('locked aircraft buttons explain which aircraft the flight requires', () => {
+  const originalDoc = globalThis.document;
+  try {
+    const { mockDocument, elements } = setupMockDOM();
+    globalThis.document = mockDocument;
+    setLanguage('en');
+    let preset = 'runway';
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => preset, getTime: () => 12, getAircraft: () => 'B738',
+      getDemoProfile: () => null, onAirport: () => {}, onPreset: p => { preset = p; }, onTime: () => {},
+      onAircraft: () => {}, onDemoProfile: () => {}, onFly: () => {},
+    });
+    const reason = elements.get('lobby-aircraft-reason');
+    const c172 = elements.get('lobby-aircraft-c172');
+    assert.equal(c172.disabled, false);
+    assert.equal(reason.hidden, true);
+    assert.equal(c172.getAttribute('aria-describedby'), undefined);
+
+    const lockedType = Object.keys(SPAWN_SCENARIOS).find(type => SPAWN_SCENARIOS[type].aircraft);
+    assert.ok(lockedType, 'fixture needs a scenario with a required aircraft');
+    preset = lockedType;
+    screen.refresh();
+    const required = SPAWN_SCENARIOS[lockedType].aircraft;
+    assert.equal(c172.disabled, true);
+    assert.equal(reason.hidden, false);
+    assert.equal(reason.textContent, t('lobby.reason.aircraftLocked', { aircraft: AIRCRAFT_REGISTRY[required].name }));
+    assert.equal(c172.getAttribute('aria-describedby'), 'lobby-aircraft-reason');
+
+    preset = 'runway';
+    screen.refresh();
+    assert.equal(reason.hidden, true);
+    assert.equal(c172.getAttribute('aria-describedby'), undefined);
+  } finally {
+    setLanguage('ko');
     if (originalDoc === undefined) delete globalThis.document;
     else globalThis.document = originalDoc;
   }
