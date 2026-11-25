@@ -19,7 +19,7 @@ const GEAR_LABELS = {
   mainRight: 'right.main.gear',
 };
 
-class PhysicsIntegratorMethods {
+export class PhysicsIntegratorMethods {
   /**
    * Whoever claims this frame owns the aircraft pose, so the loop asks one question instead of
    * testing each feature flag. Registry order decides priority.
@@ -504,13 +504,20 @@ class PhysicsIntegratorMethods {
   }
 
   updateFlightDisplays(force = false) {
+    const isCockpit = !this.cameraSystem || this.cameraSystem.mode === this.cameraSystem.constructor.MODES?.COCKPIT;
+    const modeChanged = this._lastDisplayCockpit !== isCockpit;
+    this._lastDisplayCockpit = isCockpit;
     const frame = this.displayFrame ?? 0;
     this.displayFrame = frame + 1;
+    // When outside cockpit, throttle canvas redraws to every 8 frames to save CPU & GPU texture bandwidth
+    if (!force && !modeChanged && !isCockpit && frame % 8 !== 0) {
+      return;
+    }
     this.pfdCanvas.updateData(this.telemetry);
     this.pfdCanvas.render();
     this.isfdCanvas.updateData(this.telemetry);
     // Initialize both screens; then spread their uploads over alternate frames.
-    for (const display of (force || frame === 0 ? [this.ndCanvas, this.eicasCanvas]
+    for (const display of (force || modeChanged || frame === 0 ? [this.ndCanvas, this.eicasCanvas]
       : [frame % 2 === 0 ? this.ndCanvas : this.eicasCanvas])) {
       display.updateData(this.telemetry);
       display.render();

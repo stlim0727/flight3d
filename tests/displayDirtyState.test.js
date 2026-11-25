@@ -36,3 +36,32 @@ test('CDU ignores flight telemetry but redraws for displayed route state', () =>
   display.updateData({});
   assert.equal(renders, afterAirport);
 });
+
+test('updateFlightDisplays throttles redraws outside cockpit to preserve bandwidth', async () => {
+  const { PhysicsIntegratorMethods } = await import('../src/core/PhysicsIntegrator.js');
+  let pfdRenders = 0;
+  const mockSim = Object.create(PhysicsIntegratorMethods.prototype);
+  mockSim.pfdCanvas = { updateData() {}, render() { pfdRenders++; } };
+  mockSim.isfdCanvas = { updateData() {}, render() {} };
+  mockSim.ndCanvas = { updateData() {}, render() {} };
+  mockSim.eicasCanvas = { updateData() {}, render() {} };
+  mockSim.mcpCanvas = { updateData() {}, render() {} };
+  mockSim.cduCanvas = { updateData() {}, render() {} };
+  mockSim.telemetry = {};
+  mockSim.cameraSystem = {
+    mode: 1, // CHASE (non-cockpit)
+    constructor: { MODES: { COCKPIT: 0, CHASE: 1 } },
+  };
+
+  // Run 16 frames in CHASE mode:
+  // frame 0 (frame%8===0: renders), frame 1..7 (skipped), frame 8 (renders), frame 9..15 (skipped)
+  for (let i = 0; i < 16; i++) {
+    mockSim.updateFlightDisplays();
+  }
+  assert.equal(pfdRenders, 2, 'CHASE mode must throttle PFD renders to every 8 frames');
+
+  // Switching to COCKPIT mode immediately renders:
+  mockSim.cameraSystem.mode = 0; // COCKPIT
+  mockSim.updateFlightDisplays();
+  assert.equal(pfdRenders, 3, 'switching to COCKPIT must immediately trigger flight displays update');
+});

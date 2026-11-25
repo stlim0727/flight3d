@@ -198,7 +198,7 @@ class FlightSimulator {
 
     this.renderer = new THREE.WebGLRenderer({
       antialias: initialPreset.antialias ?? true,
-      logarithmicDepthBuffer: true,
+      logarithmicDepthBuffer: initialPreset.logarithmicDepthBuffer ?? true,
       powerPreference: 'high-performance'
     });
     this.renderer.setPixelRatio(renderPixelRatio(this.renderQuality, window.innerWidth, window.innerHeight,
@@ -302,7 +302,9 @@ class FlightSimulator {
       audio: this.audio,
       isCrashedGetter: () => this.isCrashed,
     });
-    this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement);
+    this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement, {
+      logarithmicDepthBuffer: initialPreset.logarithmicDepthBuffer ?? true,
+    });
     this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem, {
       onStatusChange: (status) => this.headTrackingUi?.update(status),
     });

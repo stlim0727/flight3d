@@ -33,9 +33,10 @@ export class CameraSystem {
   static QUICK_CYCLE = [1, 6, 4, 2, 0, 8];
   static CRASH_MODES = [1, 6, 4, 3];
 
-  constructor(camera, domElement) {
+  constructor(camera, domElement, options = {}) {
     this.camera = camera;
     this.domElement = domElement;
+    this.logarithmicDepthBuffer = options.logarithmicDepthBuffer ?? true;
     this.modes = {
       cockpit: CockpitCameraMode, chase: ChaseCameraMode, flyby: FlybyCameraMode, orbit: OrbitCameraMode,
       wing: WingCameraMode, gear: GearCameraMode, tower: TowerCameraMode, hud: HudCameraMode, bandit: BanditCameraMode, crash: CrashCameraMode
@@ -43,7 +44,9 @@ export class CameraSystem {
     initCameraState(this);
     this.cinematicDirector = new CinematicCameraDirector({ camera: this.camera, queryGroundHeight: (x, z) => this.queryGroundHeight(x, z) });
     if (this.camera) {
-      this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT) ? 0.08 : 0.25;
+      this.camera.near = (this.mode === CameraSystem.MODES.COCKPIT)
+        ? (this.logarithmicDepthBuffer ? 0.08 : 0.20)
+        : 0.25;
       if (typeof this.camera.updateProjectionMatrix === 'function') this.camera.updateProjectionMatrix();
     }
     this.initMouseLook();
