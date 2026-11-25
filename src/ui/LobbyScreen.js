@@ -643,7 +643,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     applyViewBox({
       ...dragStart.box,
       x: dragStart.box.x - (dx / bounds.width) * dragStart.box.width,
-      y: dragStart.box.y - (dy / bounds.height) * dragStart.box.height,
+      // One-finger touch drags reserve the vertical axis for the lobby panel's
+      // scroll; two-finger gestures still pan and zoom the map in both axes.
+      y: event.pointerType === 'touch'
+        ? dragStart.box.y
+        : dragStart.box.y - (dy / bounds.height) * dragStart.box.height,
     });
     suppressClickUntil = Date.now() + 200;
   });

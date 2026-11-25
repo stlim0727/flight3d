@@ -36,6 +36,7 @@
     "test:airport-landing": "node scripts/verify-airport-landing.mjs",
     "test:map-flight": "node scripts/verify-map-flight-start.mjs",
     "test:map-search": "node scripts/verify-map-search.mjs",
+    "test:map-scroll": "node scripts/verify-map-nested-scroll.mjs",
     "test:crash": "node scripts/test-crash-scenarios.js",
     "test:mobile": "node scripts/test-mobile-touch.js",
     "test:demo": "node scripts/test-demo-stepping.js",
