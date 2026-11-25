@@ -628,26 +628,26 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
     assert.equal(takeoff.getAttribute('aria-describedby'), 'lobby-start-reason');
     assert.equal(cruise.getAttribute('aria-describedby'), null, 'the open cruise start is not described as locked');
     assert.equal(status.hidden, false);
-    assert.equal(status.textContent, t('lobby.map.place.cruiseOnly', { place: nameOf('ZZZZ') }));
+    assert.equal(status.textContent, nameOf('ZZZZ'), 'the status line is just the place name');
     assert.equal(status.classList.contains('cruise-only'), true);
 
     pick('RKSI');
     assert.equal(takeoff.disabled, false);
     assert.equal(start.hidden, true);
     assert.equal(takeoff.getAttribute('aria-describedby'), null);
-    assert.equal(status.textContent, t('lobby.map.place.full', { place: nameOf('RKSI') }));
+    assert.equal(status.textContent, nameOf('RKSI'));
     assert.equal(status.classList.contains('cruise-only'), false);
 
     pick('RKSS');
     assert.equal(takeoff.disabled, false);
     assert.equal(plan.state, 'runway');
-    assert.equal(status.textContent, t('lobby.map.place.runwayOnly', { place: nameOf('RKSS'), length: '3,600' }));
+    assert.equal(status.textContent, nameOf('RKSS'));
 
     pick('RKSW');
     assert.equal(plan.state, 'cruise', 'a military airfield never plans a runway start');
     assert.equal(takeoff.disabled, true);
     assert.equal(start.textContent, t('lobby.reason.military'));
-    assert.equal(status.textContent, t('lobby.map.place.military', { place: nameOf('RKSW') }));
+    assert.equal(status.textContent, nameOf('RKSW'));
 
     // A short field opens for the Cessna and closes again for the B737.
     aircraft = 'C172';
@@ -660,7 +660,7 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
     assert.equal(plan.state, 'cruise', 'switching to an aircraft the runway cannot take drops the runway plan');
     assert.equal(takeoff.disabled, true);
     assert.equal(start.textContent, t('lobby.reason.runwayTooShort', { length: '1,100', min: '1,800', aircraft: b737 }));
-    assert.equal(status.textContent, t('lobby.map.place.tooShort', { place: nameOf('XSHT'), length: '1,100', aircraft: b737 }));
+    assert.equal(status.textContent, nameOf('XSHT'));
   } finally {
     globalThis.document = originalDoc;
   }

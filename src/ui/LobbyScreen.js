@@ -32,15 +32,6 @@ function mapPlaceProfile(place, aircraft) {
   return airportProfile(place, aircraft);
 }
 
-/** Status line under the map: the place name plus what it can do. */
-function placeStatusKey(profile) {
-  if (profile.tier === 'full') return 'lobby.map.place.full';
-  if (profile.tier === 'runway') return profile.tooShort ? 'lobby.map.place.tooShort' : 'lobby.map.place.runwayOnly';
-  if (profile.reason === 'military') return 'lobby.map.place.military';
-  if (profile.reason === 'unpaved') return 'lobby.map.place.unpaved';
-  return 'lobby.map.place.cruiseOnly';
-}
-
 /** Reason line under the locked takeoff/approach buttons. */
 function startReasonKey(profile) {
   if (profile.tooShort) return 'lobby.reason.runwayTooShort';
@@ -1043,7 +1034,11 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       aircraft: AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name ?? getAircraft?.() ?? 'B738',
     });
     if (place) {
-      setReason(mapPlaceStatus, placeStatusKey(placeProfile), runwayParams());
+      // Just the place name; why a start is locked is said under the start buttons.
+      if (mapPlaceStatus) {
+        mapPlaceStatus.hidden = false;
+        bindText(mapPlaceStatus, placeName);
+      }
       mapPlaceStatus?.classList.toggle('cruise-only', !placeProfile.landable);
     } else {
       setReason(mapPlaceStatus, null);
