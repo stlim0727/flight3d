@@ -91,6 +91,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const aircraftPicker = document.getElementById('lobby-aircraft-picker');
   const placeSummary = document.getElementById('lobby-place-summary');
   const missionSummary = document.getElementById('lobby-mission-summary');
+  const mapDialog = document.getElementById('lobby-map-dialog');
+  const mapDialogClose = document.getElementById('lobby-map-dialog-close');
+  const placePicker = document.getElementById('lobby-place-picker');
   const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
   let mapBookmarks = loadBookmarks();
   let mapCenteredKey = '';
@@ -304,6 +307,29 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     mapTilesEnabled = true;
     renderMapTiles();
   }
+  function openMapDialog() {
+    if (!mapDialog) return;
+    if (typeof mapDialog.showModal === 'function') {
+      if (!mapDialog.open) mapDialog.showModal();
+    } else {
+      mapDialog.setAttribute('open', '');
+    }
+    enableMapTiles();
+    if (typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches) mapSearchInput?.focus?.();
+  }
+  function closeMapDialog() {
+    if (!mapDialog || !mapDialog.open) return;
+    if (typeof mapDialog.close === 'function') mapDialog.close();
+    else mapDialog.removeAttribute('open');
+  }
+  placePicker?.querySelector('summary')?.addEventListener('click', event => {
+    event.preventDefault();
+    openMapDialog();
+  });
+  mapDialogClose?.addEventListener('click', closeMapDialog);
+  mapDialog?.addEventListener('click', event => {
+    if (event.target === mapDialog) closeMapDialog();
+  });
   function renderMapTiles() {
     if (!mapTilesEnabled || !mapTiles || typeof mapTiles.replaceChildren !== 'function') return;
     const tiles = tilesForViewBox(mapViewBox());
@@ -490,6 +516,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       setMapView(null, 0);
       mapCenteredKey = '';
       onAirport?.(place.id);
+      closeMapDialog();
       refresh();
       return;
     }
@@ -506,6 +533,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (mapPointSelect) mapPointSelect.value = pointId;
       if (mapStateSelect) mapStateSelect.value = 'cruise';
       emitMapPlan();
+      closeMapDialog();
       return;
     }
     const code = place.code ?? place.id;
@@ -526,6 +554,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (mapAirportSelect) mapAirportSelect.value = code;
     if (mapStateSelect) mapStateSelect.value = airportStartState(airport);
     emitMapPlan();
+    closeMapDialog();
   }
   async function onMapPlaceClick(event) {
     if (mapSelectionBusy) return;

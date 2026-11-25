@@ -412,6 +412,7 @@ export default {
   "lobby.map.savedPlaces": "저장한 장소",
   "lobby.map.suggestedPlaces": "기본 북마크",
   "lobby.map.pickPoint": "공항을 고르거나 지도에서 지점을 선택하세요.",
+  "lobby.map.dialogHint": "장소를 검색하거나 지도에서 지점을 선택하세요",
   "lobby.map.resetView": "전체 지도",
   "lobby.map.zoomIn": "확대",
   "lobby.map.zoomOut": "축소",

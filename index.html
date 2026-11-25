@@ -333,46 +333,10 @@
               <button id="lobby-preset-app" class="btn btn-preset" type="button" aria-pressed="false" data-start-label="lobby.approachStart"><span data-i18n="lobby.approachStart">착륙 접근</span></button>
             </div>
           </div>
-          <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure">
-            <summary><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span></summary>
-            <div id="lobby-map-flight" class="lobby-group">
-              <select id="lobby-map-state" hidden aria-hidden="true"></select>
-              <select id="lobby-map-point" hidden aria-hidden="true"></select>
-              <div id="lobby-map-browser" class="lobby-map-browser">
-                <div class="lobby-map-toolbar">
-                  <input id="lobby-map-search" type="search" autocomplete="off" data-i18n-aria-label="lobby.map.search.placeholder">
-                  <button type="button" id="lobby-map-bookmark-toggle" class="btn btn-bookmark" data-i18n="lobby.bookmark.add">Bookmark</button>
-                </div>
-                <div class="lobby-map-frame">
-                  <svg id="lobby-map-svg" viewBox="0 0 1024 1024" role="img" data-i18n-aria-label="lobby.map.overview">
-                    <rect x="0" y="0" width="1024" height="1024" class="lobby-map-backdrop"></rect>
-                    <image href="%BASE_URL%scenery/world-lobby-land.svg" width="1024" height="1024" pointer-events="none"></image>
-                    <g id="lobby-map-tiles" pointer-events="none"></g>
-                    <g id="lobby-map-markers"></g>
-                  </svg>
-                  <div class="lobby-map-attribution" title="Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, OpenStreetMap contributors, and the GIS User Community">Tiles © <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online/overview" target="_blank" rel="noopener">Esri</a> · © OpenStreetMap</div>
-                  <div class="lobby-map-zoom" role="group" aria-label="Map zoom">
-                    <button type="button" id="lobby-map-zoom-in" aria-label="Zoom in" data-i18n-aria-label="lobby.map.zoomIn" data-i18n-title="lobby.map.zoomIn" title="Zoom in">+</button>
-                    <button type="button" id="lobby-map-zoom-out" aria-label="Zoom out" data-i18n-aria-label="lobby.map.zoomOut" data-i18n-title="lobby.map.zoomOut" title="Zoom out">−</button>
-                  </div>
-                </div>
-                <div class="lobby-map-tools">
-                  <span class="lobby-label" data-i18n="lobby.map.pickPoint">지도에서 순항 시작 지점을 선택하세요.</span>
-                  <button type="button" id="lobby-map-overview" class="btn" data-i18n="lobby.map.resetView">전체 지도</button>
-                </div>
-                <div class="lobby-map-status-row"><p id="lobby-map-search-status" class="lobby-map-status" aria-live="polite"></p><button type="button" id="lobby-map-search-retry" class="btn" data-i18n="lobby.map.search.retry" hidden></button></div>
-                <div id="lobby-map-results" class="lobby-map-results"></div>
-                <span class="lobby-label" data-i18n="lobby.map.savedPlaces">저장한 장소</span>
-                <div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div>
-                <span class="lobby-label" data-i18n="lobby.map.suggestedPlaces">기본 북마크</span>
-                <div id="lobby-map-default-bookmarks" class="lobby-map-bookmarks"></div>
-              </div>
-              <label class="lobby-group"><span class="lobby-label" data-i18n="lobby.map.airport">공항</span><select id="lobby-map-airport" class="btn"></select></label>
-            </div>
-            <label class="lobby-group" for="lobby-destination">
-              <span class="lobby-label" data-i18n="lobby.destination">Destination airport</span>
-              <select id="lobby-destination" class="btn"></select>
-            </label>
+          <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure lobby-map-launcher">
+            <summary aria-haspopup="dialog" aria-controls="lobby-map-dialog"><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span><span class="lobby-map-launch-glyph" aria-hidden="true">↗</span></summary>
+            <select id="lobby-map-state" hidden aria-hidden="true"></select>
+            <select id="lobby-map-point" hidden aria-hidden="true"></select>
           </details>
           <details id="lobby-missions" name="lobby-flight-options" class="lobby-disclosure">
             <summary><span data-i18n="lobby.missions">미션·훈련·데모</span><span id="lobby-mission-summary" class="lobby-disclosure-value"></span></summary>
@@ -563,6 +527,52 @@
       <span class="unfold-glyph" aria-hidden="true">▴</span>
     </button>
   </div>
+
+  <!-- Location picker: full map with a Google-Maps-style search dropdown. -->
+  <dialog id="lobby-map-dialog" class="lobby-map-dialog" aria-labelledby="lobby-map-dialog-title">
+    <div class="lobby-map-dialog-inner">
+      <header class="lobby-map-dialog-header">
+        <div class="lobby-map-dialog-heading">
+          <h2 id="lobby-map-dialog-title" data-i18n="lobby.placePicker">Choose location</h2>
+          <p class="lobby-map-dialog-hint" data-i18n="lobby.map.dialogHint">Search a place or drop a pin on the map</p>
+        </div>
+        <button id="lobby-map-dialog-close" class="lobby-map-dialog-close" type="button" aria-label="Close" data-i18n-aria-label="ui.close" data-i18n-title="ui.close" title="Close">&times;</button>
+      </header>
+      <div class="lobby-map-dialog-body">
+        <div class="lobby-map-search-area">
+          <div class="lobby-map-toolbar">
+            <input id="lobby-map-search" type="search" autocomplete="off" data-i18n-aria-label="lobby.map.search.placeholder">
+            <button type="button" id="lobby-map-bookmark-toggle" class="btn btn-bookmark" data-i18n="lobby.bookmark.add">Bookmark</button>
+          </div>
+          <div id="lobby-map-results" class="lobby-map-results"></div>
+          <div class="lobby-map-status-row"><p id="lobby-map-search-status" class="lobby-map-status" aria-live="polite"></p><button type="button" id="lobby-map-search-retry" class="btn" data-i18n="lobby.map.search.retry" hidden></button></div>
+        </div>
+        <div class="lobby-map-frame">
+          <svg id="lobby-map-svg" viewBox="0 0 1024 1024" role="img" data-i18n-aria-label="lobby.map.overview">
+            <rect x="0" y="0" width="1024" height="1024" class="lobby-map-backdrop"></rect>
+            <image href="%BASE_URL%scenery/world-lobby-land.svg" width="1024" height="1024" pointer-events="none"></image>
+            <g id="lobby-map-tiles" pointer-events="none"></g>
+            <g id="lobby-map-markers"></g>
+          </svg>
+          <div class="lobby-map-tools">
+            <span class="lobby-label" data-i18n="lobby.map.pickPoint">지도에서 순항 시작 지점을 선택하세요.</span>
+            <button type="button" id="lobby-map-overview" class="btn" data-i18n="lobby.map.resetView">전체 지도</button>
+          </div>
+          <div class="lobby-map-attribution" title="Sources: Esri, HERE, Garmin, USGS, Intermap, INCREMENT P, NRCan, Esri Japan, METI, Esri China (Hong Kong), Esri Korea, Esri (Thailand), NGCC, OpenStreetMap contributors, and the GIS User Community">Tiles © <a href="https://www.esri.com/en-us/arcgis/products/arcgis-online/overview" target="_blank" rel="noopener">Esri</a> · © OpenStreetMap</div>
+          <div class="lobby-map-zoom" role="group" aria-label="Map zoom">
+            <button type="button" id="lobby-map-zoom-in" aria-label="Zoom in" data-i18n-aria-label="lobby.map.zoomIn" data-i18n-title="lobby.map.zoomIn" title="Zoom in">+</button>
+            <button type="button" id="lobby-map-zoom-out" aria-label="Zoom out" data-i18n-aria-label="lobby.map.zoomOut" data-i18n-title="lobby.map.zoomOut" title="Zoom out">−</button>
+          </div>
+        </div>
+        <div class="lobby-map-saved">
+          <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.savedPlaces">Saved places</span><div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div></div>
+          <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.suggestedPlaces">Default bookmarks</span><div id="lobby-map-default-bookmarks" class="lobby-map-bookmarks"></div></div>
+        </div>
+        <label class="lobby-map-airport-row"><span class="lobby-label" data-i18n="lobby.map.airport">공항</span><select id="lobby-map-airport" class="btn"></select></label>
+        <label class="lobby-map-airport-row"><span class="lobby-label" data-i18n="lobby.destination">Destination airport</span><select id="lobby-destination" class="btn"></select></label>
+      </div>
+    </div>
+  </dialog>
 
   <!-- Pause menu (ESC during flight) -->
   <aside id="dev-live" class="dev-live" hidden aria-label="Developer scenario">

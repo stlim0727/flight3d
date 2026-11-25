@@ -1,7 +1,8 @@
 # Airport search and bookmarks (issue #922 step 4)
 
-The lobby map-flight panel now has a local search box, a compact Korea map and
-bookmarks. All three feed the same selection path as the existing map selects.
+The lobby place picker opens a dedicated full-screen map dialog with a
+Google-Maps-style search dropdown, bookmark chips and the same selection path as
+the existing map selects.
 
 ## Data and ranking
 
@@ -16,10 +17,11 @@ airport code is hand-authored in the UI.
 ## Selection flow
 
 Clicking a search result, SVG marker or bookmark calls the existing
-`emitMapPlan()` path. Airports set the airport select and seed a runway; cruise
-points set the point select and force the cruise state. `onMapPlan` then resolves
-the geographic anchor, destination and spawn plan exactly as for a manual
-select. Selecting a result also centres the SVG `viewBox` on its coordinates.
+`emitMapPlan()` path and closes the dialog. Airports set the airport select and
+seed a runway; cruise points set the point select and force the cruise state.
+`onMapPlan` then resolves the geographic anchor, destination and spawn plan
+exactly as for a manual select. Selecting a result also centres the SVG
+`viewBox` on its coordinates.
 
 ## Bookmarks
 
@@ -70,6 +72,10 @@ without real runway geometry.
 - `npm run test:map-search`: hardware Vulkan Chrome search, map centring, bookmark
 add, restore, and restore again after a real `Page.reload` in the same browser
 profile. Refresh persistence is also covered by the bookmark store tests.
+- `npm run test:map-scroll`: hardware Vulkan Chrome check that the dialog opens,
+the search dropdown appears, a result closes it and applies the plan, and zoom,
+pinch and horizontal pan still work while vertical drags leave the map viewBox
+untouched.
 - `tests/airportIndexBuilder.test.js`, `tests/airportIndexData.test.js`: artifact contents, version pin and tile consistency.
 - `tests/airportIndex.test.js`: lazy reader caching, validation and propagated failures.
 - `tests/uiStateContract.test.js`: loading/ready/empty/error/retry states, local-result preservation and global-result selection.
