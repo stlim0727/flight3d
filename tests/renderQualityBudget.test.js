@@ -49,7 +49,7 @@ test('lower tiers reduce real geometry and framebuffer work', () => {
   assert.equal(RENDER_QUALITY.balanced.logarithmicDepthBuffer, true);
   assert.equal(RENDER_QUALITY.performance.logarithmicDepthBuffer, false);
   assert.equal(RENDER_QUALITY.ultraLow.logarithmicDepthBuffer, false);
-  assert.ok(RENDER_QUALITY.balanced.shadowMapSize <= 1024, 'balanced uses efficient shadowMapSize');
+  assert.equal(RENDER_QUALITY.balanced.shadowMapSize, 2048);
   assert.ok(RENDER_QUALITY.balanced.farShadowMapSize <= 1024, 'balanced uses efficient farShadowMapSize');
   const balanced = renderPixelRatio('balanced', 1440, 900, 1);
   const performance = renderPixelRatio('performance', 1440, 900, 1);

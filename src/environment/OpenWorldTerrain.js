@@ -260,9 +260,11 @@ function installFarTerrainShader(material, opacity) {
       `)
       .replace('#include <logdepthbuf_fragment>', `
         #include <logdepthbuf_fragment>
+        #if defined(USE_LOGDEPTHBUF)
         // Reserve a depth range behind foreground scenery while retaining the order
         // of the backdrop's own surfaces. Both passes must compute identical depth.
         gl_FragDepth = 0.995 + 0.004 * clamp(-vFarTerrainViewPosition.z / ${highAltitudeClipM.toFixed(1)}, 0.0, 1.0);
+        #endif
       `)
       .replace('#include <opaque_fragment>', `
         diffuseColor.a *= coverage;

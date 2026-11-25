@@ -306,7 +306,7 @@ class FlightSimulator {
       isCrashedGetter: () => this.isCrashed,
     });
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement, {
-      logarithmicDepthBuffer: initialPreset.logarithmicDepthBuffer ?? true,
+      logarithmicDepthBuffer: Boolean(this.renderer.capabilities?.logarithmicDepthBuffer ?? initialPreset.logarithmicDepthBuffer ?? true),
     });
     this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem, {
       onStatusChange: (status) => this.headTrackingUi?.update(status),
