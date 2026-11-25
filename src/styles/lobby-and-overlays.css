@@ -292,7 +292,9 @@ body[data-flow="paused"] #pause-menu { display: flex; }
   aspect-ratio: 4 / 3;
   height: auto;
   cursor: grab;
-  touch-action: none;
+  /* Let a one-finger vertical drag scroll the lobby panel; the map keeps
+     horizontal panning and two-finger pan/zoom through pointer events. */
+  touch-action: pan-y;
   user-select: none;
   -webkit-user-select: none;
 }
