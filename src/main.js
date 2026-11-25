@@ -189,7 +189,10 @@ class FlightSimulator {
     this.camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.08, 45000);
 
     let savedQuality;
-    try { savedQuality = localStorage.getItem(RENDER_QUALITY_KEY); } catch { /* Use default. */ }
+    try {
+      const urlQuality = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('quality');
+      savedQuality = urlQuality || localStorage.getItem(RENDER_QUALITY_KEY);
+    } catch { /* Use default. */ }
     this.renderQuality = initialRenderQuality(savedQuality, {
       coarsePointer: window.matchMedia('(pointer: coarse)').matches,
       deviceMemory: navigator.deviceMemory,
@@ -320,6 +323,9 @@ class FlightSimulator {
     this.cameraSystem.onGazeClick = (clientX, clientY) => this.handleGazeCanvasClick(clientX, clientY);
     this.loadAircraftConfig(AIRCRAFT_REGISTRY[savedSelection.aircraft] || BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
+    if (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('fps') || new URLSearchParams(window.location.search).has('diagnostics'))) {
+      this.diagnostics.show();
+    }
     this.joystickDialog = new JoystickCheckDialog(this);
     this.demoDirector = new DemoFlightDirector(this);
     this.voiceChallengeOverlay = new VoiceChallengeOverlay({ sim: this });
