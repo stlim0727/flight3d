@@ -416,7 +416,7 @@ export default {
   "lobby.map.pickPoint": "공항을 고르거나 지도에서 지점을 선택하세요.",
   "lobby.map.legend": "지도 범례",
   "lobby.map.tier.full": "공항 시설 포함",
-  "lobby.map.tier.runway": "활주로만",
+  "lobby.map.tier.runway": "이착륙 · 시설 없음",
   "lobby.map.tier.cruise": "순항 시작만",
   "lobby.reason.cruiseOnly": "선택한 장소는 활주로 정보가 없어 ‘순항 중’으로만 시작할 수 있어요. 이륙·착륙하려면 지도에서 파란 공항 핀을 고르세요.",
   "lobby.reason.military": "군 비행장은 이착륙할 수 없어 ‘순항 중’으로만 시작할 수 있어요. 이륙·착륙하려면 지도에서 파란 공항 핀을 고르세요.",

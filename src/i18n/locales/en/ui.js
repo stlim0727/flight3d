@@ -416,7 +416,7 @@ export default {
   "lobby.map.pickPoint": "Choose an airport or pick a point on the map.",
   "lobby.map.legend": "Map legend",
   "lobby.map.tier.full": "Full airport",
-  "lobby.map.tier.runway": "Runway only",
+  "lobby.map.tier.runway": "Takeoff & landing · no facilities",
   "lobby.map.tier.cruise": "Cruise start only",
   "lobby.reason.cruiseOnly": "This place has no runway data, so it can only start in cruise. Pick a blue airport pin on the map to take off or land.",
   "lobby.reason.military": "Military airfields are closed to takeoff and landing, so this can only start in cruise. Pick a blue airport pin on the map to take off or land.",
