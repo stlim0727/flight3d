@@ -266,7 +266,7 @@ export class GeographicBuildings {
     this.project = project;
     this.terrain = terrain;
     this.isRunwaySafetyArea = isRunwaySafetyArea;
-    this.exclude = (x, z, footprint) => exclude?.(x, z)
+    this.exclude = (x, z, footprint = []) => exclude?.(x, z, footprint)
       || isRunwaySafetyArea?.(x, z)
       || footprint.some(point => isRunwaySafetyArea?.(point.x, point.y));
     this.archive = archive;
@@ -560,7 +560,9 @@ export function updateGeographicBuildings(sim, elapsed) {
     const airport = sim.currentAirport;
     sim.geographicBuildingLayer = new GeographicBuildings({
       origin, project, terrain,
-      exclude: (x, z) => airport?.hasModeledBuilding?.(x, z),
+      exclude: (x, z, corners) => airport?.hasModeledBuilding?.(x, z)
+        || sim.parisShowcase?.excludes?.(x, z)
+        || (corners?.some(({ x: cx, y: cz }) => sim.parisShowcase?.excludes?.(cx, cz)) ?? false),
       isRunwaySafetyArea: (x, z) => airport?.isRunwaySafetyArea?.(x, z),
     });
     terrain.geographicBuildingLayer = sim.geographicBuildingLayer;

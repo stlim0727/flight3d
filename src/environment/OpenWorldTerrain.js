@@ -9,6 +9,7 @@ import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { getInsetsForRegion } from '../config/terrainInsets.js';
+import { parisShowcaseInsets } from '../config/parisShowcase.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 import { EARTH_RADIUS_M } from './AerialPerspective.js';
 import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
@@ -1449,7 +1450,7 @@ export function updateOpenWorldTerrain(sim) {
   const surface = sim.currentTerrain;
   const customOrigin = sim.world?.customOrigin ?? null;
   const frame = customOrigin
-    ? { origin: customOrigin, protectedAreas: [] }
+    ? { origin: customOrigin, protectedAreas: [], insets: parisShowcaseInsets(customOrigin) }
     : (Object.hasOwn(frames, sim.activeAirport) && frames[sim.activeAirport]);
   const originChanged = Boolean(
     surface?.openWorld && frame && (

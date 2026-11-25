@@ -1594,6 +1594,7 @@ class FlightSimulator {
     this.sky.updateSun(this.position, this.camera.position);
     if (this._geoLayers) {
       this._geoLayers.updateOpenWorldTerrain(this);
+      this._geoLayers.updateParisShowcase(this);
       this._geoLayers.updateGeographicBuildings(this, frameDelta);
       this._geoLayers.updateGeographicRoads(this, frameDelta);
       this._geoLayers.updateGeographicGreenSpace(this);

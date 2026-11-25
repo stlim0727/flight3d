@@ -73,6 +73,17 @@
       "elevationM": 1947,
       "kinds": ["peak"],
       "importance": 5
+    },
+    {
+      "id": "eiffel-tower",
+      "names": { "ko": "에펠탑", "en": "Eiffel Tower" },
+      "latitude": 48.858222,
+      "longitude": 2.2945,
+      "elevationM": 365,
+      "groundRelative": false,
+      "wikidata": "Q243",
+      "kinds": ["tower", "attraction"],
+      "importance": 5
     }
   ]
 }

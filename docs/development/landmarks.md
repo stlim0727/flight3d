@@ -89,3 +89,10 @@ When `places` is omitted, `LandmarkPins` merges `landmarksForMap()` with
 renders only that dataset.
 
 Verify unit tests with `node --test tests/overtureLandmarks.test.js tests/geographicLandmarks.test.js tests/landmarks.test.js tests/landmarkPins.test.js`, and verify renderless global Overture discovery across 11 regions with `node scripts/verify-landmarks-renderless.mjs`.
+
+## Dedicated 3D landmark models
+
+Pins are screen-space labels; a streamed landmark record does not draw a
+structure. The Paris showcase is the first dedicated model: it swaps a GLB
+Eiffel Tower (three LODs, split collision envelopes) for the generic Overture
+building near the tower. See [Paris showcase](paris-showcase.md) (#1014).
