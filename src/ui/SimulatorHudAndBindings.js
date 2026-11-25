@@ -22,6 +22,9 @@ import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
 import { SoutheastAtlas } from './SoutheastAtlas.js';
+import { RegionalChart } from './RegionalChart.js';
+import { insideSoutheastAtlas } from '../geospatial/busanChart.js';
+import { chartSceneFrame, chartSceneOrigin } from '../geospatial/regionalChart.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -238,7 +241,9 @@ class SimulatorHudAndBindingsMethods {
     if (map) {
       const busanCruise = this.lastPresetType === 'busan'
         || (this.lastPresetType === 'cruise' && this.activeMapPlace?.pointId === 'busan');
-      const available = busanCruise
+      // Any real region has a chart; fictional arenas have no geodesy to draw.
+      const chartOrigin = chartSceneOrigin(this);
+      const available = Boolean(chartOrigin)
         && !this.multiplayer?.active && !this.demoDirector?.isActive && !this.isCrashed;
       if (map.hidden === available) {
         map.hidden = !available;
@@ -246,7 +251,8 @@ class SimulatorHudAndBindingsMethods {
         if (mapButton) mapButton.hidden = !available;
       }
       if (!available && map.open) map.open = false;
-      this.pilotageFlight = available;
+      // The Busan cruise stays a chart-reading flight without landmark pins.
+      this.pilotageFlight = available && busanCruise;
       let layout = '';
       if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
         if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) layout = 'cockpit';
@@ -256,9 +262,23 @@ class SimulatorHudAndBindingsMethods {
         }
       }
       this.setPilotageLayout(layout);
-      if (available && map.open) {
-        this.busanChart ??= new SoutheastAtlas(map);
-        this.busanChart.update(this.position, this.quaternion);
+      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+        if (this.pilotageFrame?.origin !== chartOrigin || this.chartBusanCruise !== busanCruise) {
+          this.pilotageChart?.hide();
+          this.pilotageFrame = chartSceneFrame(this);
+          this.chartBusanCruise = busanCruise;
+          // Keep the printed atlas on its original Busan cruise. Airport starts
+          // in the same area still need their runway-scale map.
+          this.pilotageChart = busanCruise && insideSoutheastAtlas(this.pilotageFrame.toWgs(this.position.x, this.position.z))
+            ? (this.busanChart ??= new SoutheastAtlas(map))
+            : (this.regionalChart ??= new RegionalChart(map));
+          this.pilotageChart.show();
+        }
+        this.pilotageChart.update(this.position, this.quaternion, this.pilotageFrame);
+      } else if (this.pilotageChart) {
+        this.pilotageChart.hide();
+        this.pilotageChart = null;
+        this.pilotageFrame = null;
       }
     }
     this.updateAutopilotUI();

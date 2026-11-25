@@ -1,7 +1,7 @@
 import data from '../geospatial/southeastAtlas.json' with { type: 'json' };
 import { Vector3 } from 'three';
-import { getLanguage } from '../i18n/index.js';
-import { chartAircraft, chartPoint } from '../geospatial/busanChart.js';
+import { getLanguage, t } from '../i18n/index.js';
+import { chartAircraft, chartPoint, SOUTHEAST_ATLAS_BOUNDS } from '../geospatial/busanChart.js';
 
 // Natural Earth 1:10m admin-1 boundaries, roads and river centerlines.
 // Coordinates are simplified for the printed regional scale, in WGS84.
@@ -36,6 +36,7 @@ export class SoutheastAtlas {
     this.forward = new Vector3();
     this.heading = 0;
     this.status = map.querySelector('.map-area');
+    this.credit = map.querySelector('.map-credit');
     this.ids = Object.keys(data.regions);
     this.regions = Object.values(data.regions).map(rings => ink(rings, true));
     this.surroundings = ink(data.surroundings, true);
@@ -58,7 +59,17 @@ export class SoutheastAtlas {
     return 'outside';
   }
 
-  update(position, quaternion) {
+  /** Take over the shared paper; the next update reprints it. */
+  show() {
+    this.key = null;
+    this.nextUpdate = 0;
+    this.credit.textContent = 'Natural Earth';
+    this.credit.href = 'https://www.naturalearthdata.com/';
+  }
+
+  hide() {}
+
+  update(position, quaternion, frame) {
     const now = performance.now();
     if (now < this.nextUpdate) return;
     this.nextUpdate = now + 250;
@@ -66,7 +77,7 @@ export class SoutheastAtlas {
     if (!width || !height) return;
     const language = getLanguage();
     this.forward.set(0, 0, -1).applyQuaternion(quaternion);
-    const { point, heading } = chartAircraft(position, this.forward, this.heading);
+    const { point, heading } = chartAircraft(position, this.forward, this.heading, frame?.toWgs);
     this.heading = heading;
     const area = this.areaAt(...point);
     const ratio = window.devicePixelRatio || 1;
@@ -87,12 +98,14 @@ export class SoutheastAtlas {
     const names = { 'KR-48': ['경상남도 일대', 'South Gyeongsang area'], 'KR-26': ['부산 일대', 'Busan area'],
       'KR-31': ['울산 일대', 'Ulsan area'], outside: ['표시 권역 밖', 'Outside charted regions'] };
     this.status.textContent = names[area][language === 'ko' ? 0 : 1];
+    this.canvas.setAttribute('aria-label', t('ui.busanChart'));
     this.canvas.width = Math.round(width * ratio);
     this.canvas.height = Math.round(height * ratio);
     const ctx = this.canvas.getContext('2d');
     ctx.scale(ratio, ratio);
-    const [west, north] = chartPoint({ longitude: 127.53, latitude: 35.96 });
-    const [east, south] = chartPoint({ longitude: 129.52, latitude: 34.49 });
+    const bounds = SOUTHEAST_ATLAS_BOUNDS;
+    const [west, north] = chartPoint({ longitude: bounds.west, latitude: bounds.north });
+    const [east, south] = chartPoint({ longitude: bounds.east, latitude: bounds.south });
     const m = Math.max((east - west) / (width * .89), (south - north) / (height * .84));
     const tx = width / 2 - (west + east) / (2 * m);
     const ty = height / 2 - (north + south) / (2 * m);
