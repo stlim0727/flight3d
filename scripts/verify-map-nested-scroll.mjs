@@ -116,6 +116,12 @@ await withBrowserSession({ width: 390, height: 844, mobile: true, deviceScaleFac
     await settle();
   }
   assert.ok(found, 'search dropdown did not show RKSS');
+  const dropdownLayout = await evaluate(() => {
+    const status = document.querySelector('.lobby-map-status-row').getBoundingClientRect();
+    const results = document.getElementById('lobby-map-results').getBoundingClientRect();
+    return { statusBottom: status.bottom, resultsTop: results.top };
+  });
+  assert.ok(dropdownLayout.resultsTop >= dropdownLayout.statusBottom, 'search dropdown must not cover the retry status row');
   await evaluate("document.querySelector('#lobby-map-results button[data-place-id=\"RKSS\"]').click()");
   for (let i = 0; i < 20; i++) {
     if (!(await evaluate("document.getElementById('lobby-map-dialog').open"))) break;

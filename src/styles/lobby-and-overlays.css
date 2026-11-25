@@ -567,7 +567,7 @@ dialog.lobby-map-dialog::backdrop {
 }
 .lobby-map-dialog .lobby-map-results {
   position: absolute;
-  top: 48px;
+  top: calc(100% + 4px);
   left: 0;
   right: 0;
   z-index: 6;
@@ -583,6 +583,7 @@ dialog.lobby-map-dialog::backdrop {
   box-shadow: 0 12px 32px rgba(60, 64, 67, .3);
 }
 .lobby-map-dialog .lobby-map-results:empty { display: none; }
+.lobby-map-dialog .lobby-map-status-row { position: relative; z-index: 7; }
 .lobby-map-dialog .lobby-map-results .btn {
   display: flex;
   align-items: center;

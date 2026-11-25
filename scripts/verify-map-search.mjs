@@ -85,17 +85,26 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   assert.ok(await evaluate("!document.getElementById('lobby-map-runway').checkVisibility()"), 'direction must stay hidden in Places');
   await evaluate("document.getElementById('lobby-preset-app').click()");
   assert.ok(await waitFor(session, "sim.lobby.mapPlan.state === 'approach'"), 'airport must allow approach');
-  const pickPoint = (x, y) => evaluate(`(() => {
-    document.getElementById('lobby-map-overview').click();
-    const map = document.getElementById('lobby-map-svg');
-    const point = map.createSVGPoint();
-    point.x = ${x};
-    point.y = ${y};
-    const screen = point.matrixTransform(map.getScreenCTM());
-    map.querySelector('.lobby-map-backdrop').dispatchEvent(new MouseEvent('click', {
-      bubbles: true, clientX: screen.x, clientY: screen.y,
-    }));
-  })()`);
+  const openMapModal = async () => {
+    if (await evaluate("document.getElementById('lobby-map-dialog')?.open")) return;
+    await evaluate("document.querySelector('#lobby-place-picker > summary')?.click()");
+    assert.ok(await waitFor(session, "document.getElementById('lobby-map-dialog')?.open"), 'map modal did not reopen');
+    assert.ok(await waitFor(session, "document.getElementById('lobby-map-search').checkVisibility()"), 'map modal content did not reopen');
+  };
+  const pickPoint = async (x, y) => {
+    await openMapModal();
+    return evaluate(`(() => {
+      document.getElementById('lobby-map-overview').click();
+      const map = document.getElementById('lobby-map-svg');
+      const point = map.createSVGPoint();
+      point.x = ${x};
+      point.y = ${y};
+      const screen = point.matrixTransform(map.getScreenCTM());
+      map.querySelector('.lobby-map-backdrop').dispatchEvent(new MouseEvent('click', {
+        bubbles: true, clientX: screen.x, clientY: screen.y,
+      }));
+    })()`);
+  };
   await pickPoint(880.36, 397.68);
   const custom = await evaluate("sim.lobby.mapPlan");
   assert.equal(custom.state, 'cruise');
