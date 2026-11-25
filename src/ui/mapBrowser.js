@@ -65,3 +65,25 @@ export function fitMapViewBoxToAspect(viewBox, aspect) {
 export function markerScaleForViewBoxWidth(width) {
   return Number.isFinite(width) && width > 0 ? Math.max(width / 160, 0.001) : 0.001;
 }
+
+/**
+ * Collapse nearby projected markers into one group per dense area. The radius
+ * scales with the viewBox, so a cluster covers the same screen area at any zoom.
+ */
+export function clusterMapPoints(points, viewBoxWidth) {
+  const radius = markerScaleForViewBoxWidth(viewBoxWidth) * 14;
+  const clusters = [];
+  for (const point of points) {
+    if (![point?.x, point?.y].every(Number.isFinite)) continue;
+    const cluster = clusters.find(candidate => Math.hypot(candidate.x - point.x, candidate.y - point.y) <= radius);
+    if (!cluster) {
+      clusters.push({ x: point.x, y: point.y, places: [point.place] });
+      continue;
+    }
+    const count = cluster.places.length + 1;
+    cluster.x = (cluster.x * cluster.places.length + point.x) / count;
+    cluster.y = (cluster.y * cluster.places.length + point.y) / count;
+    cluster.places.push(point.place);
+  }
+  return clusters;
+}

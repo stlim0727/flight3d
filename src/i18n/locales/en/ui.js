@@ -445,6 +445,7 @@ export default {
   "lobby.map.search.retry": "Click to retry",
   "lobby.map.search.tileError": "Selected airport details could not be loaded; search results are still available",
   "lobby.map.bookmarks": "Bookmarks",
+  "lobby.map.cluster.title": "{count} bookmarks",
   "lobby.map.bookmarks.empty": "No bookmarks",
   "lobby.bookmark.add": "Bookmark",
   "lobby.bookmark.remove": "Remove bookmark",

@@ -445,6 +445,7 @@ export default {
   "lobby.map.search.retry": "클릭하여 다시 시도",
   "lobby.map.search.tileError": "선택한 공항의 상세 정보를 불러오지 못했습니다. 검색 결과는 그대로 표시합니다",
   "lobby.map.bookmarks": "북마크",
+  "lobby.map.cluster.title": "북마크 {count}개",
   "lobby.map.bookmarks.empty": "저장된 북마크가 없습니다",
   "lobby.bookmark.add": "북마크 추가",
   "lobby.bookmark.remove": "북마크 제거",

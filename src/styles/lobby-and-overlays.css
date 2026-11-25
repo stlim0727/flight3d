@@ -537,6 +537,11 @@ dialog.lobby-map-dialog::backdrop {
 /* Cruise-only places: a small grey dot, so runway pins stand out. */
 .lobby-map-marker.cruise-only .lobby-map-marker-pin { fill: #5f6368; stroke-width: 1.6px; }
 .lobby-map-marker.cruise-only.active .lobby-map-marker-pin { fill: #ea4335; }
+
+.lobby-map-cluster { cursor: zoom-in; }
+.lobby-map-cluster-badge { fill: #1a73e8; stroke: #fff; stroke-width: 2px; }
+.lobby-map-cluster.active .lobby-map-cluster-badge { fill: #ea4335; }
+.lobby-map-cluster-count { fill: #fff; font-size: 10px; font-weight: 700; pointer-events: none; }
 .lobby-map-legend {
   position: absolute;
   left: 8px;

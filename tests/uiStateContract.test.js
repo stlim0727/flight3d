@@ -6,6 +6,7 @@ import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
 import { getLanguage, t } from '../src/i18n/index.js';
 import { airportDisplayName } from '../src/config/airportProfile.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
+import { mapViewBoxFor } from '../src/ui/mapBrowser.js';
 import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
 
 class MockElement {
@@ -582,6 +583,8 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
       { code: 'XSHT', iata: '', name: 'Short Field Airport', latitude: 36.5, longitude: 127.5, runways: [runway(1100)] },
       { code: 'ZZZZ', iata: '', name: 'No Runways Field', latitude: 37, longitude: 127, runways: [] },
     ];
+    // Inspect individual pins at a zoom where the new cluster badge has split.
+    elements.get('lobby-map-svg').setAttribute('viewBox', mapViewBoxFor(37.1, 127, 8));
     screen.setMapPlaces({ airports, points: [{ id: 'sea-point', label: 'Open Sea', latitude: 36, longitude: 125 }] });
     const nameOf = code => airportDisplayName(airports.find(airport => airport.code === code), getLanguage());
     const marker = id => elements.get('lobby-map-markers').children.find(child => child.dataset.placeId === id);
@@ -663,6 +666,49 @@ test('UI State Contract: map pins tell runway airports from cruise-only places a
     assert.equal(status.textContent, nameOf('XSHT'));
   } finally {
     globalThis.document = originalDoc;
+  }
+});
+
+test('UI State Contract: dense map bookmarks share a numbered marker that zooms in', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalStorage = globalThis.localStorage;
+  globalThis.document = mockDoc;
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'coastal', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    const runway = lengthM => ({ id: '1', lengthM, surface: 'ASP', ends: [{ ident: '09', headingDegT: 90 }, { ident: '27', headingDegT: 270 }] });
+    screen.setMapPlaces({
+      airports: [
+        { code: 'RKSI', name: 'Incheon', latitude: 37.4691, longitude: 126.451, runways: [runway(3750)] },
+        { code: 'RKSS', name: 'Gimpo', latitude: 37.5583, longitude: 126.7906, runways: [runway(3600)] },
+        { code: 'KJFK', name: 'JFK', latitude: 40.6394, longitude: -73.7793, runways: [runway(4400)] },
+      ],
+      points: [],
+    });
+    const markers = () => elements.get('lobby-map-markers').children;
+    const cluster = markers().find(marker => marker.dataset.clusterIndex !== undefined);
+    assert.ok(cluster, 'nearby pins collapse into one cluster');
+    assert.equal(cluster.children.find(child => child.tagName === 'TEXT')?.textContent, '2');
+    assert.ok(cluster.children.some(child => child.textContent === t('lobby.map.cluster.title', { count: 2 })));
+    assert.ok(markers().some(marker => marker.dataset.placeId === 'KJFK'), 'a distant pin stays separate');
+    assert.ok(!markers().some(marker => marker.dataset.placeId === 'RKSI' || marker.dataset.placeId === 'RKSS'));
+
+    const svg = elements.get('lobby-map-svg');
+    svg.listeners.click[0]({ target: { closest: selector => selector === '[data-cluster-index]' ? cluster : null } });
+    const width = Number(svg.getAttribute('viewBox').split(/\s+/)[2]);
+    assert.ok(width < 1024, 'clicking a cluster zooms into its area');
+    assert.ok(markers().some(marker => marker.dataset.placeId === 'RKSI'));
+    assert.ok(markers().some(marker => marker.dataset.placeId === 'RKSS'));
+    assert.equal(markers().filter(marker => marker.dataset.clusterIndex !== undefined).length, 0);
+    assert.equal(plan, null, 'zooming to a cluster must not select a place');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.localStorage = originalStorage;
   }
 });
 

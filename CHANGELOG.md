@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(map-ui):** group nearby map bookmarks into one numbered marker
+  - Dense clusters stay a single numbered badge at wide zooms; tapping or clicking one zooms in until the individual place markers separate again.
+  - Grouping follows the existing marker screen scale, so the same area stays clustered at every zoom; the count is localized in English and Korean.
+  - Verified in hardware Chrome: the world view collapsed 36 dense pins into one badge; clicking it zoomed into Korea and split the group into 22/9/5 badges.
 - **feat(map-ui):** open the location picker as a full-screen map dialog
   - Choose location now opens a native modal with a large map, a Google-Maps-style search dropdown, the destination selector and single-line saved/default bookmark rows instead of expanding the lobby card.
   - The results dropdown starts below the search status/retry row, and the map-search verification reopens the dialog before its map-click checks.
