@@ -695,8 +695,19 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (!center) return;
     const span = Math.max(1, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
     const fit = Math.ceil(Math.log2(MAP_WIDTH / (span * 3)));
+    const nextZoom = Math.max(0, Math.min(12, Math.max(mapZoom + 1, fit)));
+    if (nextZoom <= mapZoom) {
+      renderPlaceList(mapResults, cluster.places.map(place => ({
+        ...place,
+        key: `${place.kind}:${place.id}`,
+        label: place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label,
+        detail: place.iata || place.code || '',
+      })), 'lobby.map.search.empty', mapActiveKey());
+      if (mapStatus) mapStatus.textContent = t('lobby.map.cluster.choose');
+      return;
+    }
     enableMapTiles();
-    setMapView(center, Math.max(0, Math.min(12, Math.max(mapZoom + 1, fit))));
+    setMapView(center, nextZoom);
   }
 
   mapSvg?.addEventListener('click', event => {

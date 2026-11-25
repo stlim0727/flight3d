@@ -712,6 +712,47 @@ test('UI State Contract: dense map bookmarks share a numbered marker that zooms 
   }
 });
 
+test('UI State Contract: a cluster that cannot zoom further lists its members for selection', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalStorage = globalThis.localStorage;
+  const zoomIn = new MockElement('lobby-map-zoom-in', 'button');
+  elements.set('lobby-map-zoom-in', zoomIn);
+  globalThis.document = mockDoc;
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'coastal', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    for (let i = 0; i < 12; i++) zoomIn.listeners.click[0]();
+    const svg = elements.get('lobby-map-svg');
+    svg.setAttribute('viewBox', mapViewBoxFor(37.4691, 126.451, 12));
+    const runway = { id: '1', lengthM: 3750, surface: 'ASP', ends: [{ ident: '09', headingDegT: 90 }, { ident: '27', headingDegT: 270 }] };
+    screen.setMapPlaces({
+      airports: [{ code: 'RKSI', name: 'Incheon', latitude: 37.4691, longitude: 126.451, runways: [runway] }],
+      points: [{ id: 'close-point', label: 'Nearby point', latitude: 37.4641, longitude: 126.451 }],
+    });
+    const markers = () => elements.get('lobby-map-markers').children;
+    const cluster = markers().find(marker => marker.dataset.clusterIndex !== undefined);
+    assert.ok(cluster, 'very close places stay clustered at maximum zoom');
+    const before = svg.getAttribute('viewBox');
+    svg.listeners.click[0]({ target: { closest: selector => selector === '[data-cluster-index]' ? cluster : null } });
+    assert.equal(svg.getAttribute('viewBox'), before, 'no further zoom remains');
+    const results = elements.get('lobby-map-results');
+    assert.deepEqual(results.children.map(button => button.dataset.placeId), ['RKSI', 'close-point']);
+    assert.equal(elements.get('lobby-map-search-status').textContent, t('lobby.map.cluster.choose'));
+
+    const memberButton = results.children.find(button => button.dataset.placeId === 'close-point');
+    results.listeners.click[0]({ target: { closest: () => memberButton } });
+    assert.equal(plan?.pointId, 'close-point', 'the listed member can still be selected');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.localStorage = originalStorage;
+  }
+});
+
 test('UI State Contract: lobby map tiles stay deferred until enableMapTiles is called', () => {
   const { elements, mockDoc } = setupMapDOM();
   const originalDoc = globalThis.document;
