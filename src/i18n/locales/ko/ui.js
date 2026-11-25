@@ -1,7 +1,7 @@
 export default {
   "ui.mapShortcut": "지도 펼치기 / 접기 (M)",
   "ui.busanChart": "현재 기체 위치와 기수 방향이 표시된 경상남도·부산·울산 권역도",
-  "ui.regionalChart": "현재 기체 위치와 기수 방향, 주변 해안선·공항·활주로가 표시된 지도",
+  "ui.regionalChart": "현재 기체 위치와 기수 방향, 지역 경계와 지명, 해안선·공항·활주로가 표시된 북쪽 위 지도",
   "map.chart.loading": "지도 불러오는 중…",
   "ui.mapMark": "다음 확인 지점으로 표시",
   "ui.mapCheckpoint": "확인 지점 · {name}",
