@@ -77,7 +77,7 @@ import {
   loadSavedDestination,
   saveSavedAircraft,
 } from './config/flightSelection.js';
-import { resolveFlightUrl } from './config/flightUrls.js';
+import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -266,6 +266,7 @@ class FlightSimulator {
     this.currentAirport = null;
     this._geoLayers = null;
     this._geoLayersPromise = null;
+    this.freezePhysics = false;
 
     // Height-over-ground cue for the ultraLow tier, which ships without shadow maps.
     this.contactShadow = new GroundContactShadow(this.scene);
@@ -1261,6 +1262,82 @@ class FlightSimulator {
         this.ensureUnifiedRegions?.();
       }
     }, 500);
+
+    const initialPose = parsePoseUrlParams(window.location.search);
+    if (initialPose) {
+      this.applyFixedPose(initialPose);
+    }
+  }
+
+  /**
+   * Immediately position and orient the aircraft at arbitrary geo/local coordinates
+   * in a stationary (frozen) inspection state directly from URL arguments or scripts.
+   */
+  applyFixedPose(pose) {
+    if (!pose) return;
+    this.demoDirector?.stop();
+    this.freezePhysics = Boolean(pose.freeze);
+    if (this.gameFlow.state === FLOW.LOBBY) {
+      this.gameFlow.enterFlight();
+      this.syncFlowUi();
+    }
+    const hasGeo = Number.isFinite(pose.lat) && Number.isFinite(pose.lon);
+    if (hasGeo) {
+      this.setCustomWorldOrigin({ latitude: pose.lat, longitude: pose.lon });
+    }
+    const targetX = hasGeo ? 0 : (pose.x ?? 0);
+    const targetZ = hasGeo ? 0 : (pose.z ?? 0);
+    const ground = this.currentTerrain?.getHeight?.(targetX, targetZ) ?? 0;
+    const targetY = pose.alt !== null ? pose.alt : (ground + (this.gear?.cgGroundHeightM ?? 3.5));
+
+    this.position.set(targetX, targetY, targetZ);
+    this.linearVelocity.set(0, 0, 0);
+    this.angularVelocity.set(0, 0, 0);
+    const headingDeg = (pose.heading % 360 + 360) % 360;
+    if (this.telemetry) {
+      this.telemetry.iasKnots = 0;
+      this.telemetry.tasKnots = 0;
+      this.telemetry.altitudeM = targetY;
+      this.telemetry.altitudeFt = targetY * 3.28084;
+      this.telemetry.headingDeg = headingDeg;
+      this.telemetry.compassDegrees = headingDeg;
+      this.telemetry.onGround = Boolean(ground !== 0 && Math.abs(targetY - ground) < 5);
+    }
+    const yaw = -(headingDeg * Math.PI / 180);
+    this.quaternion.setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ'));
+
+    this.aircraft.group.position.copy(this.position);
+    this.aircraft.group.quaternion.copy(this.quaternion);
+    this.aircraft.group.updateMatrixWorld(true);
+    this.renderPose.reset(this.position, this.quaternion);
+
+    if (this.cameraSystem) {
+      const modeKey = (pose.camera || 'chase').toUpperCase();
+      const modeId = CameraSystem.MODES[modeKey] ?? CameraSystem.MODES.CHASE;
+      this.cameraSystem.setMode(modeId);
+      this.cameraSystem.snapToTarget(this.aircraft.group);
+    }
+
+    this.updateFlightDisplays?.(true);
+
+    this.ensureGeographicLayers?.().then(mod => {
+      mod.updateOpenWorldTerrain?.(this);
+      if (pose.alt === null) {
+        const resolvedGround = this.currentTerrain?.getHeight?.(targetX, targetZ);
+        if (Number.isFinite(resolvedGround) && resolvedGround !== 0) {
+          const newY = resolvedGround + (this.gear?.cgGroundHeightM ?? 3.5);
+          this.position.y = newY;
+          this.aircraft.group.position.y = newY;
+          this.aircraft.group.updateMatrixWorld(true);
+          this.renderPose.reset(this.position, this.quaternion);
+          if (this.telemetry) {
+            this.telemetry.altitudeM = newY;
+            this.telemetry.altitudeFt = newY * 3.28084;
+          }
+          this.updateFlightDisplays?.(true);
+        }
+      }
+    });
   }
 
   setAircraft(aircraftId = 'B738', pilotPreparation = false) {
@@ -1506,7 +1583,7 @@ class FlightSimulator {
     if (poseDriver) {
       this.physicsAccumulator = 0;
       if (!this.gameFlow.isPhysicsFrozen()) poseDriver.update(frameDelta);
-    } else if (this.startingFlight || this.replayDirector?.loading || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
+    } else if (this.freezePhysics || this.startingFlight || this.replayDirector?.loading || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
       advancePhysicsFrame(this, frameDelta);

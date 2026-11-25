@@ -14,6 +14,7 @@ import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 export function createSimulatorScenarioStart(sim) {
   return new ScenarioStartCoordinator({
     prepare({ keepTimeOfDay = false }) {
+      sim.freezePhysics = false;
       sim.devRunner.stop();
       sim.shadowDemo.stop();
       sim.replayDirector.stop();

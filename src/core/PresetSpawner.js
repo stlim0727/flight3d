@@ -59,6 +59,7 @@ const REGION_UNMOUNT_EXTRA_MARGIN_M = 30000;
 
 class PresetSpawnerMethods {
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
+    this.freezePhysics = false;
     const regionCruise = regionalCruise(type);
     if (this.multiplayer?.locked) {
       if (this.multiplayer.room.session.state !== 'flying') return;
