@@ -9,7 +9,7 @@ import { validateAddonManifest, validateCatalog } from '../src/addons/addonContr
 import { lintAddonSet } from '../src/addons/lintAddonSet.js';
 import { profileShareParams } from '../src/addons/regionPackBinding.js';
 import { buildCatalog } from '../scripts/addon-tooling.mjs';
-import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
+import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack, resolveCatalogUrl } from '../src/addons/addonCatalogBrowser.js';
 import { AddonPicker } from '../src/ui/AddonPicker.js';
 import { installAddonPicker } from '../src/ui/installAddonPicker.js';
 
@@ -30,6 +30,11 @@ function createFakeElement(tagName) {
     _innerHTML: '',
     set innerHTML(html) { this._innerHTML = html; },
     get innerHTML() { return this._innerHTML; },
+    setAttribute(name, value) { this.attributes.set(name, String(value)); },
+    removeAttribute(name) { this.attributes.delete(name); },
+    getAttribute(name) { return this.attributes.get(name) ?? null; },
+    set href(value) { this.setAttribute('href', value); },
+    get href() { return this.getAttribute('href') ?? ''; },
     setAttribute(name, value) { this.attributes.set(name, String(value)); },
     appendChild(child) { this.children.push(child); return child; },
     append(...nodes) { this.children.push(...nodes); },
@@ -61,7 +66,9 @@ function withFakeDocument(fn) {
     '.addon-list': createFakeElement('div'),
     '.addon-picker-status': createFakeElement('p'),
     '.addon-share': createFakeElement('button'),
-    '.addon-share-url': createFakeElement('output'),
+    '.addon-share-actions': createFakeElement('div'),
+    '.addon-share-link': createFakeElement('a'),
+    '.addon-share-copy': createFakeElement('button'),
   };
   const kindButtons = ['all', 'region', 'aircraft', 'scenario'].map(kind => {
     const btn = createFakeElement('button');
@@ -111,6 +118,19 @@ test('catalog command computes the manifest checksum and exact URL', async () =>
   assert.equal(catalog.addons[0].url, 'https://packs.example/demo/region/sky/addon.json');
   const digest = createHash('sha256').update(await readFile(manifestPath)).digest('hex');
   assert.equal(catalog.addons[0].sha256, digest);
+});
+
+test('catalog command resolves owner/repo to the repository root manifest', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'addon-catalog-shorthand-'));
+  const manifestPath = join(dir, 'addon.json');
+  await writeFile(manifestPath, JSON.stringify({ id: 'demo/region/sky', version: '2.0.0' }));
+  const catalog = await buildCatalog(manifestPath, 'demo/sky-addon');
+  assert.equal(catalog.addons[0].url, 'https://raw.githubusercontent.com/demo/sky-addon/main/addon.json');
+});
+
+test('catalog URL accepts a GitHub owner/repo shorthand', () => {
+  assert.equal(resolveCatalogUrl('stlim0727/flight3d-addon-jeju-coast-tour'), 'https://raw.githubusercontent.com/stlim0727/flight3d-addon-jeju-coast-tour/main/catalog.json');
+  assert.equal(resolveCatalogUrl(' https://example.com/catalog.json '), 'https://example.com/catalog.json');
 });
 
 test('catalog browser filters and builds a share URL from selected pins', () => {
@@ -189,13 +209,15 @@ test('AddonPicker clears selection and stale share output on reload or failure a
     picker.selected.add('demo/region/sky');
     const shared = picker.share();
     assert.match(shared, /pack=demo%2Fregion%2Fsky/);
-    assert.equal(slots['.addon-share-url'].hidden, false);
+    assert.equal(slots['.addon-share-actions'].hidden, false);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), shared);
 
     await picker.load('https://packs.example/b.json');
     assert.equal(picker.selected.size, 0);
     assert.equal(slots['.addon-share'].hidden, true);
-    assert.equal(slots['.addon-share-url'].hidden, true);
-    assert.equal(slots['.addon-share-url'].textContent, '');
+    assert.equal(slots['.addon-share-actions'].hidden, true);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), null);
+    assert.equal(slots['.addon-share-link'].textContent, '');
     assert.equal(picker.share(), '');
 
     picker.selected.add('demo/aircraft/jet');
@@ -203,8 +225,9 @@ test('AddonPicker clears selection and stale share output on reload or failure a
     await picker.load('https://packs.example/bad.json');
     assert.equal(picker.selected.size, 0);
     assert.equal(slots['.addon-share'].hidden, true);
-    assert.equal(slots['.addon-share-url'].hidden, true);
-    assert.equal(slots['.addon-share-url'].textContent, '');
+    assert.equal(slots['.addon-share-actions'].hidden, true);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), null);
+    assert.equal(slots['.addon-share-link'].textContent, '');
   });
 });
 

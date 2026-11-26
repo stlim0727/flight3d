@@ -93,9 +93,18 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
   });
 }
 
+export function resolveCatalogUrl(input) {
+  const value = String(input ?? '').trim();
+  if (/^https?:\/\//.test(value)) return value;
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/.test(value)) {
+    return `https://raw.githubusercontent.com/${value}/main/catalog.json`;
+  }
+  return value;
+}
+
 export async function loadAddonCatalog(url, { fetchImpl = globalThis.fetch, validate = validateCatalog } = {}) {
-  const response = await fetchImpl(url);
-  if (!response.ok) throw new Error(`catalog fetch failed (${response.status}): ${url}`);
+  const response = await fetchImpl(resolveCatalogUrl(url));
+  if (!response.ok) throw new Error(`catalog fetch failed (${response.status}): ${resolveCatalogUrl(url)}`);
   const document = await response.json();
   const result = validate(document);
   if (!result.ok) throw new Error(`invalid catalog: ${result.errors.join('; ')}`);

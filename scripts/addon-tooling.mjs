@@ -14,7 +14,11 @@ export async function initAddon(options, { outDir = process.cwd() } = {}) {
 }
 
 export async function buildCatalog(manifestPath, baseUrl) {
-  if (typeof baseUrl !== 'string' || !/^https?:\/\//.test(baseUrl)) throw new Error('catalog needs an absolute http(s) base URL');
+  if (typeof baseUrl !== 'string' || !baseUrl) throw new Error('catalog needs a URL or owner/repo');
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/.test(baseUrl.trim())) {
+    baseUrl = `https://raw.githubusercontent.com/${baseUrl.trim()}/main`;
+  }
+  if (!/^https?:\/\//.test(baseUrl)) throw new Error('catalog needs an absolute http(s) base URL');
   const manifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8'));
   if (!manifest?.id || !manifest?.version) throw new Error('manifest needs id and version');
   const bytes = await readFile(resolve(manifestPath));
@@ -31,6 +35,6 @@ export async function buildCatalog(manifestPath, baseUrl) {
 export function usage() {
   console.error('Usage:');
   console.error('  node scripts/addon-dev.mjs init <region|aircraft|scenario> --publisher <id> --name <id> [--version 1.0.0] [--core 1.8.0] [--title "My addon"] [--out DIR]');
-  console.error('  node scripts/addon-dev.mjs catalog <addon.json> <https://host/path> [--out catalog.json]');
+  console.error('  node scripts/addon-dev.mjs catalog <addon.json> <https://host/path|owner/repo> [--out catalog.json]');
   process.exitCode = 2;
 }
