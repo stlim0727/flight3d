@@ -310,7 +310,7 @@ test('Paris Eiffel Tower bookmark starts the showcase cruise at a custom origin'
 
 test('specialRegionPlaces exposes non-Korea and fictional free-flight regions for default bookmarks', () => {
   const regions = specialRegionPlaces();
-  assert.deepEqual(regions.map(region => region.id), ['lukla', 'neon', 'coastal']);
+  assert.deepEqual(regions.map(region => region.id), ['lukla', 'neon', 'coastal', 'patagonia']);
   assert.ok(!regions.some(region => region.id === 'valley'));
   const airports = [{ code: 'RKSS', name: 'Gimpo' }];
   assert.deepEqual(
@@ -324,6 +324,7 @@ test('specialRegionPlaces exposes non-Korea and fictional free-flight regions fo
       ['region', 'lukla'],
       ['region', 'neon'],
       ['region', 'coastal'],
+      ['region', 'patagonia'],
     ],
   );
 });
