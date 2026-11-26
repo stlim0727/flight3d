@@ -1889,6 +1889,10 @@ installSimulatorHudAndBindings(FlightSimulator);
 
 // Start Simulator when DOM is ready (guaranteed across all browser lifecycle states)
 async function initFlightSimulator() {
+  if (typeof document !== 'undefined') {
+    const { installAddonPicker } = await import('./ui/installAddonPicker.js').catch(() => ({}));
+    installAddonPicker?.(document.getElementById('lobby-addon-picker'));
+  }
   if (!window.simulator) {
     document.getElementById('startup-retry').addEventListener('click', () => location.reload());
     document.getElementById('canvas-container').inert = true;
