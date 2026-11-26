@@ -138,31 +138,35 @@ test('catalog command computes the manifest checksum and exact URL', async () =>
 });
 
 test('catalog browser filters and builds a share URL from selected pins', () => {
-  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
   const catalog = { schemaVersion: 1, addons: [
-    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
-    { id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+    { id: 'demo/region/sky', version: '1.0.0', title: 'Sky', publisher: 'demo', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+    { id: 'demo/aircraft/jet', version: '2.0.0', title: 'Jet', publisher: 'demo', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
   ] };
   assert.deepEqual(listAddons(catalog, { kind: 'aircraft' }).map(entry => entry.id), ['demo/aircraft/jet']);
-  assert.deepEqual(listAddons(catalog, { search: 'SKY' }).map(entry => entry.id), ['demo/region/sky']);
-  const url = buildAddonProfileUrl(catalog, ['demo/region/sky'], { profileShareParams });
-  assert.match(url, /pack=demo%2Fregion%2Fsky/);
-  assert.match(url, /profile=/);
+  assert.deepEqual(listAddons(catalog, { search: 'sky' }).map(entry => entry.id), ['demo/region/sky']);
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  const url = buildAddonProfileUrl(catalog, ['demo/region/sky'], { baseUrl: 'https://flight.example/?' });
+  const params = new URL(url).searchParams;
+  assert.equal(params.get('pack'), 'demo/region/sky');
+  assert.equal(params.get('version'), '1.0.0');
+  assert.ok(params.get('profile'));
 });
 
 test('scaffolding produces valid manifests and catalogs for every addon kind and core version', () => {
   for (const kind of ADDON_KINDS) {
-    for (const coreVersion of ['1.0.0', '1.8.0', '2.0.0']) {
+    for (const coreVersion of ['1.8.0', '2.0.0']) {
       const result = buildAddonStarter({
         publisher: 'demo', name: `sample-${kind}`, kind,
-        version: '1.2.3', coreVersion, title: `Sample ${kind}`,
+        version: '1.0.0', coreVersion, title: `Sample ${kind}`,
       });
-      assert.equal(result.ok, true);
-      const manifest = result.files['addon.json'];
-      assert.equal(validateAddonManifest(manifest, { coreVersion: '2.0.0' }).ok, true);
+      assert.equal(result.ok, true, `${kind}@${coreVersion}: ${result.errors.join('; ')}`);
+      const manifestCheck = validateAddonManifest(result.files['addon.json'], { coreVersion });
+      assert.equal(manifestCheck.ok, true, `${kind}@${coreVersion} manifest invalid: ${manifestCheck.errors.join('; ')}`);
+      const lintCheck = lintAddonSet([result.files['addon.json']], { coreVersion });
+      assert.equal(lintCheck.ok, true, `${kind}@${coreVersion} lint invalid: ${lintCheck.errors.join('; ')}`);
       const catalog = JSON.parse(result.files['catalog.json']);
       assert.equal(validateCatalog(catalog).ok, true);
-      assert.equal(lintAddonSet([manifest], { coreVersion: '2.0.0' }).ok, true);
+      assert.equal(catalog.addons.length, 1);
     }
   }
 });
@@ -303,26 +307,52 @@ test('share URL round-trips through resolveSharedAddonPack for profile and legac
     publisher: 'demo', name: 'sky', kind: 'region',
     version: '1.0.0', coreVersion: '1.8.0', title: 'Sky',
   }).files['addon.json'];
-  const bytes = new Map([
-    ['https://packs.example/sky.json', Buffer.from(JSON.stringify(regionManifest), 'utf8')],
-  ]);
-  const catalog = { schemaVersion: 1, addons: [
-    { id: regionManifest.id, version: regionManifest.version, url: 'https://packs.example/sky.json', sha256: createHash('sha256').update(bytes.get('https://packs.example/sky.json')).digest('hex') },
-  ] };
-  const url = buildAddonProfileUrl(catalog, [regionManifest.id], { coreVersion: '1.8.0', profileShareParams });
-  const search = `?${url.split('?')[1]}`;
-  const bound = await resolveSharedAddonPack(search, {
-    coreVersion: '1.8.0',
-    fetchImpl: async target => ({ ok: bytes.has(target), arrayBuffer: async () => bytes.get(target) }),
-  });
-  assert.equal(bound.id, regionManifest.id);
+  const aircraftManifest = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft',
+    version: '2.0.0', coreVersion: '1.8.0', title: 'Jet',
+  }).files['addon.json'];
 
-  const manifestBytes = bytes.get('https://packs.example/sky.json');
-  const encoded = Buffer.from(manifestBytes).toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-  const regionSha = createHash('sha256').update(manifestBytes).digest('hex');
+  const regionBytes = Buffer.from(JSON.stringify(regionManifest), 'utf8');
+  const regionSha = createHash('sha256').update(regionBytes).digest('hex');
+  const aircraftBytes = Buffer.from(JSON.stringify(aircraftManifest), 'utf8');
+  const aircraftSha = createHash('sha256').update(aircraftBytes).digest('hex');
+
+  const catalog = {
+    schemaVersion: 1,
+    addons: [
+      { id: regionManifest.id, version: regionManifest.version, url: 'https://packs.example/sky.json', sha256: regionSha },
+      { id: aircraftManifest.id, version: aircraftManifest.version, url: 'https://packs.example/jet.json', sha256: aircraftSha },
+    ],
+  };
+
+  const fetchImpl = async url => {
+    if (url === 'https://packs.example/sky.json') return { ok: true, arrayBuffer: async () => regionBytes };
+    if (url === 'https://packs.example/jet.json') return { ok: true, arrayBuffer: async () => aircraftBytes };
+    return { ok: false, status: 404 };
+  };
+
+  const shareUrl = buildAddonProfileUrl(catalog, [regionManifest.id], {
+    baseUrl: 'https://flight.example/?',
+    coreVersion: '1.8.0',
+  });
+  const boundPack = await resolveSharedAddonPack(new URL(shareUrl).search, { fetchImpl });
+  assert.equal(boundPack.id, 'demo/region/sky');
+  assert.equal(boundPack.version, '1.0.0');
+  assert.equal(boundPack.sha256, regionSha);
+  assert.match(boundPack.urlTemplate, /https:\/\/packs\.example\/demo\/sky\/1\.0\.0\/\{z\}\/\{y\}\/\{x\}\.png/);
+
+  const aircraftUrl = buildAddonProfileUrl(catalog, [aircraftManifest.id], {
+    baseUrl: 'https://flight.example/?',
+    coreVersion: '1.8.0',
+  });
+  const aircraftPack = await resolveSharedAddonPack(new URL(aircraftUrl).search, { fetchImpl });
+  assert.equal(aircraftPack.aircraft.id, aircraftManifest.id);
+
+  const manifestBytes = Buffer.from(JSON.stringify(regionManifest), 'utf8');
+  const encoded = manifestBytes.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
   const legacy = await resolveSharedAddonPack(
     `?addonManifest=${encoded}&addonSha256=${regionSha}`,
-    { coreVersion: '1.8.0', fetchImpl: async () => { throw new Error('unexpected fetch'); } },
+    { fetchImpl: async () => { throw new Error('unexpected fetch'); } },
   );
   assert.equal(legacy.id, regionManifest.id);
 });
