@@ -30,7 +30,7 @@ export const SPAWN_SCENARIOS = {
   },
   cruise: {
     airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju', 'patagonia'],
-    labelKeys: { incheon: 'incheon.cruise', jeju: 'jeju.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise', patagonia: 'patagonia.fitz.roy' },
+    labelKeys: { incheon: 'incheon.cruise', jeju: 'jeju.cruise', coastal: 'cruise.terrain.relative', lukla: 'cruise.terrain.relative', neon: 'cruise.terrain.relative', patagonia: 'cruise.terrain.relative' },
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
   },

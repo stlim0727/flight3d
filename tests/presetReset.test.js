@@ -4,6 +4,30 @@ import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { createPilotMissionSimulation } from './helpers/pilotMissionFlight.js';
 
+test('cruise altitude follows local terrain instead of a region-specific constant', () => {
+  const sim = createPilotMissionSimulation({ terrain: { getHeight: () => 0 } });
+  sim.setPreset('cruise');
+  assert.equal(sim.position.y, 750);
+
+  sim.currentTerrain.getHeight = () => 2500;
+  sim.setPreset('cruise');
+  assert.equal(sim.position.y, 3250);
+});
+
+test('every region cruise shares the terrain-relative altitude rule', () => {
+  const cases = [
+    ['jamsil', () => createPilotMissionSimulation({ terrain: { getHeight: () => 0 } })],
+    ['cruise', () => createPilotMissionSimulation({ aircraftId: 'F16', airportId: 'lukla', terrain: { getHeight: () => 2500 } })],
+    ['cruise', () => createPilotMissionSimulation({ aircraftId: 'F16', airportId: 'patagonia', terrain: { getHeight: () => 1800 } })],
+  ];
+  for (const [scenario, createSimulation] of cases) {
+    const sim = createSimulation();
+    sim.setPreset(scenario);
+    assert.ok(sim.position.y > 0, scenario);
+    assert.equal(sim.position.y - sim.currentTerrain.getHeight(sim.position.x, sim.position.z), 750, scenario);
+  }
+});
+
 test('fresh ordinary presets clear cached damage even after the global crash flag was cleared', () => {
   for (const aircraftId of ['B738', 'C172', 'F16']) {
     const sim = createPilotMissionSimulation({ aircraftId });
