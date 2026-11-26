@@ -1,6 +1,6 @@
-import { PMTiles } from 'pmtiles';
+import { RetryablePMTiles } from './RetryablePMTiles.js';
 
-export const overtureBase = new PMTiles(
+export const overtureBase = new RetryablePMTiles(
   'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/base.pmtiles',
 );
 

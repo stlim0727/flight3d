@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { PMTiles } from 'pmtiles';
+import { RetryablePMTiles } from '../src/geospatial/RetryablePMTiles.js';
 import { ATLAS_ZOOM, atlasOnSheet, decodeAtlasTile } from '../src/geospatial/regionalAtlas.js';
 import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
 import { chartRunwayBoxes, layoutAtlasNames, overlaps } from '../src/ui/regionalChartNames.js';
@@ -32,6 +33,23 @@ test('shipped chart tiles preserve city coordinates, provinces and border lines'
     assert.ok(features.some(f => f.kind === 'regions' && f.en === province && f.ko), province);
     if (province !== 'Jeju') assert.ok(features.some(f => f.kind === 'borders'), province);
   }
+});
+
+test('retry after a failed archive header fetch recovers real city data', async () => {
+  let headerReads = 0;
+  const source = new RetryablePMTiles({
+    getKey: () => 'interrupted-atlas',
+    async getBytes(start, length) {
+      if (start === 0 && ++headerReads === 1) throw new Error('offline');
+      return { data: Uint8Array.from(file.subarray(start, start + length)).buffer };
+    },
+  });
+  const tile = wgs84ToTile(37.478, 126.640, ATLAS_ZOOM);
+  const read = () => source.getZxy(tile.zoom, tile.x, tile.y);
+  await assert.rejects(read, /offline/);
+  const recovered = decodeAtlasTile((await read()).data, tile);
+  assert.ok(recovered.some(feature => feature.kind === 'cities' && feature.en === 'Incheon'));
+  assert.equal(headerReads, 2);
 });
 
 test('open ocean has no manufactured labels or boundaries', async () => {

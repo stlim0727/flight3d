@@ -3,6 +3,7 @@ export default {
   "ui.busanChart": "현재 기체 위치와 기수 방향이 표시된 경상남도·부산·울산 권역도",
   "ui.regionalChart": "현재 기체 위치와 기수 방향, 지역 경계와 지명, 해안선·공항·활주로가 표시된 북쪽 위 지도",
   "map.chart.loading": "지도 불러오는 중…",
+  "map.chart.incomplete": "지도 일부를 불러오지 못했습니다. 재시도 중…",
   "ui.mapMark": "다음 확인 지점으로 표시",
   "ui.mapCheckpoint": "확인 지점 · {name}",
   "ui.mapNorthUp": "북쪽 위",

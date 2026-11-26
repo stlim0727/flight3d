@@ -3,15 +3,15 @@ import { getLanguage, t } from '../i18n/index.js';
 import { overtureBase } from '../geospatial/overtureWater.js';
 import { ATLAS_ZOOM, atlasOnSheet, decodeAtlasTile, regionalAtlas } from '../geospatial/regionalAtlas.js';
 import { chartRunwayBoxes, layoutAtlasNames, overlaps, projectAtlas } from './regionalChartNames.js';
-import { findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
+import { ChartTileLayer, CHART_RETRY_MS } from './ChartTileLayer.js';
+import { distanceKm, findAirportsInRegion, loadAirportManifest } from '../geospatial/airportIndex.js';
 import {
-  AIRPORT_RADIUS_KM, CHART_TILE_LIMIT, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartBounds, chartMetersPerPixel,
+  AIRPORT_RADIUS_KM, CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartBounds, chartMetersPerPixel,
   chartNeedsRecenter, chartProjection, chartScaleBar, chartTileTransform, chartWaterTiles,
   decodeWaterRings, formatChartPosition,
 } from '../geospatial/regionalChart.js';
 
-const RETRY_MS = 10000;
-const TIMEOUT_MS = 8000;
+const AIRPORT_MARGIN_KM = 20;
 const LAND = '#ece2c6';
 const WATER = '#a9c5cb';
 const RUNWAY = '#352c25';
@@ -41,9 +41,8 @@ export class RegionalChart {
     this.aircraft = map.querySelector('.map-aircraft');
     this.status = map.querySelector('.map-area');
     this.credit = map.querySelector('.map-credit');
-    this.waterSource = waterSource;
-    this.atlasSource = atlasSource;
-    this.atlasTiles = new Map();
+    this.water = new ChartTileLayer(waterSource, data => data ? ringsPath(decodeWaterRings(data)) : null);
+    this.atlas = new ChartTileLayer(atlasSource, decodeAtlasTile);
     this.nameLayer = document.createElement('div');
     this.nameLayer.className = 'map-names';
     this.canvas.after(this.nameLayer);
@@ -52,17 +51,15 @@ export class RegionalChart {
     this.findAirports = findAirports;
     this.forward = new Vector3();
     this.heading = 0;
-    this.tiles = new Map();
-    this.view = [];
     this.projection = null;
     this.airports = null;
     this.session = null;
-    this.version = 0;
+    this.airportVersion = 0;
     this.nextUpdate = 0;
   }
 
   show() {
-    this.session?.abort();
+    if (this.session) this.hide();
     this.session = new AbortController();
     this.key = null;
     this.nextUpdate = 0;
@@ -74,13 +71,12 @@ export class RegionalChart {
   hide() {
     this.session?.abort();
     this.session = null;
-    for (const [key, entry] of this.tiles) if (entry.state === 'loading') this.tiles.delete(key);
+    this.water.select([]);
+    this.atlas.select([]);
     this.projection = null;
     this.airports = null;
     this.frame = null;
-    this.atlasTiles.clear();
     this.atlasExtent = null;
-    this.atlasData = null;
     this.projectedAtlas = null;
     this.atlasLayoutExtent = null;
     this.nameAtlas = null;
@@ -108,24 +104,35 @@ export class RegionalChart {
     }
     this.heading = mark.heading;
     this.metersPerPixel = m;
-    this.requestTiles(width, height, m, now);
     const extent = [width, height, this.projection.center.latitude, this.projection.center.longitude].join('/');
     if (extent !== this.atlasExtent) {
       this.atlasExtent = extent;
-      this.loadAtlas(chartWaterTiles(this.projection, width, height, m, ATLAS_ZOOM));
+      this.water.select(chartWaterTiles(this.projection, width, height, m));
+      this.atlas.select(chartWaterTiles(this.projection, width, height, m, ATLAS_ZOOM));
+    }
+    this.water.refresh(now);
+    this.atlas.refresh(now);
+    if (this.airportRetryAt && now >= this.airportRetryAt) {
+      this.airportRetryAt = 0;
+      this.loadAirports(this.projection, this.session, this.frame.placeAirport);
     }
 
     const language = getLanguage();
     const ratio = window.devicePixelRatio || 1;
     const { latitude, longitude } = this.projection.center;
-    const key = [width, height, ratio, language, latitude, longitude, this.version].join('/');
+    const key = [width, height, ratio, language, latitude, longitude, this.water.revision, this.atlas.revision, this.airportVersion].join('/');
     if (key !== this.key) {
       this.print(width, height, ratio, mark.point);
       this.key = key;
     }
-    const loading = this.airports === null || [...this.atlasTiles.values()].some(entry => !entry.features && !entry.failed) ||
-      this.view.some(tile => this.tiles.get(tile.key)?.state === 'loading');
-    this.status.textContent = loading ? t('map.chart.loading') : formatChartPosition(here);
+    const tiles = [...this.water.visible, ...this.atlas.visible];
+    if (this.airportRetryAt || tiles.some(tile => tile.state === 'failed')) {
+      this.status.textContent = t('map.chart.incomplete');
+    } else if (!this.airports || tiles.some(tile => tile.state === 'loading')) {
+      this.status.textContent = t('map.chart.loading');
+    } else {
+      this.status.textContent = formatChartPosition(here);
+    }
 
     const x = width / 2 + mark.point[0] / m;
     const y = height / 2 + mark.point[1] / m;
@@ -137,99 +144,36 @@ export class RegionalChart {
     this.aircraft.style.transform = `translate(-50%, -50%) rotate(${mark.heading}rad)`;
   }
 
-  async loadAtlas(tiles) {
-    const previous = this.atlasTiles;
-    const current = new Map();
-    const session = this.session;
-    this.atlasTiles = current;
-    for (const tile of tiles) {
-      const key = `${tile.zoom}/${tile.x}/${tile.y}`;
-      let entry = previous.get(key);
-      if (!entry || entry.failed) {
-        entry = {};
-        const signal = AbortSignal.any([session.signal, AbortSignal.timeout(TIMEOUT_MS)]);
-        entry.ready = this.atlasSource.getZxy(tile.zoom, tile.x, tile.y, signal)
-          .then(result => { entry.features = decodeAtlasTile(result?.data, tile); })
-          .catch(error => {
-            entry.failed = true;
-            if (!session.signal.aborted) console.warn('[RegionalChart] atlas tile unavailable', key, error);
-          });
-      }
-      current.set(key, entry);
-    }
-    const entries = [...current.values()];
-    const visible = () => entries.flatMap(entry => entry.features ?? []);
-    this.atlasData = visible();
-    if (entries.every(entry => entry.features)) return;
-    await Promise.all(entries.map(entry => entry.ready));
-    if (session.signal.aborted || this.atlasTiles !== current) return;
-    this.atlasData = visible();
-    this.version++;
-  }
-
   recenter(center) {
     this.projection = chartProjection(center);
-    this.airports = null;
-    this.version++;
-    this.loadAirports(this.projection, this.session, this.frame.placeAirport);
+    this.airportRetryAt = 0;
+    this.airportVersion++;
+    if (this.airportArea && distanceKm(center, this.airportArea.center) <= AIRPORT_MARGIN_KM) {
+      this.airports = this.projectAirports(this.airportArea.list, this.projection, this.frame.placeAirport);
+    } else {
+      this.airports = null;
+      this.loadAirports(this.projection, this.session, this.frame.placeAirport);
+    }
+  }
+
+  projectAirports(list, projection, place) {
+    return chartAirports(list.filter(airport => distanceKm(projection.center, airport) <= AIRPORT_RADIUS_KM),
+      projection, place);
   }
 
   async loadAirports(projection, session, place) {
-    let airports = { runways: [], labels: [] };
     try {
       const manifest = await this.loadManifest();
       if (session.signal.aborted || projection !== this.projection) return;
-      const { latitude, longitude } = projection.center;
-      const list = await this.findAirports(manifest, { latitude, longitude, radiusKm: AIRPORT_RADIUS_KM });
-      airports = chartAirports(list, projection, place);
-    } catch (error) {
-      console.warn('[RegionalChart] airport index unavailable', error);
+      const center = projection.center;
+      const list = await this.findAirports(manifest, { ...center, radiusKm: AIRPORT_RADIUS_KM + AIRPORT_MARGIN_KM });
+      if (session.signal.aborted || projection !== this.projection) return;
+      this.airports = this.projectAirports(list, projection, place);
+      this.airportArea = { center, list };
+      this.airportVersion++;
+    } catch {
+      if (!session.signal.aborted && projection === this.projection) this.airportRetryAt = performance.now() + CHART_RETRY_MS;
     }
-    if (session !== this.session || projection !== this.projection) return;
-    this.airports = airports;
-    this.version++;
-  }
-
-  requestTiles(width, height, m, now) {
-    const session = this.session;
-    this.view = chartWaterTiles(this.projection, width, height, m).map(tile => ({
-      ...tile, key: `${tile.zoom}/${tile.x}/${tile.y}`,
-    }));
-    for (const tile of this.view) {
-      const existing = this.tiles.get(tile.key);
-      if (existing) {
-        existing.used = now;
-        if (existing.state !== 'failed' || now < existing.retryAt) continue;
-      }
-      const entry = { state: 'loading', used: now, path: null };
-      this.tiles.set(tile.key, entry);
-      const signal = AbortSignal.any([session.signal, AbortSignal.timeout(TIMEOUT_MS)]);
-      Promise.resolve()
-        .then(() => {
-          signal.throwIfAborted();
-          return this.waterSource.getZxy(tile.zoom, tile.x, tile.y, signal);
-        })
-        .then(result => {
-          if (this.tiles.get(tile.key) !== entry) return;
-          entry.path = result?.data ? ringsPath(decodeWaterRings(result.data)) : null;
-          entry.state = 'ready';
-          this.version++;
-        }).catch(() => {
-          if (this.tiles.get(tile.key) !== entry) return;
-          if (session.signal.aborted) {
-            this.tiles.delete(tile.key);
-            return;
-          }
-          entry.state = 'failed';
-          entry.retryAt = performance.now() + RETRY_MS;
-          this.version++;
-        });
-    }
-    if (this.tiles.size <= CHART_TILE_LIMIT) return;
-    const visible = new Set(this.view.map(tile => tile.key));
-    const stale = [...this.tiles].filter(([key, entry]) => !visible.has(key) && entry.state !== 'loading')
-      .sort((a, b) => a[1].used - b[1].used);
-    for (const [key] of stale.slice(0, this.tiles.size - CHART_TILE_LIMIT)) this.tiles.delete(key);
   }
 
   layoutNames(ctx, width, height, screen, [x, y], placed, x0) {
@@ -274,19 +218,20 @@ export class RegionalChart {
     const m = this.metersPerPixel;
     const cx = width / 2, cy = height / 2;
     const screen = ([east, south]) => [cx + east / m, cy + south / m];
-    if (this.atlasLayoutExtent !== this.atlasExtent || this.atlasLayoutData !== this.atlasData) {
-      const features = atlasOnSheet(this.atlasData ?? [], chartBounds(this.projection, width * m, height * m));
+    if (this.atlasLayoutExtent !== this.atlasExtent || this.atlasLayoutRevision !== this.atlas.revision) {
+      const data = this.atlas.visible.flatMap(tile => tile.data ?? []);
+      const features = atlasOnSheet(data, chartBounds(this.projection, width * m, height * m));
       this.projectedAtlas = projectAtlas(features, point => screen(this.projection.project(point)));
       this.atlasLayoutExtent = this.atlasExtent;
-      this.atlasLayoutData = this.atlasData;
+      this.atlasLayoutRevision = this.atlas.revision;
     }
 
     // Unloaded and failed tiles keep the canvas hatch, so missing data never reads as land.
     // All land goes down before any water, so a tile edge never paints land over its neighbour's sea.
-    const ready = this.view.filter(tile => this.tiles.get(tile.key)?.state === 'ready');
+    const ready = this.water.visible.filter(tile => tile.state === 'ready');
     for (const pass of ['land', 'water']) {
       for (const tile of ready) {
-        const { path } = this.tiles.get(tile.key);
+        const path = tile.data;
         if (pass === 'water' && !path) continue;
         const transform = chartTileTransform(this.projection, tile.x, tile.y, tile.zoom ?? CHART_WATER_ZOOM);
         ctx.save();
