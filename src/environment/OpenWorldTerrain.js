@@ -829,6 +829,38 @@ export class OpenWorldTerrain {
     return { height: Math.max(0, height), water };
   }
 
+  sampleContact(x, z) {
+    if (this.protects(x, z)) return undefined;
+    const { x: tx, y: ty, fx, fy } = this.coordinate(x, z);
+    const tile = this.tiles.get(keyOf(wrapX(tx), ty));
+    if (!tile) return undefined;
+    const col = Math.min(segments - 1, Math.floor(fx * segments));
+    const row = Math.min(segments - 1, Math.floor(fy * segments));
+    const geometry = tile.fullGeometry ?? tile.mesh.geometry;
+    const positions = geometry.attributes.position;
+    let height;
+    for (let dz = -1; dz <= 1 && height === undefined; dz++) {
+      for (let dx = -1; dx <= 1 && height === undefined; dx++) {
+        if (row + dz < 0 || row + dz >= segments || col + dx < 0 || col + dx >= segments) continue;
+        if (tile.cellOffsets) {
+          const cell = (row + dz) * segments + col + dx;
+          const indices = geometry.index.array;
+          for (let i = tile.cellOffsets[cell]; i < tile.cellOffsets[cell + 1] && height === undefined; i += 3) {
+            height = heightOnTriangle(positions, x, z, indices[i], indices[i + 1], indices[i + 2]);
+          }
+          continue;
+        }
+        const nw = (row + dz) * stride + col + dx;
+        height = heightOnTriangle(positions, x, z, nw, nw + stride, nw + 1)
+          ?? heightOnTriangle(positions, x, z, nw + stride + 1, nw + 1, nw + stride);
+      }
+    }
+    if (height === undefined) return undefined;
+    const pixel = (Math.floor(fy * samples) * samples + Math.floor(fx * samples)) * 4 + 3;
+    const water = (tile.water?.[pixel] ?? 0) >= 128;
+    return { height, water };
+  }
+
   sampleRaw(x, z) {
     return this.sample(x, z, { unblended: true })?.height;
   }

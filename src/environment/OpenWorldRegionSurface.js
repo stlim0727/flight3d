@@ -82,6 +82,8 @@ export class OpenWorldRegionSurface {
   }
 
   getHeight(x, z) {
+    const contact = this.openWorld?.sampleContact?.(x, z);
+    if (Number.isFinite(contact?.height)) return contact.height;
     const streamed = this.openWorld?.sampleRaw?.(x, z) ?? this.openWorld?.sample?.(x, z)?.height;
     const natural = Number.isFinite(streamed) ? streamed : (this.fallback?.getHeight(x, z) ?? 0);
     const nearest = this.nearest(x, z);
