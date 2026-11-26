@@ -533,3 +533,23 @@ test('incompatible saved pins are not restored into the picker', async () => {
     assert.equal(picker.selected.size, 0);
   });
 });
+
+test('GitHub repository URL resolves to the catalog raw URL', () => {
+  const raw = 'https://raw.githubusercontent.com/stlim0727/flight3d-skyhawk-addon/main/catalog.json';
+  assert.equal(
+    resolveCatalogUrl('https://github.com/stlim0727/flight3d-skyhawk-addon'),
+    raw,
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/stlim0727/flight3d-skyhawk-addon/'),
+    raw,
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/stlim0727/flight3d-skyhawk-addon/tree/main'),
+    raw,
+  );
+  assert.equal(
+    resolveCatalogUrl('https://raw.githubusercontent.com/owner/repo/main/catalog.json'),
+    'https://raw.githubusercontent.com/owner/repo/main/catalog.json',
+  );
+});

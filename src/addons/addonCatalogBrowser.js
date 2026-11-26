@@ -109,11 +109,26 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
 
 export function resolveCatalogUrl(input) {
   const value = String(input ?? '').trim();
-  if (/^https?:\/\//.test(value)) return value;
+  if (/^https?:\/\//.test(value)) return resolveGitHostCatalogUrl(value);
   if (/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/.test(value)) {
     return `https://raw.githubusercontent.com/${value}/main/catalog.json`;
   }
   return value;
+}
+
+function resolveGitHostCatalogUrl(value) {
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return value;
+  }
+  if (url.hostname !== 'github.com') return value;
+  const parts = url.pathname.split('/').filter(Boolean);
+  if (parts.length < 2 || !/^[A-Za-z0-9._-]+$/.test(parts[0]) || !/^[A-Za-z0-9._-]+$/.test(parts[1])) return value;
+  const branch = parts[2] === 'tree' || parts[2] === 'blob' ? parts[3] : null;
+  const ref = branch && /^[A-Za-z0-9._/-]+$/.test(branch) ? branch : 'main';
+  return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${ref}/catalog.json`;
 }
 
 export async function loadAddonCatalog(url, { fetchImpl = globalThis.fetch, validate = validateCatalog } = {}) {
