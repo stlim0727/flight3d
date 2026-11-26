@@ -4,6 +4,18 @@ export const MAP_HEIGHT = 1024;
 export const MAP_BOUNDS = Object.freeze({ west: -180, east: 180, south: -85.0511, north: 85.0511 });
 const MAX_LATITUDE = MAP_BOUNDS.north;
 
+/** Fold an unwrapped SVG x (from panning) into the canonical world copy. */
+export function wrapMapX(x) {
+  if (!Number.isFinite(x)) return null;
+  return ((x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+}
+
+/** Place a world x in the repeating copy nearest a reference x. */
+export function unwrapMapX(worldX, referenceX) {
+  if (![worldX, referenceX].every(Number.isFinite)) return worldX;
+  return worldX + Math.round((referenceX - worldX) / MAP_WIDTH) * MAP_WIDTH;
+}
+
 export function projectToMap(latitude, longitude) {
   if (![latitude, longitude].every(Number.isFinite) || longitude < MAP_BOUNDS.west || longitude > MAP_BOUNDS.east) return null;
   const x = ((longitude - MAP_BOUNDS.west) / (MAP_BOUNDS.east - MAP_BOUNDS.west)) * MAP_WIDTH;
@@ -15,8 +27,9 @@ export function projectToMap(latitude, longitude) {
 }
 
 export function mapCoordinates(x, y) {
-  if (![x, y].every(Number.isFinite) || x < 0 || y < 0 || x > MAP_WIDTH || y > MAP_HEIGHT) return null;
-  const longitude = MAP_BOUNDS.west + (x / MAP_WIDTH) * (MAP_BOUNDS.east - MAP_BOUNDS.west);
+  const wrappedX = wrapMapX(x);
+  if (wrappedX === null || !Number.isFinite(y) || y < 0 || y > MAP_HEIGHT) return null;
+  const longitude = MAP_BOUNDS.west + (wrappedX / MAP_WIDTH) * (MAP_BOUNDS.east - MAP_BOUNDS.west);
   const latitude = Math.atan(Math.sinh(Math.PI - (y / MAP_HEIGHT) * 2 * Math.PI)) * 180 / Math.PI;
   return { latitude, longitude };
 }
@@ -33,7 +46,7 @@ export function mapViewBoxFor(latitude, longitude, zoom = 6) {
   return `${x} ${y} ${width} ${height}`;
 }
 
-/** Grow a viewBox to match the displayed map's aspect ratio without leaving the bounds. */
+/** Grow a viewBox to match the displayed map's aspect ratio, keeping its centre. */
 export function fitMapViewBoxToAspect(viewBox, aspect) {
   const values = String(viewBox).split(/\s+/).map(Number);
   const [x, y, width, height] = values;
@@ -52,7 +65,7 @@ export function fitMapViewBoxToAspect(viewBox, aspect) {
   }
   const centerX = x + width / 2;
   const centerY = y + height / 2;
-  const nextX = Math.max(0, Math.min(MAP_WIDTH - nextWidth, centerX - nextWidth / 2));
+  const nextX = centerX - nextWidth / 2;
   const nextY = Math.max(0, Math.min(MAP_HEIGHT - nextHeight, centerY - nextHeight / 2));
   return `${nextX.toFixed(2)} ${nextY.toFixed(2)} ${nextWidth.toFixed(2)} ${nextHeight.toFixed(2)}`;
 }

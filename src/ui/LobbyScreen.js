@@ -12,7 +12,7 @@ import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../con
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
-import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints } from './mapBrowser.js';
+import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, unwrapMapX } from './mapBrowser.js';
 import { tilesForViewBox } from './lobbyMapTiles.js';
 import { airportDisplayName, airportProfile } from '../config/airportProfile.js';
 const MAP_SEARCH_LIMIT = 20;
@@ -325,7 +325,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const centerX = box.x + box.width / 2;
     const centerY = box.y + box.height / 2;
     return {
-      x: Math.max(0, Math.min(MAP_WIDTH - width, centerX - width / 2)),
+      x: Number.isFinite(centerX) ? centerX - width / 2 : 0,
       y: Math.max(0, Math.min(MAP_HEIGHT - height, centerY - height / 2)),
       width, height,
     };
@@ -416,9 +416,16 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (!mapSvg?.setAttribute) return;
     mapFocus = focus && Number.isFinite(focus.latitude) && Number.isFinite(focus.longitude) ? focus : null;
     mapZoom = Number.isFinite(zoom) ? Math.max(0, Math.min(12, Math.round(zoom))) : 0;
-    const base = mapZoom === 0
-      ? `0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`
-      : mapViewBoxFor(mapFocus.latitude, mapFocus.longitude, mapZoom);
+    const current = svgViewBox();
+    const referenceX = Number.isFinite(current.x) ? current.x + current.width / 2 : MAP_WIDTH / 2;
+    const point = mapFocus ? projectToMap(mapFocus.latitude, mapFocus.longitude) : null;
+    const centerX = point ? unwrapMapX(point.x, referenceX) : referenceX;
+    const width = MAP_WIDTH / 2 ** mapZoom;
+    const height = MAP_HEIGHT / 2 ** mapZoom;
+    const y = point
+      ? Math.max(0, Math.min(MAP_HEIGHT - height, point.y - height / 2))
+      : Math.max(0, Math.min(MAP_HEIGHT - height, (MAP_HEIGHT - height) / 2));
+    const base = `${(centerX - width / 2).toFixed(2)} ${y.toFixed(2)} ${width.toFixed(2)} ${height.toFixed(2)}`;
     const bounds = typeof mapSvg.getBoundingClientRect === 'function' ? mapSvg.getBoundingClientRect() : null;
     const aspect = bounds?.width > 0 && bounds?.height > 0 ? bounds.width / bounds.height : MAP_WIDTH / MAP_HEIGHT;
     const fitted = fitMapViewBoxToAspect(base, aspect).split(/\s+/).map(Number);
@@ -439,18 +446,27 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   function renderMapMarkers(activeKey = mapActiveKey()) {
     if (!mapMarkers?.replaceChildren) return;
     mapMarkers.replaceChildren();
-    const { width } = svgViewBox();
+    const box = svgViewBox();
     mapClusters = clusterMapPoints(
       mapPlaces().flatMap(place => {
         const projected = projectToMap(place.latitude, place.longitude);
         return projected ? [{ ...projected, place }] : [];
       }),
-      width,
+      box.width,
     );
-    for (const [index, cluster] of mapClusters.entries()) {
+    const firstCopy = Math.floor(box.x / MAP_WIDTH) - 1;
+    const lastCopy = Math.floor((box.x + box.width) / MAP_WIDTH) + 1;
+    const instances = mapClusters.flatMap((cluster, index) => {
+      const copies = [];
+      for (let copy = firstCopy; copy <= lastCopy; copy += 1) {
+        copies.push({ cluster, index, x: cluster.x + copy * MAP_WIDTH });
+      }
+      return copies;
+    });
+    for (const { cluster, index, x } of instances) {
       const marker = document.createElementNS(svgNamespace, 'g');
-      marker.setAttribute('transform', `translate(${cluster.x.toFixed(2)} ${cluster.y.toFixed(2)})`);
-      marker.dataset.mapX = cluster.x.toFixed(2);
+      marker.setAttribute('transform', `translate(${x.toFixed(2)} ${cluster.y.toFixed(2)})`);
+      marker.dataset.mapX = x.toFixed(2);
       marker.dataset.mapY = cluster.y.toFixed(2);
       if (cluster.places.length > 1) {
         const containsActive = cluster.places.some(place =>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
+import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, wrapMapX, unwrapMapX, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
 
 test('projection covers airports worldwide and keeps south below north', () => {
   const gimpo = projectToMap(37.5583, 126.791);
@@ -33,20 +33,35 @@ test('map clicks convert projected coordinates back to latitude and longitude', 
     assert.ok(Math.abs(restored.latitude - latitude) < 1e-6);
     assert.ok(Math.abs(restored.longitude - longitude) < 1e-6);
   }
-  assert.equal(mapCoordinates(-1, 0), null);
+  assert.ok(mapCoordinates(-1, 0), 'negative x wraps into the repeating world');
   assert.equal(mapCoordinates(0, NaN), null);
 });
 
-test('aspect fitting keeps a square phone map centred and inside bounds', () => {
+test('aspect fitting keeps a square phone map centred without bounding repeating x', () => {
   assert.equal(
     fitMapViewBoxToAspect(`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`, 4 / 3),
     `0.00 ${((MAP_HEIGHT - MAP_HEIGHT * 3 / 4) / 2).toFixed(2)} ${MAP_WIDTH.toFixed(2)} ${(MAP_HEIGHT * 3 / 4).toFixed(2)}`,
   );
-  const square = fitMapViewBoxToAspect('256 384 512 256', 1).split(' ').map(Number);
+  const square = fitMapViewBoxToAspect('256 384 512 256', 1).split(/\s+/).map(Number);
   assert.ok(Math.abs(square[2] - square[3]) < 0.01, 'viewBox must match the square viewport');
-  assert.deepEqual(square.slice(0, 2), [256, 256]);
-  assert.ok(square[0] + square[2] <= MAP_WIDTH && square[1] + square[3] <= MAP_HEIGHT);
+  assert.ok(Math.abs(square[0] + square[2] / 2 - 512) < 0.01, 'the centre stays put when x is unbounded');
   assert.equal(fitMapViewBoxToAspect('not a viewBox', 1), 'not a viewBox');
+
+  const repeated = fitMapViewBoxToAspect('1100 384 16 16', 4 / 3).split(/\s+/).map(Number);
+  assert.ok(Math.abs(repeated[0] + repeated[2] / 2 - 1108) < 0.01, 'a repeated world copy keeps its centre');
+});
+
+test('map x wraps for repeating worlds while y stays bounded', () => {
+  const east = mapCoordinates(-1, 500);
+  const west = mapCoordinates(MAP_WIDTH + 1, 500);
+  assert.ok(east && west);
+  assert.ok(east.longitude > 179, 'just west of the seam wraps to the far east');
+  assert.ok(west.longitude < -179, 'just east of the seam wraps to the far west');
+  assert.equal(mapCoordinates(1, -1), null);
+  assert.equal(wrapMapX(-1), MAP_WIDTH - 1);
+  assert.equal(wrapMapX(MAP_WIDTH + 1), 1);
+  assert.equal(unwrapMapX(10, MAP_WIDTH + 10), MAP_WIDTH + 10);
+  assert.equal(unwrapMapX(10, 10 - MAP_WIDTH), 10 - MAP_WIDTH);
 });
 
 test('map markers stay readable and tappable from overview to deep zoom', () => {
