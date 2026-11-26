@@ -5,6 +5,9 @@ import { aircraftPackFromProfile } from '../src/addons/aircraftPackBinding.js';
 import { registerAddonAircraft, resolveAircraftConfig, addonAircraftIds } from '../src/config/aircraftConfigs.js';
 import { AddonAircraft } from '../src/aircraft/AddonAircraft.js';
 import { buildAddonStarter } from '../src/addons/addonStarter.js';
+import { Aerodynamics } from '../src/physics/Aerodynamics.js';
+import { EngineModel } from '../src/physics/EngineModel.js';
+import { createHeadlessSimulation } from '../src/core/HeadlessSimulation.js';
 
 const manifest = {
   schemaVersion: 1,
@@ -128,4 +131,53 @@ test('starter aircraft physics never inherits built-in propulsion or gear', () =
   assert.notEqual(descriptor.config.propulsion.engineName, 'CFM56-7B26');
   assert.equal(descriptor.config.landingGear.cgGroundHeightM, 1.3);
   assert.equal(descriptor.config.aerodynamics.flapAngles.length, 1);
+});
+
+test('starter aircraft mass and fuel loading survive refuel and fuel burn', () => {
+  const starter = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: starter.id, version: starter.version, sha256: 'a'.repeat(64), manifest: starter }],
+  }, starter.id, { coreVersion: '1.8.0' });
+  const aero = new Aerodynamics(descriptor.config);
+  const engines = new EngineModel(descriptor.config);
+  engines.loadConfig(descriptor.config);
+  engines.bindMassProperties(aero.massProperties);
+  engines.refuel(aero);
+  assert.equal(engines.fuelKg, 120);
+  assert.equal(aero.massProperties.fuelKg, 120);
+  const before = aero.massProperties.fuelKg;
+  const supplied = aero.massProperties.consume(0.5);
+  assert.equal(supplied, 0.5);
+  assert.ok(aero.massProperties.fuelKg < before);
+  assert.ok(aero.mass > 0);
+  aero.setFlapPosition(5);
+  assert.equal(aero.flapsIndex, 0);
+  assert.equal(aero.currentFlapAngle, 0);
+});
+
+test('headless approach preset starts and advances with an addon aircraft', () => {
+  const starter = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: starter.id, version: starter.version, sha256: 'a'.repeat(64), manifest: starter }],
+  }, starter.id, { coreVersion: '1.8.0' });
+  registerAddonAircraft([descriptor]);
+  const sim = createHeadlessSimulation({ aircraftId: descriptor.id, airportId: 'jeju' });
+  sim.setPreset('approach');
+  assert.equal(sim.aero.flapsIndex, 0);
+  assert.equal(sim.engines.fuelKg > 0, true);
+  const startX = sim.position.x;
+  for (let tick = 0; tick < 120; tick++) {
+    sim.totalSimTime += sim.physicsDt;
+    sim.integratePhysics(sim.physicsDt);
+  }
+  assert.ok(Math.abs(sim.position.x - startX) > 1);
+  assert.equal(Number.isFinite(sim.telemetry.iasKnots), true);
 });
