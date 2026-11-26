@@ -74,6 +74,7 @@ function withFakeDocument(fn) {
   const slots = {
     '.addon-catalog-url': createFakeElement('input'),
     '.addon-catalog-load': createFakeElement('button'),
+    '.addon-catalog-clear': createFakeElement('button'),
     '.addon-picker-filters': createFakeElement('div'),
     '.addon-search': createFakeElement('input'),
     '.addon-list': createFakeElement('div'),
@@ -230,6 +231,37 @@ test('AddonPicker clears selection and stale share output on reload or failure a
     assert.equal(slots['.addon-share-actions'].hidden, true);
     assert.equal(slots['.addon-share-link'].getAttribute('href'), null);
     assert.equal(slots['.addon-share-link'].textContent, '');
+  });
+});
+
+test('AddonPicker clear button removes the URL and saved addons', async () => {
+  const catalog = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) }],
+  };
+  await withFakeDocument(async ({ parent, slots }) => {
+    const storage = memoryStorage();
+    saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
+    const picker = new AddonPicker({
+      catalogUrl: 'https://packs.example/wrong-long-url.json',
+      profileShareParams,
+      validateCatalog,
+      storage,
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+    });
+    picker.mount(parent);
+    await picker.load('https://packs.example/a.json');
+    assert.equal(loadSavedAddonProfile(storage)?.pins.length, 1);
+
+    slots['.addon-catalog-clear'].dispatch('click');
+    assert.equal(slots['.addon-catalog-url'].value, '');
+    assert.equal(picker.catalog, null);
+    assert.equal(picker.selected.size, 0);
+    assert.equal(slots['.addon-picker-filters'].hidden, true);
+    assert.equal(slots['.addon-share'].hidden, true);
+    assert.equal(loadSavedAddonProfile(storage), null);
+    assert.equal(storage.getItem(SAVED_ADDON_PROFILE_KEY), null);
+    assert.equal(slots['.addon-picker-status'].textContent, picker.labels.urlCleared);
   });
 });
 
