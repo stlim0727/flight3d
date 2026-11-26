@@ -4,9 +4,83 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { buildAddonStarter } from '../src/addons/addonStarter.js';
+import { ADDON_KINDS, buildAddonStarter } from '../src/addons/addonStarter.js';
+import { validateAddonManifest, validateCatalog } from '../src/addons/addonContract.js';
+import { lintAddonSet } from '../src/addons/lintAddonSet.js';
+import { profileShareParams } from '../src/addons/regionPackBinding.js';
 import { buildCatalog } from '../scripts/addon-tooling.mjs';
 import { listAddons, buildAddonProfileUrl } from '../src/addons/addonCatalogBrowser.js';
+import { AddonPicker } from '../src/ui/AddonPicker.js';
+import { installAddonPicker } from '../src/ui/installAddonPicker.js';
+
+function createFakeElement(tagName) {
+  const listeners = new Map();
+  const el = {
+    tagName: tagName.toUpperCase(),
+    className: '',
+    type: '',
+    value: '',
+    checked: false,
+    disabled: false,
+    hidden: false,
+    textContent: '',
+    dataset: {},
+    attributes: new Map(),
+    children: [],
+    _innerHTML: '',
+    set innerHTML(html) { this._innerHTML = html; },
+    get innerHTML() { return this._innerHTML; },
+    setAttribute(name, value) { this.attributes.set(name, String(value)); },
+    appendChild(child) { this.children.push(child); return child; },
+    append(...nodes) { this.children.push(...nodes); },
+    replaceChildren(...nodes) { this.children = [...nodes]; },
+    addEventListener(type, fn) {
+      if (!listeners.has(type)) listeners.set(type, []);
+      listeners.get(type).push(fn);
+    },
+    dispatch(type, event = {}) {
+      for (const fn of listeners.get(type) ?? []) fn({ target: el, ...event });
+    },
+    querySelector(selector) {
+      return el._slots?.[selector] ?? null;
+    },
+    querySelectorAll(selector) {
+      return el._slotLists?.[selector] ?? [];
+    },
+  };
+  return el;
+}
+
+function withFakeDocument(fn) {
+  const prevDocument = globalThis.document;
+  const slots = {
+    '.addon-catalog-url': createFakeElement('input'),
+    '.addon-catalog-load': createFakeElement('button'),
+    '.addon-picker-filters': createFakeElement('div'),
+    '.addon-search': createFakeElement('input'),
+    '.addon-list': createFakeElement('div'),
+    '.addon-picker-status': createFakeElement('p'),
+    '.addon-share': createFakeElement('button'),
+    '.addon-share-url': createFakeElement('output'),
+  };
+  const kindButtons = ['all', 'region', 'aircraft', 'scenario'].map(kind => {
+    const btn = createFakeElement('button');
+    btn.dataset.kind = kind;
+    return btn;
+  });
+  globalThis.document = {
+    createElement(tag) {
+      const node = createFakeElement(tag);
+      if (tag === 'section') {
+        node._slots = slots;
+        node._slotLists = { '.addon-kind': kindButtons };
+      }
+      return node;
+    },
+  };
+  return Promise.resolve().then(() => fn({ parent: createFakeElement('div'), slots }))
+    .finally(() => { globalThis.document = prevDocument; });
+}
 
 test('scaffolding creates a starter addon with catalog and CI workflow', () => {
   const result = buildAddonStarter({
@@ -51,4 +125,95 @@ test('catalog browser filters and builds a share URL from selected pins', () => 
   assert.equal(params.get('pack'), 'demo/region/sky');
   assert.equal(params.get('version'), '1.0.0');
   assert.ok(params.get('profile'));
+});
+
+test('scaffolding produces valid manifests and catalogs for every addon kind and core version', () => {
+  for (const kind of ADDON_KINDS) {
+    for (const coreVersion of ['1.8.0', '2.0.0']) {
+      const result = buildAddonStarter({
+        publisher: 'demo', name: `sample-${kind}`, kind,
+        version: '1.0.0', coreVersion, title: `Sample ${kind}`,
+      });
+      assert.equal(result.ok, true, `${kind}@${coreVersion}: ${result.errors.join('; ')}`);
+      const manifestCheck = validateAddonManifest(result.files['addon.json'], { coreVersion });
+      assert.equal(manifestCheck.ok, true, `${kind}@${coreVersion} manifest invalid: ${manifestCheck.errors.join('; ')}`);
+      const lintCheck = lintAddonSet([result.files['addon.json']], { coreVersion });
+      assert.equal(lintCheck.ok, true, `${kind}@${coreVersion} lint failed: ${lintCheck.errors.join('; ')}`);
+      const catalogCheck = validateCatalog(result.files['catalog.json']);
+      assert.equal(catalogCheck.ok, true, `${kind}@${coreVersion} catalog invalid: ${catalogCheck.errors.join('; ')}`);
+      assert.match(result.files['README.md'], /scripts\/addon-dev\.mjs catalog/);
+      assert.doesNotMatch(result.files['README.md'], /scripts\/addon-contract\.mjs catalog/);
+      assert.match(result.files['.github/workflows/validate-addon.yml'], /repository: stlim0727\/flight3d/);
+    }
+  }
+});
+
+test('AddonPicker clears selection and stale share output on reload or failure and avoids innerHTML injection', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  const catalogA = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) }],
+  };
+  const catalogB = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) }],
+  };
+  const responses = new Map([
+    ['https://packs.example/a.json', { ok: true, json: async () => catalogA }],
+    ['https://packs.example/b.json', { ok: true, json: async () => catalogB }],
+    ['https://packs.example/bad.json', { ok: false, status: 404 }],
+  ]);
+
+  await withFakeDocument(async ({ parent, slots }) => {
+    const trickyUrl = 'https://packs.example/a.json" data-injected="1';
+    const picker = new AddonPicker({
+      catalogUrl: trickyUrl,
+      profileShareParams,
+      validateCatalog,
+      fetchImpl: async url => responses.get(url) ?? { ok: false, status: 404 },
+    });
+    const root = picker.mount(parent);
+    assert.doesNotMatch(root.innerHTML, /data-injected/);
+    assert.equal(slots['.addon-catalog-url'].value, trickyUrl);
+
+    await picker.load('https://packs.example/a.json');
+    picker.selected.add('demo/region/sky');
+    const shared = picker.share();
+    assert.match(shared, /pack=demo%2Fregion%2Fsky/);
+    assert.equal(slots['.addon-share-url'].hidden, false);
+
+    await picker.load('https://packs.example/b.json');
+    assert.equal(picker.selected.size, 0);
+    assert.equal(slots['.addon-share'].hidden, true);
+    assert.equal(slots['.addon-share-url'].hidden, true);
+    assert.equal(slots['.addon-share-url'].textContent, '');
+    assert.equal(picker.share(), '');
+
+    picker.selected.add('demo/aircraft/jet');
+    picker.share();
+    await picker.load('https://packs.example/bad.json');
+    assert.equal(picker.selected.size, 0);
+    assert.equal(slots['.addon-share'].hidden, true);
+    assert.equal(slots['.addon-share-url'].hidden, true);
+    assert.equal(slots['.addon-share-url'].textContent, '');
+  });
+});
+
+test('installAddonPicker fetches an initial catalogUrl only once', async () => {
+  let fetchCount = 0;
+  const catalog = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) }],
+  };
+  await withFakeDocument(async ({ parent }) => {
+    installAddonPicker(parent, {
+      catalogUrl: 'https://packs.example/catalog.json',
+      fetchImpl: async () => {
+        fetchCount += 1;
+        return { ok: true, json: async () => catalog };
+      },
+    });
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(fetchCount, 1);
+  });
 });

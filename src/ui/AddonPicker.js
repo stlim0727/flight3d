@@ -41,7 +41,7 @@ export class AddonPicker {
       <h3>${this.labels.title}</h3>
       <p class="addon-picker-hint">${this.labels.hint}</p>
       <div class="addon-picker-url">
-        <label><span>${this.labels.catalogUrl}</span><input type="url" class="addon-catalog-url" value="${this.catalogUrl}" placeholder="https://.../catalog.json"></label>
+        <label><span>${this.labels.catalogUrl}</span><input type="url" class="addon-catalog-url" placeholder="https://.../catalog.json"></label>
         <button type="button" class="btn addon-catalog-load">${this.labels.load}</button>
       </div>
       <div class="addon-picker-filters" hidden>
@@ -57,6 +57,7 @@ export class AddonPicker {
 
     parent.appendChild(this.root);
     this.urlInput = this.root.querySelector('.addon-catalog-url');
+    this.urlInput.value = this.catalogUrl;
     this.filters = this.root.querySelector('.addon-picker-filters');
     this.list = this.root.querySelector('.addon-list');
     this.status = this.root.querySelector('.addon-picker-status');
@@ -83,6 +84,11 @@ export class AddonPicker {
   }
 
   async load(url) {
+    this.selected.clear();
+    if (this.shareOutput) {
+      this.shareOutput.hidden = true;
+      this.shareOutput.textContent = '';
+    }
     try {
       const catalog = await loadAddonCatalog(url, {
         fetchImpl: this.fetchImpl,

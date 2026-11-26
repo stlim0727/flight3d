@@ -7,10 +7,10 @@ export function installAddonPicker(parent, options = {}) {
   const picker = new AddonPicker({
     catalogUrl: options.catalogUrl ?? '',
     coreVersion: options.coreVersion,
+    fetchImpl: options.fetchImpl,
     profileShareParams,
     validateCatalog,
   });
   picker.mount(parent);
-  if (options.catalogUrl) picker.load(options.catalogUrl).catch(() => {});
   return picker;
 }

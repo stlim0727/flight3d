@@ -21,7 +21,7 @@ node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json https://example.
 - `.github/workflows/validate-addon.yml` — the same CLI in CI;
 - `README.md` — the remaining publisher steps.
 
-Replace `example.com` URLs and placeholder SHA-256 values before publishing.
+Replace placeholder URLs (`packs.example`) and SHA-256 values before publishing.
 `catalog` computes the manifest SHA-256 from the file; binary asset checksums
 still need to be calculated by the publisher.
 
