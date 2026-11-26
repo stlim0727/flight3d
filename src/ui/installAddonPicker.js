@@ -12,5 +12,31 @@ export function installAddonPicker(parent, options = {}) {
     validateCatalog,
   });
   picker.mount(parent);
+  const dialog = typeof options.dialog === 'undefined'
+    ? document.getElementById('lobby-addon-dialog')
+    : options.dialog;
+  const openButton = typeof options.openButton === 'undefined'
+    ? document.getElementById('lobby-addon-open')
+    : options.openButton;
+  const closeButton = typeof options.closeButton === 'undefined'
+    ? document.getElementById('lobby-addon-dialog-close')
+    : options.closeButton;
+  const open = () => {
+    if (!dialog) return;
+    if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
+    else dialog.setAttribute?.('open', '');
+  };
+  const close = () => {
+    if (!dialog) return;
+    if (typeof dialog.close === 'function' && dialog.open) dialog.close();
+    else dialog.removeAttribute?.('open');
+  };
+  openButton?.addEventListener?.('click', open);
+  closeButton?.addEventListener?.('click', close);
+  dialog?.addEventListener?.('click', event => {
+    if (event.target === dialog) close();
+  });
+  picker.open = open;
+  picker.close = close;
   return picker;
 }

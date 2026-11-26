@@ -381,6 +381,8 @@ export default {
   "lobby.tab.single": "Free flight",
   "lobby.tab.multi": "Multi",
   "lobby.tab.option": "Option",
+  "lobby.addon.open": "Manage addons",
+  "lobby.addon.title": "Addons",
   "lobby.tab.managed": "Active Flight",
   "lobby.managed.title": "Flight in Progress",
   "lobby.managed.hint": "Current flight is paused and held. To select another aircraft, region, or time, end the current flight first.",
