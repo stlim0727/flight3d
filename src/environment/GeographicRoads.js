@@ -276,24 +276,48 @@ function lampGeometry() {
   return geometry;
 }
 
+function roadMaterial(quality = 'balanced') {
+  const isUltraLow = quality === 'ultraLow';
+  const isPerformance = quality === 'performance';
+  const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  material.defines = {
+    QUALITY_ULTRALOW: isUltraLow ? 1 : 0,
+    QUALITY_PERFORMANCE: isPerformance ? 1 : 0,
+    QUALITY_FAST: (isUltraLow || isPerformance) ? 1 : 0,
+  };
+  material.onBeforeCompile = shader => addGroundSurfaceColor(shader, `
+    #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
+      // Fast path: no procedural weathering/aggregate noise in ultraLow
+    #elif defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1
+      // Fast path: single-octave weathering noise without aggregate in performance
+      float weathering = groundNoise(vGroundXZ / 14.0);
+      diffuseColor.rgb *= 1.0 + weathering * 0.16;
+    #else
+      float weathering = groundNoise(vGroundXZ / 14.0);
+      float aggregate = groundNoise(vGroundXZ / 0.3);
+      diffuseColor.rgb *= 1.0 + weathering * 0.16 + aggregate * 0.28;
+    #endif
+  `);
+  material.customProgramCacheKey = () => (
+    isUltraLow ? 'geographic-road-surface-ultralow'
+      : isPerformance ? 'geographic-road-surface-performance'
+        : 'geographic-road-surface-standard'
+  );
+  return applyLogDepthOffset(material, 4);
+}
+
 export class GeographicRoads {
-  constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source }) {
+  constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source, quality = 'balanced' }) {
     this.origin = origin;
     this.project = project;
     this.terrain = terrain;
     this.isRunwaySafetyArea = isRunwaySafetyArea;
     this.exclude = (x, z) => exclude?.(x, z) || isRunwaySafetyArea?.(x, z);
     this.archive = archive;
+    this.quality = quality;
     this.group = new THREE.Group();
     this.group.name = 'Geographic roads';
-    const material = new THREE.MeshLambertMaterial({ vertexColors: true });
-    material.onBeforeCompile = shader => addGroundSurfaceColor(shader, `
-      float weathering = groundNoise(vGroundXZ / 14.0);
-      float aggregate = groundNoise(vGroundXZ / 0.3);
-      diffuseColor.rgb *= 1.0 + weathering * 0.16 + aggregate * 0.28;
-    `);
-    material.customProgramCacheKey = () => 'geographic-road-surface';
-    this.material = applyLogDepthOffset(material, 4);
+    this.material = roadMaterial(quality);
     this.tiles = new Map();
     this.lamps = new Map();
     this.samples = new Map();
@@ -321,6 +345,27 @@ export class GeographicRoads {
     this.lampPoints.frustumCulled = false;
     this.group.add(this.lampPoints);
     this.matrix = new THREE.Matrix4();
+    this.setQuality(quality);
+  }
+
+  setQuality(quality) {
+    this.quality = quality;
+    const isUltraLow = quality === 'ultraLow';
+    const isPerformance = quality === 'performance';
+    const nextUl = isUltraLow ? 1 : 0;
+    const nextPerf = isPerformance ? 1 : 0;
+    const nextFast = (isUltraLow || isPerformance) ? 1 : 0;
+    if (!this.material.defines) this.material.defines = {};
+    if (this.material.defines.QUALITY_ULTRALOW !== nextUl ||
+        this.material.defines.QUALITY_PERFORMANCE !== nextPerf ||
+        this.material.defines.QUALITY_FAST !== nextFast) {
+      this.material.defines.QUALITY_ULTRALOW = nextUl;
+      this.material.defines.QUALITY_PERFORMANCE = nextPerf;
+      this.material.defines.QUALITY_FAST = nextFast;
+      this.material.needsUpdate = true;
+    }
+    if (this.lampMesh) this.lampMesh.visible = !isUltraLow;
+    if (this.lampPoints) this.lampPoints.visible = !isUltraLow;
   }
 
   tilesAround(position) {
@@ -439,6 +484,11 @@ export class GeographicRoads {
   }
 
   updateLights(cameraPosition, sunHeight) {
+    if (this.quality === 'ultraLow') {
+      if (this.lampPoints) this.lampPoints.visible = false;
+      if (this.lampMesh) this.lampMesh.visible = false;
+      return;
+    }
     const night = nightLightLevel(sunHeight);
     const agl = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
     const fade = 1 - THREE.MathUtils.smoothstep(agl, 2500, 4000);
@@ -569,12 +619,14 @@ export function updateGeographicRoads(sim, elapsed) {
     const airport = sim.currentAirport;
     sim.geographicRoadLayer = new GeographicRoads({
       origin, project, terrain,
+      quality: sim.renderQuality,
       exclude: (x, z) => airport?.hasModeledBuilding?.(x, z),
       isRunwaySafetyArea: (x, z) => airport?.isRunwaySafetyArea?.(x, z),
     });
     terrain.geographicRoadLayer = sim.geographicRoadLayer;
     terrain.mesh.add(sim.geographicRoadLayer.group);
   }
+  sim.geographicRoadLayer?.setQuality?.(sim.renderQuality);
   sim.geographicRoadLayer?.update(sim.position, sim.camera.position, sim.sky.sunPosition.y, elapsed);
   setMapAttributionSource('geographic-roads-attribution', Boolean(sim.geographicRoadLayer?.tiles.size));
 }

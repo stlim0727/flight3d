@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Texture, Vector3, Vector4 } from 'three';
-import { buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
+import { applyTerrainMaterialQuality, buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
@@ -833,4 +833,46 @@ test('tile protection requires one protected area to cover both corners', () => 
   assert.equal(covered.readyForTile(tile, 11), true);
   split.dispose();
   covered.dispose();
+});
+
+test('terrain material applies shader fast paths and disables shadow writes for performance and ultraLow presets', () => {
+  const world = new OpenWorldTerrain({ origin, quality: 'balanced' });
+  assert.equal(world.renderQuality, 'balanced');
+
+  // Create a dummy tile entry to verify material quality propagation
+  const material = { defines: {}, needsUpdate: false };
+  const mockMesh = { material, receiveShadow: true };
+  const mockLocalMesh = { material: { defines: {}, needsUpdate: false }, receiveShadow: true };
+  world.tiles.set('test-tile', { mesh: mockMesh, localMesh: mockLocalMesh });
+
+  // When switched via setImageryQuality to ultraLow:
+  world.setImageryQuality('ultraLow');
+  assert.equal(mockMesh.material.defines.QUALITY_ULTRALOW, 1);
+  assert.equal(mockMesh.material.defines.QUALITY_PERFORMANCE, 0);
+  assert.equal(mockMesh.receiveShadow, false);
+  assert.equal(mockLocalMesh.receiveShadow, false);
+
+  // Switch to performance preset:
+  world.setImageryQuality('performance');
+  assert.equal(world.renderQuality, 'performance');
+  assert.equal(mockMesh.material.defines.QUALITY_ULTRALOW, 0);
+  assert.equal(mockMesh.material.defines.QUALITY_PERFORMANCE, 1);
+  assert.equal(mockMesh.receiveShadow, true);
+  assert.equal(mockLocalMesh.receiveShadow, true);
+
+  // Switch to high/balanced preset:
+  world.setImageryQuality('high');
+  assert.equal(world.renderQuality, 'high');
+  assert.equal(mockMesh.material.defines.QUALITY_ULTRALOW, 0);
+  assert.equal(mockMesh.material.defines.QUALITY_PERFORMANCE, 0);
+  assert.equal(mockMesh.receiveShadow, true);
+
+  // Direct helper test
+  const testMat = { defines: { QUALITY_ULTRALOW: 0, QUALITY_PERFORMANCE: 0 }, needsUpdate: false };
+  applyTerrainMaterialQuality(testMat, 'ultraLow');
+  assert.equal(testMat.defines.QUALITY_ULTRALOW, 1);
+  assert.equal(testMat.needsUpdate, true);
+
+  world.tiles.clear();
+  world.dispose();
 });
