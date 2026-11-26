@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "studio/scenario/islander-coast-tour",
+  "publisher": "studio",
+  "version": "2.1.0",
+  "coreRange": {
+    "min": "1.8.0",
+    "maxExclusive": "2.0.0"
+  },
+  "dependencies": [
+    {
+      "id": "studio/aircraft/islander-x",
+      "version": "1.2.0"
+    },
+    {
+      "id": "med/region/aegean-palette",
+      "version": "1.0.0"
+    },
+    {
+      "id": "med/region/santorini-overrides",
+      "version": "0.4.0"
+    }
+  ],
+  "license": "CC-BY-NC-4.0",
+  "attribution": "Studio coast tour",
+  "scenario": {
+    "id": "islander-coast-tour",
+    "kind": "tour",
+    "start": {
+      "frame": "wgs84",
+      "latitude": 36.42,
+      "longitude": 25.43,
+      "altitudeM": 600,
+      "headingDeg": 215
+    },
+    "objectives": [
+      {
+        "id": "coast-leg",
+        "type": "reach-waypoint",
+        "bounds": {
+          "west": 25.41,
+          "south": 36.4,
+          "east": 25.46,
+          "north": 36.44
+        },
+        "altitudeM": 450
+      },
+      {
+        "id": "village-photo",
+        "type": "photograph-landmark",
+        "landmarkId": "santorini-blue-dome"
+      }
+    ],
+    "events": [
+      {
+        "trigger": "on-objective-complete",
+        "action": "set-briefing",
+        "textKey": "scenario.islander.village"
+      },
+      {
+        "trigger": "on-objective-complete",
+        "action": "complete-scenario"
+      }
+    ],
+    "requiredAddons": [
+      {
+        "id": "studio/aircraft/islander-x",
+        "version": "1.2.0"
+      },
+      {
+        "id": "med/region/aegean-palette",
+        "version": "1.0.0"
+      },
+      {
+        "id": "med/region/santorini-overrides",
+        "version": "0.4.0"
+      }
+    ]
+  }
+}

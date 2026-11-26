@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "addons": [
+    {
+      "id": "demo/region/kos-gulf-pack",
+      "version": "1.0.0",
+      "url": "https://raw.githubusercontent.com/stlim0727/flight3d-addon-poc/main/addon.json",
+      "sha256": "882e0e41bd6207a14322758ca2b4dbc23fec3646b1d72fc73cccd877e26bfaad"
+    }
+  ]
+}
