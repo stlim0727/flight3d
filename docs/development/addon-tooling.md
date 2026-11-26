@@ -11,7 +11,7 @@ node scripts/addon-dev.mjs init region --publisher demo --name my-pack --core 1.
 cd my-addon
 node /path/to/flight3d/scripts/addon-contract.mjs validate addon.json --core 1.8.0
 node /path/to/flight3d/scripts/addon-contract.mjs lint-set addon.json --core 1.8.0
-node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json https://example.com/demo/region/my-pack/1.0.0
+node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json <owner>/<repo>
 ```
 
 `init` writes:
@@ -22,15 +22,18 @@ node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json https://example.
 - `README.md` — the remaining publisher steps.
 
 Replace placeholder URLs (`packs.example`) and SHA-256 values before publishing.
-`catalog` computes the manifest SHA-256 from the file; binary asset checksums
-still need to be calculated by the publisher.
+`catalog` computes the manifest SHA-256 from the file and accepts either a full
+HTTP(S) base URL or `owner/repo` shorthand for a GitHub repository. For the shorthand
+it writes `https://raw.githubusercontent.com/<owner>/<repo>/main/1.0.0/addon.json`.
+Binary asset checksums still need to be calculated by the publisher.
 
 ## User addon selection
 
-The lobby **Options** tab contains an addon picker. Paste a catalog URL, load
-it, filter by name or type, select compatible addons, then click
-**선택 공유 링크 만들기**. The generated URL carries pinned addon versions and
-checksums through `profileShareParams()`, so the same flight can be shared.
+The lobby **Options** tab contains an addon picker. Enter a catalog URL or
+`<owner>/<repo>` for a GitHub-hosted addon, load it, filter by name or type, and
+select compatible addons. **선택 공유 링크 만들기** produces a URL that carries
+pinned addon versions and checksums through `profileShareParams()`; use **링크 복사**
+or **링크 열기** on the result.
 
 Catalog entries with invalid IDs, versions, URLs or checksums are rejected by
 `validateCatalog()`. Entries marked `compatible: false` are displayed but cannot

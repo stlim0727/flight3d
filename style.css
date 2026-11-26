@@ -88,4 +88,5 @@
 .addon-item-body { display: flex; flex-direction: column; gap: .1rem; }
 .addon-item-body small { opacity: .75; }
 .addon-picker-status { min-height: 1.2em; font-size: .85rem; color: #ffb4a8; }
-.addon-share-url { display: block; max-width: 100%; overflow-wrap: anywhere; font-size: .8rem; margin-top: .5rem; }
+.addon-share-actions { display: flex; gap: .5rem; align-items: start; flex-wrap: wrap; margin-top: .5rem; }
+.addon-share-link { flex: 1 1 16rem; max-width: 100%; overflow-wrap: anywhere; font-size: .8rem; color: #7ed7e8; }
