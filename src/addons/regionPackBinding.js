@@ -18,15 +18,17 @@ export function regionPackFromProfile(profile, packId, { coreVersion, baseUrl } 
   } else {
     const url = new URL(manifest.region.tiles.url);
     const versionSegment = encodeURIComponent(pin.version);
-    const segments = url.pathname.split('/').filter(Boolean).map(segment => decodeURIComponent(segment));
-    if (!segments.includes(versionSegment) && !segments.includes(pin.version)) {
-      const firstToken = segments.findIndex(segment => /[{[](?:z|x|y)[}\]]/.test(segment));
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (!segments.some(segment => decodeURIComponent(segment) === pin.version)) {
+      const firstToken = segments.findIndex(segment => /[{[](?:z|x|y)[}\]]/.test(decodeURIComponent(segment)));
       if (firstToken >= 0) segments.splice(firstToken, 0, versionSegment);
       else segments.push(versionSegment);
     }
-    const rest = segments.slice(segments.findIndex(segment => segment === versionSegment || segment === pin.version) + 1);
-    if (!rest.some(segment => /[{[](?:z|x|y)[}\]]/.test(segment))) segments.push('{z}', '{y}', '{x}');
-    urlTemplate = `${url.origin}/${segments.join('/')}${url.search}`;
+    const versionIndex = segments.findIndex(segment => decodeURIComponent(segment) === pin.version);
+    const rest = segments.slice(versionIndex + 1);
+    if (!rest.some(segment => /[{[](?:z|x|y)[}\]]/.test(decodeURIComponent(segment)))) segments.push('{z}', '{y}', '{x}');
+    urlTemplate = `${url.origin}/${segments.join('/')}${url.search}`
+      .replaceAll('%7B', '{').replaceAll('%7D', '}');
   }
   const bounds = manifest.region.bounds;
   return Object.freeze({

@@ -138,3 +138,13 @@ test('catalogs reject duplicate id and version pins', () => {
   const entry = { id: manifest.id, version: manifest.version, url: 'https://packs.example/a', sha256: schemaHash(manifest) };
   assert.equal(validateCatalog({ schemaVersion: 1, addons: [entry, { ...entry }] }).ok, false);
 });
+
+test('profiles without a target core version round-trip through JSON', async () => {
+  const manifest = fixture();
+  const catalog = catalogFor(manifest);
+  const profile = await resolveProfile(catalog, [manifest.id], {
+    fetchImpl: fetchFor({ [catalog.addons[0].url]: manifest }),
+  });
+  assert.equal(profile.coreVersion, null);
+  assert.equal(parseProfile(serializeProfile(profile)).coreVersion, null);
+});

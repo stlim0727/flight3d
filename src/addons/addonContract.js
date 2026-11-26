@@ -377,7 +377,7 @@ export async function resolveProfile(catalog, requestedIds, { coreVersion, fetch
     if (entries.length > 1) throw new Error(`ambiguous catalog pin for ${id}`);
     await resolve(id, entries[0].version);
   }
-  return { schemaVersion: PROFILE_SCHEMA_VERSION, coreVersion, pins: [...pins.values()] };
+  return { schemaVersion: PROFILE_SCHEMA_VERSION, coreVersion: coreVersion ?? null, pins: [...pins.values()] };
 }
 
 export function serializeProfile(profile) {
@@ -390,7 +390,8 @@ export function serializeProfile(profile) {
 
 export function parseProfile(json) {
   const profile = JSON.parse(json);
-  if (profile?.schemaVersion !== PROFILE_SCHEMA_VERSION || typeof profile.coreVersion !== 'string'
+  if (profile?.schemaVersion !== PROFILE_SCHEMA_VERSION
+    || !(profile.coreVersion === null || typeof profile.coreVersion === 'string')
     || !Array.isArray(profile.pins)) throw new Error('unsupported profile');
   const ids = new Set();
   for (const pin of profile.pins) {

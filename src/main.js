@@ -136,15 +136,17 @@ async function resolveAddonPinnedPack(search) {
   const params = new URLSearchParams(search);
   const encoded = params.get('addonManifest');
   if (!encoded) return null;
+  let manifestBytes;
   let manifest;
   try {
     const normalized = encoded.replaceAll('-', '+').replaceAll('_', '/');
     const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4));
-    manifest = JSON.parse(new TextDecoder().decode(Uint8Array.from(binary, character => character.charCodeAt(0))));
+    manifestBytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
   } catch {
     throw new Error('malformed pinned addon manifest');
   }
-  const checksum = await sha256Hex(new TextEncoder().encode(JSON.stringify(manifest)));
+  const checksum = await sha256Hex(manifestBytes);
   const expected = params.get('addonSha256');
   if (expected && expected !== checksum) throw new Error('pinned addon checksum mismatch');
   const result = validateAddonManifest(manifest, { coreVersion: '1.0.0' });
