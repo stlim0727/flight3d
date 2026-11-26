@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "med/region/aegean-palette",
+  "publisher": "med",
+  "version": "1.0.0",
+  "coreRange": { "min": "1.8.0", "maxExclusive": "2.0.0" },
+  "dependencies": [],
+  "license": "CC0-1.0",
+  "attribution": "Aegean sea palette",
+  "region": {
+    "bounds": { "west": 25.0, "south": 36.0, "east": 26.0, "north": 37.0 },
+    "origin": { "latitude": 36.5, "longitude": 25.5 },
+    "verticalDatum": "EGM2008",
+    "tiles": {
+      "format": "xyz-image",
+      "url": "https://packs.example/aegean/tiles/{z}/{y}/{x}.png",
+      "checksum": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+      "minZoom": 8,
+      "maxZoom": 14
+    },
+    "palette": {
+      "sea": { "deepColor": "#063b66", "shallowColor": "#25b7c9", "roughness": 0.22 },
+      "sky": { "hazeColor": "#d8e9f5" }
+    }
+  }
+}

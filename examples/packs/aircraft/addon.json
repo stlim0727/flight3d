@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "studio/aircraft/islander-x",
+  "publisher": "studio",
+  "version": "1.2.0",
+  "coreRange": { "min": "1.8.0", "maxExclusive": "2.0.0" },
+  "dependencies": [],
+  "license": "CC-BY-NC-4.0",
+  "attribution": "Studio Islander model",
+  "aircraft": {
+    "id": "islander-x",
+    "physics": {
+      "profile": "flight-model-v1",
+      "massKg": 1850,
+      "wingAreaM2": 24.5,
+      "wingspanM": 13.1,
+      "lengthM": 10.8
+    },
+    "model": {
+      "url": "https://packs.example/islander/1.2.0/islander.glb",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "cockpit": {
+      "url": "https://packs.example/islander/1.2.0/cockpit.glb",
+      "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "controlBindings": {
+      "azimuth": "Propeller",
+      "elevator": "Elevator",
+      "rudder": "Rudder",
+      "flaps": "Flaps",
+      "gear": "Gear"
+    }
+  },
+  "assets": [
+    {
+      "url": "https://packs.example/islander/1.2.0/livery.png",
+      "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    }
+  ]
+}

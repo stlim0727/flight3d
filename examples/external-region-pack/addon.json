@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "poc/region/sample-bay",
+  "publisher": "poc",
+  "version": "1.0.0",
+  "coreRange": { "min": "1.0.0", "maxExclusive": "2.0.0" },
+  "dependencies": [],
+  "license": "CC-BY-4.0",
+  "attribution": "Flight3d addon POC fixture",
+  "region": {
+    "bounds": { "west": 126.4, "south": 34.2, "east": 126.6, "north": 34.4 },
+    "origin": { "latitude": 34.3, "longitude": 126.5 },
+    "verticalDatum": "EGM2008",
+    "tiles": {
+      "format": "pmtiles",
+      "url": "https://packs.example/poc/sample-bay/1.0.0/tiles.pmtiles",
+      "checksum": "1111111111111111111111111111111111111111111111111111111111111111",
+      "minZoom": 8,
+      "maxZoom": 14
+    }
+  }
+}

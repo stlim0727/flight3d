@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "med/region/santorini-overrides",
+  "publisher": "med",
+  "version": "0.4.0",
+  "coreRange": { "min": "1.8.0", "maxExclusive": "2.0.0" },
+  "dependencies": [
+    { "id": "med/region/aegean-palette", "version": "1.0.0" }
+  ],
+  "license": "CC0-1.0",
+  "attribution": "Santorini volunteer mapping team",
+  "region": {
+    "bounds": { "west": 25.36, "south": 36.38, "east": 25.48, "north": 36.48 },
+    "origin": { "latitude": 36.42, "longitude": 25.43 },
+    "verticalDatum": "EGM2008",
+    "tiles": {
+      "format": "xyz-image",
+      "url": "https://packs.example/santorini/tiles/{z}/{y}/{x}.png",
+      "checksum": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+      "minZoom": 12,
+      "maxZoom": 16
+    },
+    "buildingOverrides": [
+      {
+        "id": "santorini-blue-dome",
+        "bounds": { "west": 25.424, "south": 36.457, "east": 25.427, "north": 36.459 },
+        "model": {
+          "url": "https://packs.example/santorini/models/blue-dome.glb",
+          "scale": 1.0,
+          "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        },
+        "material": { "baseColor": "#ffffff", "roofColor": "#2f6fb5" },
+        "collision": "replace"
+      }
+    ]
+  }
+}
