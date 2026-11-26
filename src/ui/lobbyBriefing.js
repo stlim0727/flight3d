@@ -8,6 +8,7 @@ const AIRPORT_NAME_KEYS = {
   coastal: 'coastal.airport',
   lukla: 'lukla.vnlk',
   neon: 'neon.metropolis',
+  patagonia: 'patagonia.fitz.roy',
 };
 
 /**

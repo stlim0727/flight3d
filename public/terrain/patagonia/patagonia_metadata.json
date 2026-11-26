@@ -1,0 +1,146 @@
+{
+  "gridSize": 1025,
+  "worldSize": 44000,
+  "sampleSpacingM": 42.96875,
+  "origin": {
+    "lat": -49.271278,
+    "lon": -73.043222,
+    "reference": "Mount Fitz Roy summit, Wikipedia/Wikidata coordinates"
+  },
+  "projection": "PROJCS[\"unknown\",GEOGCS[\"unknown\",DATUM[\"WGS_1984\",SPHEROID[\"WGS 84\",6378137,298.257223563,AUTHORITY[\"EPSG\",\"7030\"]],AUTHORITY[\"EPSG\",\"6326\"]],PRIMEM[\"Greenwich\",0,AUTHORITY[\"EPSG\",\"8901\"]],UNIT[\"degree\",0.0174532925199433,AUTHORITY[\"EPSG\",\"9122\"]]],PROJECTION[\"Azimuthal_Equidistant\"],PARAMETER[\"latitude_of_center\",-49.271278],PARAMETER[\"longitude_of_center\",-73.043222],PARAMETER[\"false_easting\",0],PARAMETER[\"false_northing\",0],UNIT[\"metre\",1,AUTHORITY[\"EPSG\",\"9001\"]],AXIS[\"Easting\",EAST],AXIS[\"Northing\",NORTH]]",
+  "axes": "x east, z south; binary rows north to south, columns west to east",
+  "dem": {
+    "dataset": "Copernicus DEM GLO-30 public (DSM)",
+    "sources": [
+      {
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S50_00_W073_00_DEM/Copernicus_DSM_COG_10_S50_00_W073_00_DEM.tif",
+        "sha256": "1a2fc644fdc9ac7fd4a4e4c4e3d7899680839eb05d4e2cae1cb621aa7f418933"
+      },
+      {
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_S50_00_W074_00_DEM/Copernicus_DSM_COG_10_S50_00_W074_00_DEM.tif",
+        "sha256": "aa8afaff8eec42b506319102b33c30bc27872c858645cb444c0a42a3132f8152"
+      }
+    ],
+    "outputSha256": "b8059e9cccebbb29bd4863bd2c5a80153cc5675844df0b5e150ab6e0ad72f3ac",
+    "resampling": "bilinear",
+    "verticalDatum": "EGM2008 orthometric metres",
+    "sourceSpacingArcSec": 1,
+    "attribution": "produced using Copernicus WorldDEM-30 \u00a9 DLR e.V. 2010-2014 and \u00a9 Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved",
+    "checkpoints": [
+      {
+        "x": 0.0,
+        "z": 0.0,
+        "lat": -49.271278,
+        "lon": -73.043222,
+        "sourceHeightM": 2475.762451171875,
+        "gridHeightM": 2492.28173828125
+      },
+      {
+        "x": 0.0,
+        "z": -4296.875,
+        "lat": -49.23264211627918,
+        "lon": -73.043222,
+        "sourceHeightM": 1248.0897216796875,
+        "gridHeightM": 1249.772216796875
+      },
+      {
+        "x": -2148.4375,
+        "z": 4296.875,
+        "lat": -49.30990984885573,
+        "lon": -73.07276729412071,
+        "sourceHeightM": 1657.3609619140625,
+        "gridHeightM": 1641.861572265625
+      },
+      {
+        "x": -4296.875,
+        "z": 0.0,
+        "lat": -49.27126291398714,
+        "lon": -73.10226642437735,
+        "sourceHeightM": 1992.64990234375,
+        "gridHeightM": 1995.6829833984375
+      },
+      {
+        "x": 3437.5,
+        "z": -3007.8125,
+        "lat": -49.2442232601554,
+        "lon": -72.99601226096841,
+        "sourceHeightM": 1671.54833984375,
+        "gridHeightM": 1658.018310546875
+      }
+    ]
+  },
+  "imagery": {
+    "service": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer",
+    "zoom": 12,
+    "tileSha256": {
+      "12/2690/1213": "891f243be3454b086670ffdf5cec0e414e6900a7d8c055639866082c543e9ff3",
+      "12/2690/1214": "e1e886601427080760492d2bfd7e731b7c764ed603bb32ad7ac6242b66b6c759",
+      "12/2690/1215": "9a38689e1b0e5d0b047f23f3a1145b7622d14b8e846f62aed80fe4fec5b7ab06",
+      "12/2690/1216": "b2dd85c399e6ec7e3c870d60be223343d3942c6c76ba84ffbaf816e2269720ec",
+      "12/2690/1217": "e8154a2c83b8646c6637b95239696104461c357c9b0ee9da0e9f2253fe70f768",
+      "12/2690/1218": "e912d68201dab2ae4d750d29926d0b79c8d451d71e227e1b52d4e484a49b29d3",
+      "12/2690/1219": "10088a57880e9ab6ebcab1b7cc2a2e39d72386d1958e9b3e9966678c5853ecd5",
+      "12/2690/1220": "fddd7528fab63495222541fc8039d17ffb360256137dca552b52700b5f8d3874",
+      "12/2691/1213": "31c7b243f67e66a1a92f9ac50c5fd23134c2c2fda67a2b9810425284db517a17",
+      "12/2691/1214": "8d90ddf9cec35784b8122544dec4b9cef989e4d7da124cdb93a72aa93eafd245",
+      "12/2691/1215": "f4dbde07d487307e0f7d948cdfb00f6bb5582d3378970f8e1c328dc2172dc94e",
+      "12/2691/1216": "124349a297162da0eb03e16bd397d3684bda099805ad02cb1b2cd9ae1399499e",
+      "12/2691/1217": "c99dc4e759053391f2c9dc0ef1a58a11fe20e818febd17c898973a473e4c8280",
+      "12/2691/1218": "3b0f65d451b9595d6312314feb464862aabf7c629131f0880cd802ed058dd43f",
+      "12/2691/1219": "64225ae7fabe889799de1d39cc15b6032541702d5f7064c53199a62d54c8f808",
+      "12/2691/1220": "d749b83adf9a15fd4d1e3c30bd1d61b984c142831219445b87f18bda32f4cfbb",
+      "12/2692/1213": "25289b75ec95db43befae7ae3b74c284d0dba068b67515e3e07eae478aecf16e",
+      "12/2692/1214": "539c892bef17fee9788ea9a80e672e2ba0053694d9d35551a36fbadf1051a6c9",
+      "12/2692/1215": "588056dae2d510ed1444a4494a4d7fd4ee0cc13ad9301a862c39181918922503",
+      "12/2692/1216": "8438a11a0dc8b3c92299f494ea188401242be50857de2d2a4b53cd9e9f181847",
+      "12/2692/1217": "19d240a4b4d800ce62700bce5834a329fb8c9a546686ee9d500b3c514243dace",
+      "12/2692/1218": "63efa8a7db4da57a9bda6c3a8e67ddf84dbd10af5e0c5fb608fb26751bbf9844",
+      "12/2692/1219": "6cffa5fdce113a38682c9fad3d21ffc0ab74b8529395fd3d7599dd2fc2d1caaf",
+      "12/2692/1220": "afc879e6f59654a46f2eb107b504e157c5ab01240e48ce18609278a244067198",
+      "12/2693/1213": "8c2e2ff229d1c4dfbb5b31f1e1aa8086d612841512b11834cfb96a3cefe83b89",
+      "12/2693/1214": "cfcba19fb31a9e3cda93c3559e6531bb87268deafac504f5f9a9c6e4f55982a9",
+      "12/2693/1215": "71574e75e2841b86c32a788049488e8a003b16c0778bec6f678484e4f96c2e73",
+      "12/2693/1216": "966bbfc9fd93299e8a0a7f7e90d9ec0904b5e510d9f50e2859c7406f1f1bf73e",
+      "12/2693/1217": "9e8a18ad5494adbad292c3e7f92b2ac2a483b9b0b653aef84d58b44b35c9787c",
+      "12/2693/1218": "b851cef21a0407d9dc82962d8cd25afde1bd1d70de37548c30ed5e226a87dc35",
+      "12/2693/1219": "097d1de9b5e433a36ad1b448fb94856ebe67ef0eb2b72924f6ed5b42908e19c9",
+      "12/2693/1220": "7d7a3467620668157c9c73085e26f297259f05cf468f2e220a8d1d29eb5a9567",
+      "12/2694/1213": "c131e9671db75a5c3a85722a83895aa66841dfc2de1e8527fc7547e977e072a1",
+      "12/2694/1214": "4fb27c9e90a1a0c4ed2ac50df931c8d85cc53ed584d5f0f6d1c94711295f748d",
+      "12/2694/1215": "497f089059d335a6d688d1c26bdc2d59f38e9b5824b4b83fc16e5c224a4f593e",
+      "12/2694/1216": "bfc553ba95319d4864b6932c6863554b27d1a7edb843352dbeab7efe52e85983",
+      "12/2694/1217": "ae3a91176eb9ef6e1b4e144f6cfd877f514b6036e80b48834d42dbd5b538b701",
+      "12/2694/1218": "7e1803c3b438d1fb57485ed00e580196e08db4574a2bbdad955c588d5e3b31c2",
+      "12/2694/1219": "9ad9e0efc740f23c8b9777a21a3fcf85734a29bf6353d5b328e7fdbbe8c7664d",
+      "12/2694/1220": "536a1d146619d1e9048c2f54e007fc71aa5458938793cd3be378905271bb0075",
+      "12/2695/1213": "3933b15e3320058ae714834c9de2d46e4852fcabd494a44d385e8f463f533ef6",
+      "12/2695/1214": "29239e87dfc7d6cdd58fff80f7f855ae1136f26f56494cdc522af823dc32f0ba",
+      "12/2695/1215": "803e8a69e246a17ac4ff1ffe89c099d004a5c09fd7fb12b36ac32de4ccf9d951",
+      "12/2695/1216": "2851209822730e9023132e2976029184ef606c5e7adfe626fc9db8f85b6992ce",
+      "12/2695/1217": "8715c8d8ab9a75bfaffd329b194ceb86d49089c389cd5e552cf08bea4f61f01a",
+      "12/2695/1218": "5a0fa31d9c1d401bd138186aa62439d9bbb3180e84c561d0a293a0a116e75aed",
+      "12/2695/1219": "a749918ac030747444dd54814464a46c8de58ad72f122cee2e2907023bee6e6f",
+      "12/2695/1220": "5ae42beab9197f6dbc6885b6a819d26bf98456c52d107690576e6dd91ebb93b0",
+      "12/2696/1213": "a78e15248d7839a344ceecddae4d1fad50c87c54086cab3cfe098b577d7dcd5a",
+      "12/2696/1214": "350e6251dd06a134b89614f64af37a55fd3375a8ad0ee0b47cac4ec21eed986c",
+      "12/2696/1215": "f3be65c88146a6a90bf11f428d14b29f56c693d79f4d6209a2b256b5e8dab838",
+      "12/2696/1216": "1f6c06100c99ff338a57af01f15eab073ec0abcd3a82d2dc1db4e60df119133d",
+      "12/2696/1217": "dd3348d791b748ce948c60fb865f6101ed6149b0ba1ec60e3d96316beff5c600",
+      "12/2696/1218": "40c68b5afd24c201b3c64724ce8e416cc26cb2bef72fa4a7b1281f2abc5f5517",
+      "12/2696/1219": "e76ff247fbdae6a0ff667b434095220a0e7651753f3011490a570e542a8c9fc4",
+      "12/2696/1220": "768fc74a1a9cfbd4c1396f0412831176edfcd51cb4aa7c5c02cdc85fdf82f179",
+      "12/2697/1213": "5a8633adbf5215098ccbc9d069fad17b93d0450db8531be1acb773a64eb0fab8",
+      "12/2697/1214": "cf827767515e8ca5ad1905dfdaa7a71bd677a63b554a74ed389ecb65325d264c",
+      "12/2697/1215": "b0ba755324e9e71e0cde9d92a27102b220154b689f17c77bb573581b26fcad9b",
+      "12/2697/1216": "21c10edb56776cb28210faae9373656f302629561ff364dcfe05f63045485c78",
+      "12/2697/1217": "b1bb77c5e13d7a9638746f1c6a3117b02407b0aa41912f8ff9a5312388595918",
+      "12/2697/1218": "ea709c18ced220f13a888c89040f9a3207d76570c2586d6f91e801a6531bf250",
+      "12/2697/1219": "0de2e81aad9d367209e5770eaa5feaac283cd487de238bd554614eddda282048",
+      "12/2697/1220": "de849b38adeb53aae9d477000253c64d9f0d8ac1ef51537d3d6f26454de743ae"
+    },
+    "resampling": "bilinear to same local-metre extent"
+  },
+  "minElevation": 251.0,
+  "maxElevation": 2872.527099609375,
+  "limitations": "DSM includes vegetation and ice. Coordinates are not surveyed survey control. No airport grading or invented terrain is applied."
+}

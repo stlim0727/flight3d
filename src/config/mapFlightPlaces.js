@@ -71,6 +71,14 @@ export function specialRegionPlaces() {
       nameKey: 'coastal.airport',
       aliases: ['Coastal', 'Coastal Airport', '국제공항'],
     }),
+    Object.freeze({
+      kind: 'region',
+      id: 'patagonia',
+      code: 'PTR',
+      label: 'Patagonia · Fitz Roy',
+      nameKey: 'patagonia.fitz.roy',
+      aliases: ['Patagonia', 'Fitz Roy', '파타고니아', '피츠 로이'],
+    }),
   ]);
 }
 

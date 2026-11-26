@@ -44,6 +44,14 @@ export const APPROACH_DATA = {
     gsAngleDeg: 3.0,
     elevationFt: 39,
   },
+  patagonia: {
+    // Fitz Roy local-metre frame: +X east, +Z south. There is no runway here;
+    // the "threshold" is the summit and this is a visual, unguided close pass.
+    threshold: { x: 0, z: 0 },
+    headingDeg: 215,
+    gsAngleDeg: 0,
+    elevationFt: 8176,
+  },
 };
 
 export function approachDeviation(airportKey, pos) {
