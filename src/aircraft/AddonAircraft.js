@@ -30,11 +30,14 @@ export class AddonAircraft {
     this.cockpit = {
       group: new THREE.Group(),
       yokesVisible: true,
-      cockpitModelFailed: !descriptor.cockpit,
+      cockpitModelFailed: Boolean(descriptor.cockpit),
+      cockpitModelLoading: false,
+      gltfCockpitLoaded: false,
       gltfCockpitGroup: null,
       syncLighting: () => {},
       toggleYokes: () => { this.cockpit.yokesVisible = !this.cockpit.yokesVisible; return this.cockpit.yokesVisible; },
       onModelReady: null,
+      ensureCockpitModel: () => this.ensureCockpitModel(),
     };
     this.group.add(this.cockpit.group);
     this.loadingGltf = Boolean(descriptor.model);
@@ -95,7 +98,8 @@ export class AddonAircraft {
       this.proceduralGroup.visible = false;
       this.modelLoaded = true;
       this.cockpit.gltfCockpitGroup = gltf.scene;
-      this.cockpit.cockpitModelFailed = !this.descriptor.cockpit;
+      this.cockpit.gltfCockpitLoaded = true;
+      this.cockpit.cockpitModelFailed = false;
       this.loadingGltf = false;
       this.cockpit.onModelReady?.();
       settle();
@@ -114,7 +118,7 @@ export class AddonAircraft {
       case 'aileron': return clamp(telemetry.controlInputs?.aileron ?? 0, -1, 1);
       case 'rudder': return clamp(telemetry.controlInputs?.rudder ?? 0, -1, 1);
       case 'normalized': return clamp(telemetry.controlInputs?.elevator ?? 0, -1, 1);
-      case 'rpm': return (telemetry.engine1N1 ?? telemetry.engine1?.n1 ?? 25) / 100;
+      case 'rpm': return telemetry.engine1N1 ?? telemetry.engine1?.n1 ?? 25;
       case 'gearState': return clamp(telemetry.gearState ?? 1, 0, 1);
       case 'flapsIndex': return clamp(telemetry.flapsIndex ?? 0, 0, 8);
       case 'compressions': return clamp(telemetry.compressions?.[0] ?? 0, 0, 1);
@@ -126,19 +130,50 @@ export class AddonAircraft {
     const node = this.surfaceNodes.get(binding.node);
     if (!node) return;
     const range = binding.rangeDeg ?? [0, 0];
-    let target = binding.input === 'rpm'
-      ? clamp(this.inputValue('rpm', telemetry), ...(binding.rpmRange ?? [0, 100])) / (binding.rpmRange?.[1] ?? 100)
-      : clamp(this.inputValue(binding.input, telemetry), -1, 1);
-    if (binding.input === 'flapsIndex') target = clamp(target / 3, 0, 1);
+    const value = this.inputValue(binding.input, telemetry);
+    const signed = ['elevator', 'aileron', 'rudder', 'normalized'].includes(binding.input);
+    let target = signed
+      ? (clamp(value, -1, 1) + 1) / 2
+      : clamp(value, 0, 1);
+    if (binding.input === 'flapsIndex') {
+      target = clamp(value / 4, 0, 1);
+    } else if (binding.input === 'rpm') {
+      const [minimum, maximum] = binding.rpmRange ?? [0, 100];
+      target = clamp((clamp(value, minimum, maximum) - minimum) / (maximum - minimum || 1), 0, 1);
+    }
     let degrees = binding.neutralDeg ?? 0;
     if (binding.continuous) {
-      this.surfaceState.set(control, (this.surfaceState.get(control) ?? 0) + target * dt * 720);
+      this.surfaceState.set(control, (this.surfaceState.get(control) ?? 0) + target * dt * 900);
       degrees += this.surfaceState.get(control);
     } else {
-      degrees += range[0] + (range[1] - range[0]) * clamp((target + 1) / 2, 0, 1);
+      degrees += range[0] + (range[1] - range[0]) * target;
     }
     const smoothed = this.smooth(control, degrees, binding.smoothingSec ?? 0, dt);
     node.rotation[binding.axis ?? 'x'] = smoothed * DEG_TO_RAD;
+  }
+
+  ensureCockpitModel() {
+    if (!this.descriptor.cockpit || this.cockpit.cockpitModelLoading || this.cockpit.gltfCockpitLoaded) return false;
+    this.cockpit.cockpitModelLoading = true;
+    const loader = new GLTFLoader();
+    loader.load(this.descriptor.cockpit.url, gltf => {
+      gltf.scene.traverse(node => {
+        if (!node.isMesh) return;
+        node.castShadow = false;
+        node.receiveShadow = true;
+      });
+      this.cockpit.group.add(gltf.scene);
+      this.cockpit.gltfCockpitGroup = gltf.scene;
+      this.cockpit.gltfCockpitLoaded = true;
+      this.cockpit.cockpitModelLoading = false;
+      this.cockpit.cockpitModelFailed = false;
+      this.cockpit.onModelReady?.();
+    }, undefined, error => {
+      console.error('Addon cockpit GLB failed to load:', error);
+      this.cockpit.cockpitModelLoading = false;
+      this.cockpit.cockpitModelFailed = true;
+    });
+    return true;
   }
 
   smooth(control, target, smoothingSec, dt) {

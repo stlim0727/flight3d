@@ -1,5 +1,5 @@
 import { t } from '../i18n/index.js';
-import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { APPROACH_DATA } from '../config/approachData.js';
 
 /**
@@ -7,12 +7,12 @@ import { APPROACH_DATA } from '../config/approachData.js';
  * menu cannot drift from the simulation. DOM-free for node tests.
  */
 export function aircraftSpec(aircraftId) {
-  const config = AIRCRAFT_REGISTRY[aircraftId];
+  const config = resolveAircraftConfig(aircraftId);
   if (!config) return '';
-  const { numEngines, engineName } = config.propulsion;
+  const { numEngines = 1, engineName = 'Generic engine' } = config.propulsion ?? {};
   const parts = [`${numEngines}× ${engineName}`];
-  parts.push(`MTOW ${Math.round(config.massProperties.maxTakeoffWeightKg).toLocaleString('en-US')} kg`);
-  if (config.landingGear.isFixed) parts.push(t('lobby.spec.fixedGear'));
+  parts.push(`MTOW ${Math.round(config.massProperties?.maxTakeoffWeightKg ?? config.massProperties?.currentMassKg ?? 0).toLocaleString('en-US')} kg`);
+  if (config.landingGear?.isFixed) parts.push(t('lobby.spec.fixedGear'));
   return parts.join(' · ');
 }
 

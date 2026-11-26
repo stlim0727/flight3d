@@ -1173,7 +1173,7 @@ class FlightSimulator {
   buildAircraftInstance(aircraftId) {
     const addon = this.pinnedAddonPack?.aircraft?.id === aircraftId ? this.pinnedAddonPack.aircraft : null;
     const instance = addon
-      ? new AddonAircraft(addon)
+      ? new AddonAircraft(addon, { pfdCanvas: this.pfdCanvas, ndCanvas: this.ndCanvas })
       : aircraftId === 'F16'
       ? new F16()
       : aircraftId === 'C172'
