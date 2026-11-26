@@ -286,9 +286,9 @@ function roadMaterial(quality = 'balanced') {
     QUALITY_FAST: (isUltraLow || isPerformance) ? 1 : 0,
   };
   material.onBeforeCompile = shader => addGroundSurfaceColor(shader, `
-    #if defined(QUALITY_ULTRALOW)
+    #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
       // Fast path: no procedural weathering/aggregate noise in ultraLow
-    #elif defined(QUALITY_PERFORMANCE)
+    #elif defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1
       // Fast path: single-octave weathering noise without aggregate in performance
       float weathering = groundNoise(vGroundXZ / 14.0);
       diffuseColor.rgb *= 1.0 + weathering * 0.16;
@@ -484,6 +484,11 @@ export class GeographicRoads {
   }
 
   updateLights(cameraPosition, sunHeight) {
+    if (this.quality === 'ultraLow') {
+      if (this.lampPoints) this.lampPoints.visible = false;
+      if (this.lampMesh) this.lampMesh.visible = false;
+      return;
+    }
     const night = nightLightLevel(sunHeight);
     const agl = cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
     const fade = 1 - THREE.MathUtils.smoothstep(agl, 2500, 4000);

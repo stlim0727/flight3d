@@ -349,5 +349,10 @@ test('GeographicRoads updates quality defines and toggles lamp visibility', () =
   assert.equal(roads.lampMesh.visible, false);
   assert.equal(roads.lampPoints.visible, false);
 
+  // Night low altitude: updateLights must keep lamps hidden in ultraLow
+  roads.updateLights({ x: 0, y: 100, z: 0 }, -1000);
+  assert.equal(roads.lampMesh.visible, false);
+  assert.equal(roads.lampPoints.visible, false);
+
   roads.dispose();
 });

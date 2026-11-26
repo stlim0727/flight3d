@@ -165,19 +165,22 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     shader.uniforms.terrainDetailBlend = detail.blend;
     shader.uniforms.terrainDistanceFade = distanceFade;
     shader.vertexShader = `
-      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+      #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
+      #else
         varying vec3 vTerrainViewPosition;
       #endif
     ` + shader.vertexShader.replace(
       '#include <project_vertex>',
       `#include <project_vertex>
-      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+      #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
+      #else
         vTerrainViewPosition = mvPosition.xyz;
       #endif`,
     );
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
-      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+      #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
+      #else
         if (terrainDistanceFade > 0.0) {
           // Dither coverage so the ocean/sky shows through while terrain retains opaque depth writes.
           float distanceM = length(vTerrainViewPosition);
@@ -192,11 +195,11 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
       #include <map_fragment>
       #ifdef USE_MAP
-        #if defined(QUALITY_ULTRALOW)
+        #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
           if (terrainDetailBlend > 0.0) {
             diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
           }
-        #elif defined(QUALITY_PERFORMANCE)
+        #elif defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1
           if (terrainDetailBlend > 0.0) {
             diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
           }
@@ -236,7 +239,7 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
       #include <lights_fragment_end>
       #ifdef USE_MAP
-        #if defined(QUALITY_ULTRALOW)
+        #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
           // Unlit-style fast path: satellite imagery already contains baked solar illumination.
           // Minimizes per-fragment ALU load and prevents double lighting.
           reflectedLight.indirectDiffuse = diffuseColor.rgb * 0.95;
@@ -255,7 +258,8 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
       uniform vec4 terrainDetailCorners;
       uniform sampler2D terrainDetailMap;
       uniform float terrainDetailBlend;
-      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+      #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
+      #else
         uniform float terrainDistanceFade;
         varying vec3 vTerrainViewPosition;
       #endif

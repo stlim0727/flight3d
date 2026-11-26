@@ -18,7 +18,7 @@ export function addGroundSurfaceColor(shader, colorSource) {
     }
 
     float groundNoise(vec2 p) {
-      #if defined(QUALITY_FAST) || defined(QUALITY_ULTRALOW) || defined(QUALITY_PERFORMANCE)
+      #if (defined(QUALITY_FAST) && QUALITY_FAST == 1) || (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
         return 0.0;
       #else
         vec2 cell = floor(p);
