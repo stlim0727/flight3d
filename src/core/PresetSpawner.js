@@ -59,6 +59,11 @@ const REGION_MOUNT_MAX_MARGIN_M = 80000;
 const REGION_UNMOUNT_EXTRA_MARGIN_M = 30000;
 
 class PresetSpawnerMethods {
+  applyTerrainRelativeCruise() {
+    const ground = this.currentTerrain?.getHeight?.(this.position.x, this.position.z);
+    if (Number.isFinite(ground)) this.position.y = ground + 750;
+  }
+
   setPreset(type, isDemoInternal = false, pilotPreparation = false) {
     this.freezePhysics = false;
     const regionCruise = regionalCruise(type);
@@ -218,7 +223,6 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.neon.canyon'));
       } else if (type === 'cruise') {
-        // Skyline Cruise: 2,500 FT (760m), 110 kts, heading 110° overlooking the glowing metropolis
         const speedMs = isC172 ? 52.0 : 120.0;
         this.position.set(-600, 760, -800);
         const headingRad = THREE.MathUtils.degToRad(110);
@@ -396,7 +400,7 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.lukla.runway.24.downhill.takeoff.11'));
       } else if (type === 'cruise') {
-        // Scenic Himalayan Valley Cruise at 13,000 FT (3,960m)
+        // Scenic Himalayan Valley cruise at a terrain-relative height.
         this.position.set(spawn.x, spawn.y, spawn.z);
         this.linearVelocity.set(spawn.vx, spawn.vy, spawn.vz);
         this.angularVelocity.set(0, 0, 0);
@@ -487,7 +491,7 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.coastal.approach'));
       } else if (type === 'cruise') {
-        // Scenic Coastal Cruise over Bay & Ships at 2,600 ft (800m), Speed 210 knots (108 m/s);
+        // Scenic coastal cruise over bay and ships; speed 210 knots (108 m/s);
         // C172 flies the same track at 48 m/s (~90 KIAS), below its 163 KIAS Vne (#599).
         this.position.set(-600, 750, 3200);
         this.linearVelocity.set(96, 0, -49); // Aligned with heading 153° (yaw -0.35pi)
@@ -506,6 +510,8 @@ class PresetSpawnerMethods {
         this.showToast(() => t('preset.coastal.cruise'));
       }
     }
+
+    if (type === 'cruise' || regionCruise) this.applyTerrainRelativeCruise();
 
     // A fresh segment restores its configured tanks/payload and clears failures.
     // Lukla's 43 t loading contains 1587 kg of fuel, not a full 14200 kg tank set.
