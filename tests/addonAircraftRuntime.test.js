@@ -159,6 +159,41 @@ test('starter aircraft mass and fuel loading survive refuel and fuel burn', () =
   assert.equal(aero.currentFlapAngle, 0);
 });
 
+test('derived addon physics rejects fuel and tank configurations that cannot load', () => {
+  const starter = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const profile = () => ({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: starter.id, version: starter.version, sha256: 'a'.repeat(64), manifest: structuredClone(starter) }],
+  });
+  const invalidFuel = structuredClone(starter);
+  invalidFuel.aircraft.physics.fuelCapacityKg = invalidFuel.aircraft.physics.massKg;
+  assert.throws(
+    () => aircraftPackFromProfile({
+      schemaVersion: 1, coreVersion: '1.8.0',
+      pins: [{ id: invalidFuel.id, version: invalidFuel.version, sha256: 'a'.repeat(64), manifest: invalidFuel }],
+    }, invalidFuel.id, { coreVersion: '1.8.0' }),
+    /positive empty mass/,
+  );
+  const invalidTanks = structuredClone(starter);
+  invalidTanks.aircraft.physics.massDistribution = {
+    referenceMassKg: 1200,
+    initialFuelKg: 120,
+    tanks: [],
+    stations: [{ id: 'payload', capacityKg: 1200, position: { x: 0, y: 0, z: 0 } }],
+  };
+  assert.throws(
+    () => aircraftPackFromProfile({
+      schemaVersion: 1, coreVersion: '1.8.0',
+      pins: [{ id: invalidTanks.id, version: invalidTanks.version, sha256: 'a'.repeat(64), manifest: invalidTanks }],
+    }, invalidTanks.id, { coreVersion: '1.8.0' }),
+    /positive-capacity tank/,
+  );
+  assert.ok(aircraftPackFromProfile(profile(), starter.id, { coreVersion: '1.8.0' }));
+});
+
 test('headless approach preset starts and advances with an addon aircraft', () => {
   const starter = buildAddonStarter({
     publisher: 'demo', name: 'jet', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',

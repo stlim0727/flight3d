@@ -30,8 +30,19 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     })) {
       if (!Number.isFinite(value) || value <= 0) throw new Error(`${packId} physics.${field} must be a positive number`);
     }
-    if (physics.fuelCapacityKg !== undefined && (!Number.isFinite(physics.fuelCapacityKg) || physics.fuelCapacityKg <= 0)) {
-      throw new Error(`${packId} physics.fuelCapacityKg must be a positive number`);
+    const fuelCapacityKg = physics.fuelCapacityKg ?? 0;
+    if (!Number.isFinite(fuelCapacityKg) || fuelCapacityKg < 0) {
+      throw new Error(`${packId} physics.fuelCapacityKg must be a non-negative number`);
+    }
+    if (fuelCapacityKg >= physics.massKg) {
+      throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
+    }
+    if (physics.massDistribution && fuelCapacityKg > 0
+      && !physics.massDistribution.tanks?.some(tank => Number.isFinite(tank?.capacityKg) && tank.capacityKg > 0)) {
+      throw new Error(`${packId} physics.massDistribution needs a positive-capacity tank`);
+    }
+    if (physics.massProperties && physics.massProperties.currentMassKg < physics.massKg - fuelCapacityKg) {
+      throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);
     }
   }
   for (const resource of [aircraft.model, aircraft.cockpit].filter(Boolean)) {
