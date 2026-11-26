@@ -311,3 +311,27 @@ test('Chuja strip is exposed for streamed DEM flattening', () => {
   surface.dispose();
 });
 
+
+test('physics contact height follows rendered blended mesh, not raw DEM', () => {
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    strips: [],
+    runways: [],
+    fallback: { getHeight: () => 0, getWaterLevel: () => 0, isOnRunway: () => false },
+  });
+  const x = 23000;
+  const z = 13895;
+  const rawHeight = 312.2;
+  const renderedHeight = 336.5;
+  surface.openWorld = {
+    sampleContact: () => ({ height: renderedHeight }),
+    sampleRaw: () => rawHeight,
+    sample: () => ({ height: Math.max(0, rawHeight), water: false }),
+  };
+  assert.equal(surface.getHeight(x, z), renderedHeight,
+    'Gear and body contact must use the same blended height the terrain mesh renders');
+  assert.equal(surface.getWaterLevel(x, z), -10000,
+    'Water classification remains based on the streamed water mask');
+  surface.dispose();
+});
