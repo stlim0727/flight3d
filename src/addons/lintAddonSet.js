@@ -24,6 +24,7 @@ function assetHosts(manifest) {
 
 export function lintAddonSet(manifests, { coreVersion } = {}) {
   const byId = new Map();
+  const addonType = manifest => String(manifest?.id ?? '').split('/')[1];
   const errors = [];
   const warnings = [];
 
@@ -51,6 +52,21 @@ export function lintAddonSet(manifests, { coreVersion } = {}) {
     }
   }
 
+  const visiting = new Set();
+  const visited = new Set();
+  const visit = id => {
+    if (visiting.has(id)) {
+      errors.push(`cyclic dependency at ${id}`);
+      return;
+    }
+    if (visited.has(id)) return;
+    visiting.add(id);
+    for (const dependency of byId.get(id)?.dependencies ?? []) visit(dependency.id);
+    visiting.delete(id);
+    visited.add(id);
+  };
+  for (const manifest of manifests) visit(manifest.id);
+
   for (const manifest of manifests) {
     for (const dependency of manifest.dependencies ?? []) {
       const target = byId.get(dependency.id);
@@ -73,8 +89,8 @@ export function lintAddonSet(manifests, { coreVersion } = {}) {
       }
     }
 
-    if (String(manifest.id).startsWith('scenario/') || String(manifest.id).includes('/scenario/')) {
-      const scenario = manifest.scenario;
+    if (addonType(manifest) === 'scenario') {
+      const scenario = manifest.scenario ?? {};
       for (const requirement of scenario.requiredAddons ?? []) {
         const target = byId.get(requirement.id);
         if (!target || target.version !== requirement.version) {

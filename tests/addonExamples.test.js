@@ -43,3 +43,17 @@ test('lint rejects scripts and unsupported scenario events', async () => {
   assert.ok(result.errors.some(message => message.includes('scripts are forbidden')));
   assert.ok(result.errors.some(message => message.includes('action is unsupported')));
 });
+
+test('lint rejects cyclic dependencies and uses the addon ID type segment', async () => {
+  const manifests = await readPacks();
+  manifests[1].dependencies.push({ id: manifests[2].id, version: manifests[2].version });
+  manifests[2].dependencies.push({ id: manifests[1].id, version: manifests[1].version });
+  const cyclic = lintAddonSet(manifests, { coreVersion: '1.8.0' });
+  assert.equal(cyclic.ok, false);
+  assert.ok(cyclic.errors.some(message => message.includes('cyclic dependency')));
+
+  const renamed = await readPacks();
+  renamed[0] = { ...renamed[0], id: 'scenario/aircraft/sample-plane', publisher: 'scenario' };
+  const typed = lintAddonSet([renamed[0]], { coreVersion: '1.8.0' });
+  assert.equal(typed.ok, true);
+});

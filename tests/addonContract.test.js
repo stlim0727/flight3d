@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
   ADDON_SCHEMA_VERSION,
+  compareVersions,
   resolveProfile,
   serializeProfile,
   parseProfile,
@@ -115,4 +116,19 @@ test('dependencies resolve transitively and conflicts fail closed', async () => 
     ...catalog.addons[0], version: '1.1.0', sha256: schemaHash({ ...dependency, version: '1.1.0' }),
   });
   assert.equal(validateCatalog(catalog).ok, false);
+});
+
+test('SemVer precedence treats prereleases below their release and ignores build metadata', () => {
+  assert.equal(compareVersions('1.0.0-rc.1', '1.0.0'), -1);
+  assert.equal(compareVersions('1.0.0+build.1', '1.0.1'), -1);
+  assert.equal(compareVersions('1.0.0-alpha.2', '1.0.0-alpha.10'), -1);
+});
+
+test('coreRange is validated even without a target core version', () => {
+  const missing = fixture();
+  delete missing.coreRange;
+  assert.equal(validateAddonManifest(missing).ok, false);
+  const invalid = fixture();
+  invalid.coreRange = { min: 'garbage', maxExclusive: 'also-invalid' };
+  assert.equal(validateAddonManifest(invalid).ok, false);
 });

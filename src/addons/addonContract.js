@@ -13,20 +13,34 @@ export function compareVersions(left, right) {
   const parse = (value, errors, label) => {
     if (typeof value !== 'string' || !VERSION.test(value)) {
       errors.push(`${label} must be a semantic version`);
-      return [0, 0, 0, ''];
+      return { core: [0, 0, 0], prerelease: [] };
     }
-    const [core, suffix = ''] = value.split('-', 2);
-    const [major, minor, patch] = core.split('.').map(Number);
-    return [major, minor, patch, suffix];
+    const [core, prerelease = ''] = value.split('+', 2)[0].split('-', 2);
+    return { core: core.split('.').map(Number), prerelease: prerelease ? prerelease.split('.') : [] };
   };
   const errors = [];
   const leftParts = parse(left, errors, 'left version');
   const rightParts = parse(right, errors, 'right version');
   if (errors.length) throw new Error(errors.join('; '));
   for (let index = 0; index < 3; index++) {
-    if (leftParts[index] !== rightParts[index]) return Math.sign(leftParts[index] - rightParts[index]);
+    if (leftParts.core[index] !== rightParts.core[index]) return Math.sign(leftParts.core[index] - rightParts.core[index]);
   }
-  return Math.sign(leftParts[3].localeCompare(rightParts[3]));
+  const leftPre = leftParts.prerelease;
+  const rightPre = rightParts.prerelease;
+  if (leftPre.length === 0 && rightPre.length === 0) return 0;
+  if (leftPre.length === 0) return 1;
+  if (rightPre.length === 0) return -1;
+  for (let index = 0; index < Math.min(leftPre.length, rightPre.length); index++) {
+    const leftNumeric = /^\d+$/.test(leftPre[index]);
+    const rightNumeric = /^\d+$/.test(rightPre[index]);
+    if (leftNumeric && rightNumeric) {
+      const delta = Number(leftPre[index]) - Number(rightPre[index]);
+      if (delta !== 0) return Math.sign(delta);
+    } else if (leftPre[index] !== rightPre[index]) {
+      return leftPre[index] < rightPre[index] ? -1 : 1;
+    }
+  }
+  return Math.sign(leftPre.length - rightPre.length);
 }
 
 export function coreVersionInRange(version, range) {
@@ -221,8 +235,20 @@ export function validateAddonManifest(manifest, { coreVersion } = {}) {
   if (manifest.publisher !== publisher) errors.push('publisher must match the id namespace');
   if (typeof manifest.license !== 'string' || !manifest.license) errors.push('license is required');
   if (typeof manifest.attribution !== 'string' || !manifest.attribution) errors.push('attribution is required');
-  if (coreVersion !== undefined && !coreVersionInRange(coreVersion, manifest.coreRange)) {
-    errors.push(`core version ${coreVersion} is outside the declared range`);
+  if (!manifest.coreRange || typeof manifest.coreRange !== 'object'
+    || typeof manifest.coreRange.min !== 'string' || typeof manifest.coreRange.maxExclusive !== 'string') {
+    errors.push('coreRange needs min and maxExclusive');
+  } else {
+    let rangeValid = true;
+    try {
+      if (compareVersions(manifest.coreRange.min, manifest.coreRange.maxExclusive) >= 0) rangeValid = false;
+    } catch {
+      rangeValid = false;
+    }
+    if (!rangeValid) errors.push('coreRange must be a valid min < maxExclusive interval');
+    if (coreVersion !== undefined && !coreVersionInRange(coreVersion, manifest.coreRange)) {
+      errors.push(`core version ${coreVersion} is outside the declared range`);
+    }
   }
   if (!Array.isArray(manifest.dependencies)) errors.push('dependencies must be an array');
   else {

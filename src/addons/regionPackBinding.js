@@ -12,17 +12,22 @@ export function regionPackFromProfile(profile, packId, { coreVersion, baseUrl } 
   if (!/^https?:\/\//.test(manifest.region.tiles.url)) {
     throw new Error('addon tile URL must be an absolute http(s) URL');
   }
-  const url = new URL(manifest.region.tiles.url);
-  const versionSegment = encodeURIComponent(pin.version);
-  const segments = url.pathname.split('/').filter(Boolean).map(segment => decodeURIComponent(segment));
-  if (!segments.includes(versionSegment) && !segments.includes(pin.version)) {
-    const firstToken = segments.findIndex(segment => /[{[](?:z|x|y)[}\]]/.test(segment));
-    if (firstToken >= 0) segments.splice(firstToken, 0, versionSegment);
-    else segments.push(versionSegment);
+  let urlTemplate;
+  if (manifest.region.tiles.format === 'pmtiles') {
+    urlTemplate = manifest.region.tiles.url;
+  } else {
+    const url = new URL(manifest.region.tiles.url);
+    const versionSegment = encodeURIComponent(pin.version);
+    const segments = url.pathname.split('/').filter(Boolean).map(segment => decodeURIComponent(segment));
+    if (!segments.includes(versionSegment) && !segments.includes(pin.version)) {
+      const firstToken = segments.findIndex(segment => /[{[](?:z|x|y)[}\]]/.test(segment));
+      if (firstToken >= 0) segments.splice(firstToken, 0, versionSegment);
+      else segments.push(versionSegment);
+    }
+    const rest = segments.slice(segments.findIndex(segment => segment === versionSegment || segment === pin.version) + 1);
+    if (!rest.some(segment => /[{[](?:z|x|y)[}\]]/.test(segment))) segments.push('{z}', '{y}', '{x}');
+    urlTemplate = `${url.origin}/${segments.join('/')}`;
   }
-  const rest = segments.slice(segments.findIndex(segment => segment === versionSegment || segment === pin.version) + 1);
-  if (!rest.some(segment => /[{[](?:z|x|y)[}\]]/.test(segment))) segments.push('{z}', '{y}', '{x}');
-  const urlTemplate = `${url.origin}/${segments.join('/')}`;
   const bounds = manifest.region.bounds;
   return Object.freeze({
     id: packId,
@@ -48,11 +53,13 @@ export function profileShareParams(profile, { packId } = {}) {
   const params = new URLSearchParams();
   params.set('pack', packId ?? pins[0].id);
   params.set('version', packId ? pins.find(pin => pin.id === packId)?.version ?? '' : pins[0].version);
-  params.set('profile', Buffer.from(JSON.stringify({
+  const bytes = new TextEncoder().encode(JSON.stringify({
     schemaVersion: profile.schemaVersion,
     coreVersion: profile.coreVersion,
     pins: pins.map(({ id, version, url, sha256 }) => ({ id, version, url, sha256 })),
-  })).toString('base64url'));
+  }));
+  const binary = Array.from(bytes, byte => String.fromCharCode(byte)).join('');
+  params.set('profile', btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', ''));
   return params;
 }
 
@@ -62,7 +69,10 @@ export function readProfileShareParams(search) {
   if (!encoded) return null;
   let parsed;
   try {
-    parsed = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+    const normalized = encoded.replaceAll('-', '+').replaceAll('_', '/');
+    const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4));
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    parsed = JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     throw new Error('malformed share profile');
   }

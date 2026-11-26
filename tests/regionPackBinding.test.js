@@ -56,3 +56,19 @@ test('share params restore the same pins and detect tampering', async () => {
   const tampered = Buffer.from(JSON.stringify({ ...restored, pins: [] })).toString('base64url');
   assert.throws(() => readProfileShareParams(`?profile=${tampered}&pack=${manifest.id}`), /malformed|unsupported/);
 });
+
+test('PMTiles packs stay archive URLs and share profiles use browser-safe base64url', async () => {
+  const pmtiles = { ...manifest, region: { ...manifest.region,
+    tiles: { ...manifest.region.tiles, format: 'pmtiles', url: 'https://packs.example/poc/tiles.pmtiles' } } };
+  const catalogPm = { schemaVersion: 1, addons: [{ id: pmtiles.id, version: pmtiles.version,
+    url: manifestUrl, sha256: hash(pmtiles) }] };
+  const full = await resolveProfile(catalogPm, [pmtiles.id], {
+    coreVersion: '1.8.0',
+    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => Buffer.from(JSON.stringify(pmtiles)) }),
+  });
+  const binding = regionPackFromProfile(full, pmtiles.id, { coreVersion: '1.8.0' });
+  assert.equal(binding.urlTemplate, 'https://packs.example/poc/tiles.pmtiles');
+  const params = profileShareParams(full, { packId: pmtiles.id });
+  assert.doesNotMatch(params.get('profile'), /[+/=]/);
+  assert.equal(readProfileShareParams(params.toString()).pins.length, 1);
+});
