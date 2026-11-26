@@ -148,6 +148,7 @@ export class AddonPicker {
   share() {
     if (!this.catalog || this.selected.size === 0 || !this.profileShareParams) return '';
     const url = buildAddonProfileUrl(this.catalog, [...this.selected], {
+      coreVersion: this.coreVersion ?? null,
       profileShareParams: this.profileShareParams,
       baseUrl: typeof location === 'undefined' ? '?' : `${location.origin}${location.pathname}?`,
     });

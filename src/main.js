@@ -78,8 +78,7 @@ import {
   saveSavedAircraft,
 } from './config/flightSelection.js';
 import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
-import { sha256Hex, validateAddonManifest } from './addons/addonContract.js';
-import { regionPackFromProfile } from './addons/regionPackBinding.js';
+import { resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -133,28 +132,7 @@ async function startupStage(value, message) {
 }
 
 async function resolveAddonPinnedPack(search) {
-  const params = new URLSearchParams(search);
-  const encoded = params.get('addonManifest');
-  if (!encoded) return null;
-  let manifestBytes;
-  let manifest;
-  try {
-    const normalized = encoded.replaceAll('-', '+').replaceAll('_', '/');
-    const binary = atob(normalized + '='.repeat((4 - normalized.length % 4) % 4));
-    manifestBytes = Uint8Array.from(binary, character => character.charCodeAt(0));
-    manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
-  } catch {
-    throw new Error('malformed pinned addon manifest');
-  }
-  const checksum = await sha256Hex(manifestBytes);
-  const expected = params.get('addonSha256');
-  if (expected && expected !== checksum) throw new Error('pinned addon checksum mismatch');
-  const result = validateAddonManifest(manifest, { coreVersion: '1.0.0' });
-  if (!result.ok) throw new Error(`invalid pinned addon: ${result.errors.join('; ')}`);
-  const profile = { schemaVersion: 1, coreVersion: '1.0.0', pins: [{
-    id: manifest.id, version: manifest.version, url: encoded, sha256: checksum, manifest,
-  }] };
-  return regionPackFromProfile(profile, manifest.id, { coreVersion: '1.0.0' });
+  return resolveSharedAddonPack(search);
 }
 
 async function startupDetail(key) {
