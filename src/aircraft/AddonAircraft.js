@@ -122,13 +122,13 @@ export class AddonAircraft {
     }
   }
 
-  applyControl(control, binding, telemetry, controls, dt) {
+  applyControl(control, binding, telemetry, dt) {
     const node = this.surfaceNodes.get(binding.node);
     if (!node) return;
     const range = binding.rangeDeg ?? [0, 0];
     let target = binding.input === 'rpm'
       ? clamp(this.inputValue('rpm', telemetry), ...(binding.rpmRange ?? [0, 100])) / (binding.rpmRange?.[1] ?? 100)
-      : clamp(this.commandValue(binding.input, telemetry, controls), -1, 1);
+      : clamp(this.inputValue(binding.input, telemetry), -1, 1);
     if (binding.input === 'flapsIndex') target = clamp(target / 3, 0, 1);
     let degrees = binding.neutralDeg ?? 0;
     if (binding.continuous) {
@@ -148,10 +148,6 @@ export class AddonAircraft {
     const value = previous + (target - previous) * alpha;
     this.surfaceState.set(`${control}:degrees`, value);
     return value;
-  }
-
-  commandValue(input, telemetry, controls) {
-    return this.inputValue(input, telemetry);
   }
 
   update(dt, telemetry = {}) {

@@ -76,4 +76,8 @@ test('procedural fallback moves control surfaces from telemetry', async () => {
   assert.ok(elevator.rotation.x > 0);
   aircraft.update(0.1, { controlInputs: { elevator: -1 } });
   assert.ok(elevator.rotation.x < 0);
+  const prop = aircraft.proceduralGroup.getObjectByName('azimuth_node');
+  aircraft.update(0.1, { engine1N1: 80 });
+  assert.ok(Number.isFinite(prop.rotation.x));
+  assert.ok(prop.rotation.x > 0);
 });
