@@ -177,7 +177,7 @@ class FlightSimulator {
     await startupStage(0, 'startup.scene');
     try {
       this.pinnedAddonPack = await resolveAddonPinnedPack(window.location.search);
-      if (this.pinnedAddonPack?.config) registerAddonAircraft([this.pinnedAddonPack]);
+      if (this.pinnedAddonPack?.aircraft) registerAddonAircraft([this.pinnedAddonPack.aircraft]);
     } catch (error) {
       startupProgress.failure?.(error.message);
       throw error;
@@ -1171,7 +1171,7 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
-    const addon = this.pinnedAddonPack?.id === aircraftId ? this.pinnedAddonPack : null;
+    const addon = this.pinnedAddonPack?.aircraft?.id === aircraftId ? this.pinnedAddonPack.aircraft : null;
     const instance = addon
       ? new AddonAircraft(addon)
       : aircraftId === 'F16'

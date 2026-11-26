@@ -89,7 +89,14 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
     ? requestedPin
     : resolved.pins.find(pin => pin.manifest?.aircraft);
   if (aircraftPin) {
-    return aircraftPackFromProfile(resolved, aircraftPin.id, { coreVersion: effectiveCore });
+    const aircraft = aircraftPackFromProfile(resolved, aircraftPin.id, { coreVersion: effectiveCore });
+    return Object.freeze({
+      id: aircraftPin.id,
+      version: aircraft.version,
+      sha256: aircraft.sha256,
+      profile: resolved,
+      aircraft,
+    });
   }
   const primaryPin = requestedPin ?? resolved.pins[0];
   return Object.freeze({
