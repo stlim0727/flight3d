@@ -1,4 +1,4 @@
-import { listAddons, loadAddonCatalog, buildAddonProfileUrl } from '../addons/addonCatalogBrowser.js';
+import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
 import { clearSavedAddonProfile, loadSavedAddonProfile, saveSelectedAddons } from '../addons/savedAddonProfile.js';
 
 const LABELS = {
@@ -18,6 +18,9 @@ const LABELS = {
   apply: '선택 추가',
   remove: '저장된 애드온 제거',
   shareReady: '공유 링크가 준비되었습니다.',
+  copy: '링크 복사',
+  copied: '링크를 복사했습니다.',
+  copyFailed: '링크를 복사하지 못했습니다. 주소를 직접 선택해 복사하세요.',
   applyReady: '선택한 애드온을 추가했습니다. 기본 주소에서도 적용됩니다.',
   removeReady: '저장된 애드온을 제거했습니다. 기본 주소에서 더 이상 사용하지 않습니다.',
   error: '애드온 카탈로그를 불러오지 못했습니다.',
@@ -62,7 +65,10 @@ export class AddonPicker {
       <button type="button" class="btn addon-apply" hidden>${this.labels.apply}</button>
       <button type="button" class="btn addon-remove" hidden>${this.labels.remove}</button>
       <button type="button" class="btn addon-share" hidden>${this.labels.share}</button>
-      <output class="addon-share-url" hidden></output>`;
+      <div class="addon-share-actions" hidden>
+        <a class="addon-share-link" target="_blank" rel="noopener noreferrer"></a>
+        <button type="button" class="btn addon-share-copy">${this.labels.copy}</button>
+      </div>`;
 
     parent.appendChild(this.root);
     this.urlInput = this.root.querySelector('.addon-catalog-url');
@@ -73,9 +79,12 @@ export class AddonPicker {
     this.applyBtn = this.root.querySelector('.addon-apply');
     this.removeBtn = this.root.querySelector('.addon-remove');
     this.shareBtn = this.root.querySelector('.addon-share');
-    this.shareOutput = this.root.querySelector('.addon-share-url');
+    this.shareActions = this.root.querySelector('.addon-share-actions');
+    this.shareLink = this.root.querySelector('.addon-share-link');
+    this.shareCopyBtn = this.root.querySelector('.addon-share-copy');
+    this.syncRemoveButton();
 
-    this.root.querySelector('.addon-catalog-load').addEventListener('click', () => this.load(this.urlInput.value.trim()));
+    this.root.querySelector('.addon-catalog-load').addEventListener('click', () => this.load(resolveCatalogUrl(this.urlInput.value)));
     this.root.querySelector('.addon-search').addEventListener('input', event => {
       this.search = event.target.value;
       this.render();
@@ -92,31 +101,48 @@ export class AddonPicker {
     this.applyBtn.addEventListener('click', () => this.apply());
     this.removeBtn.addEventListener('click', () => this.remove());
     this.shareBtn.addEventListener('click', () => this.share());
-    if (this.catalogUrl) this.load(this.catalogUrl).catch(() => {});
+    this.shareCopyBtn.addEventListener('click', () => this.copyShareLink());
+    if (this.catalogUrl) this.load(resolveCatalogUrl(this.catalogUrl)).catch(() => {});
     return this.root;
+  }
+
+  hideShareLink() {
+    if (!this.shareActions) return;
+    this.shareActions.hidden = true;
+    this.shareLink.removeAttribute('href');
+    this.shareLink.textContent = '';
+  }
+
+  async copyShareLink() {
+    if (!this.shareLink?.href) return;
+    try {
+      await navigator.clipboard.writeText(this.shareLink.href);
+      this.status.textContent = this.labels.copied;
+    } catch {
+      this.status.textContent = this.labels.copyFailed;
+    }
+  }
+
+  syncRemoveButton() {
+    if (this.removeBtn) this.removeBtn.hidden = !loadSavedAddonProfile(this.storage);
   }
 
   async load(url) {
     this.selected.clear();
     if (this.applyBtn) this.applyBtn.hidden = true;
-    if (this.removeBtn) this.removeBtn.hidden = true;
-    if (this.shareOutput) {
-      this.shareOutput.hidden = true;
-      this.shareOutput.textContent = '';
-    }
+    this.hideShareLink();
     try {
       const catalog = await loadAddonCatalog(url, {
         fetchImpl: this.fetchImpl,
         validate: this.validateCatalog,
       });
       this.catalog = catalog;
-      this.catalogUrl = url;
+      this.catalogUrl = resolveCatalogUrl(url);
       const saved = loadSavedAddonProfile(this.storage);
       if (saved) {
         for (const pin of saved.pins) {
-          if (catalog.addons.some(entry => entry.id === pin.id && entry.version === pin.version)) {
-            this.selected.add(pin.id);
-          }
+          if (catalog.addons.some(entry => entry.id === pin.id && entry.version === pin.version
+            && entry.compatible !== false)) this.selected.add(pin.id);
         }
       }
       this.filters.hidden = false;
@@ -127,7 +153,7 @@ export class AddonPicker {
       this.filters.hidden = true;
       this.list.replaceChildren();
       this.applyBtn.hidden = true;
-      this.removeBtn.hidden = true;
+      this.syncRemoveButton();
       this.shareBtn.hidden = true;
       this.status.textContent = `${this.labels.error}: ${error.message}`;
     }
@@ -156,7 +182,7 @@ export class AddonPicker {
         else this.selected.delete(entry.id);
         this.applyBtn.hidden = this.selected.size === 0;
         this.shareBtn.hidden = this.selected.size === 0;
-        this.shareOutput.hidden = true;
+        this.hideShareLink();
       });
       const body = document.createElement('span');
       body.className = 'addon-item-body';
@@ -169,7 +195,7 @@ export class AddonPicker {
       this.list.appendChild(item);
     }
     this.applyBtn.hidden = this.selected.size === 0;
-    this.removeBtn.hidden = !loadSavedAddonProfile(this.storage);
+    this.syncRemoveButton();
     this.shareBtn.hidden = this.selected.size === 0;
   }
 
@@ -192,7 +218,8 @@ export class AddonPicker {
   remove() {
     clearSavedAddonProfile(this.storage);
     this.status.textContent = this.labels.removeReady;
-    this.render();
+    this.syncRemoveButton();
+    if (this.catalog) this.render();
     return true;
   }
 
@@ -203,8 +230,9 @@ export class AddonPicker {
       profileShareParams: this.profileShareParams,
       baseUrl: typeof location === 'undefined' ? '?' : `${location.origin}${location.pathname}?`,
     });
-    this.shareOutput.textContent = url;
-    this.shareOutput.hidden = false;
+    this.shareLink.href = url;
+    this.shareLink.textContent = url;
+    this.shareActions.hidden = false;
     this.status.textContent = this.labels.shareReady;
     return url;
   }

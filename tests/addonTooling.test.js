@@ -9,7 +9,7 @@ import { validateAddonManifest, validateCatalog } from '../src/addons/addonContr
 import { lintAddonSet } from '../src/addons/lintAddonSet.js';
 import { profileShareParams } from '../src/addons/regionPackBinding.js';
 import { buildCatalog } from '../scripts/addon-tooling.mjs';
-import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
+import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack, resolveCatalogUrl } from '../src/addons/addonCatalogBrowser.js';
 import { AddonPicker } from '../src/ui/AddonPicker.js';
 import {
   SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
@@ -29,12 +29,17 @@ function createFakeElement(tagName) {
     hidden: false,
     textContent: '',
     dataset: {},
-    attributes: new Map(),
     children: [],
     _innerHTML: '',
     set innerHTML(html) { this._innerHTML = html; },
     get innerHTML() { return this._innerHTML; },
-    setAttribute(name, value) { this.attributes.set(name, String(value)); },
+    attributes: new Map(),
+    _href: '',
+    set href(value) { this._href = String(value); this.attributes.set('href', String(value)); },
+    get href() { return this._href; },
+    setAttribute(name, value) { this.attributes.set(name, String(value)); if (name === 'href') this._href = String(value); },
+    getAttribute(name) { return this.attributes.get(name) ?? null; },
+    removeAttribute(name) { this.attributes.delete(name); if (name === 'href') this._href = ''; },
     appendChild(child) { this.children.push(child); return child; },
     append(...nodes) { this.children.push(...nodes); },
     replaceChildren(...nodes) { this.children = [...nodes]; },
@@ -76,7 +81,9 @@ function withFakeDocument(fn) {
     '.addon-apply': createFakeElement('button'),
     '.addon-remove': createFakeElement('button'),
     '.addon-share': createFakeElement('button'),
-    '.addon-share-url': createFakeElement('output'),
+    '.addon-share-actions': createFakeElement('div'),
+    '.addon-share-link': createFakeElement('a'),
+    '.addon-share-copy': createFakeElement('button'),
   };
   const kindButtons = ['all', 'region', 'aircraft', 'scenario'].map(kind => {
     const btn = createFakeElement('button');
@@ -204,13 +211,15 @@ test('AddonPicker clears selection and stale share output on reload or failure a
     picker.selected.add('demo/region/sky');
     const shared = picker.share();
     assert.match(shared, /pack=demo%2Fregion%2Fsky/);
-    assert.equal(slots['.addon-share-url'].hidden, false);
+    assert.equal(slots['.addon-share-actions'].hidden, false);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), shared);
 
     await picker.load('https://packs.example/b.json');
     assert.equal(picker.selected.size, 0);
     assert.equal(slots['.addon-share'].hidden, true);
-    assert.equal(slots['.addon-share-url'].hidden, true);
-    assert.equal(slots['.addon-share-url'].textContent, '');
+    assert.equal(slots['.addon-share-actions'].hidden, true);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), null);
+    assert.equal(slots['.addon-share-link'].textContent, '');
     assert.equal(picker.share(), '');
 
     picker.selected.add('demo/aircraft/jet');
@@ -218,8 +227,9 @@ test('AddonPicker clears selection and stale share output on reload or failure a
     await picker.load('https://packs.example/bad.json');
     assert.equal(picker.selected.size, 0);
     assert.equal(slots['.addon-share'].hidden, true);
-    assert.equal(slots['.addon-share-url'].hidden, true);
-    assert.equal(slots['.addon-share-url'].textContent, '');
+    assert.equal(slots['.addon-share-actions'].hidden, true);
+    assert.equal(slots['.addon-share-link'].getAttribute('href'), null);
+    assert.equal(slots['.addon-share-link'].textContent, '');
   });
 });
 
@@ -334,6 +344,25 @@ test('share URL round-trips through resolveSharedAddonPack for profile and legac
 });
 
 
+test('owner/repo catalog shorthand resolves without altering raw picker input', async () => {
+  assert.equal(resolveCatalogUrl('owner/repo'), 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
+  await withFakeDocument(async ({ parent, slots }) => {
+    const requested = [];
+    const catalog = { schemaVersion: 1, addons: [] };
+    const picker = new AddonPicker({
+      fetchImpl: async url => { requested.push(url); return { ok: true, json: async () => catalog }; },
+      validateCatalog,
+    });
+    picker.mount(parent);
+    slots['.addon-catalog-url'].value = 'owner/repo';
+    slots['.addon-catalog-load'].dispatch('click');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(slots['.addon-catalog-url'].value, 'owner/repo');
+    assert.deepEqual(requested, ['https://raw.githubusercontent.com/owner/repo/main/catalog.json']);
+    assert.equal(picker.catalogUrl, 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
+  });
+});
+
 test('saved addon profile applies selected pins to a plain URL and loads again', async () => {
   globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
   globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
@@ -376,6 +405,14 @@ test('saved addon profile applies selected pins to a plain URL and loads again',
   assert.equal(hasExplicitAddonParams('?airport=jeju'), false);
 });
 
+test('saveSelectedAddons rejects unavailable storage and empty selection', () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+  ] };
+  assert.throws(() => saveSelectedAddons(catalog, ['demo/region/sky'], { storage: null }), /local storage unavailable/);
+  assert.throws(() => saveSelectedAddons(catalog, [], { storage: memoryStorage() }), /select at least one addon/);
+});
+
 test('saved addon profile ignores corrupt and unreadable storage', () => {
   const corrupt = memoryStorage();
   corrupt.setItem(SAVED_ADDON_PROFILE_KEY, '{not json');
@@ -407,6 +444,7 @@ test('AddonPicker saves, restores, and removes the default-flight addons', async
       storage,
     });
     picker.mount(parent);
+    assert.equal(slots['.addon-remove'].hidden, true);
     await picker.load('https://packs.example/catalog.json');
     assert.equal(slots['.addon-apply'].hidden, true);
     assert.equal(slots['.addon-remove'].hidden, true);
@@ -430,5 +468,36 @@ test('AddonPicker saves, restores, and removes the default-flight addons', async
     assert.equal(reopened.remove(), true);
     assert.equal(loadSavedAddonProfile(storage), null);
     assert.equal(reopened.removeBtn.hidden, true);
+
+    saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
+    const offline = new AddonPicker({
+      fetchImpl: async () => ({ ok: false, status: 503 }),
+      validateCatalog,
+      storage,
+    });
+    offline.mount(parent);
+    assert.equal(offline.removeBtn.hidden, false);
+    await offline.load('https://packs.example/unavailable.json');
+    assert.equal(offline.removeBtn.hidden, false);
+    assert.equal(offline.remove(), true);
+    assert.equal(offline.removeBtn.hidden, true);
+  });
+});
+
+test('incompatible saved pins are not restored into the picker', async () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64), compatible: false },
+  ] };
+  const storage = memoryStorage();
+  saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
+  await withFakeDocument(async ({ parent }) => {
+    const picker = new AddonPicker({
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      validateCatalog,
+      storage,
+    });
+    picker.mount(parent);
+    await picker.load('https://packs.example/catalog.json');
+    assert.equal(picker.selected.size, 0);
   });
 });

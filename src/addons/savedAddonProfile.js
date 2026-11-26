@@ -31,7 +31,9 @@ export function saveSelectedAddons(catalog, selectedIds, { coreVersion = null, s
     return { id: entry.id, version: entry.version, url: entry.url, sha256: entry.sha256 };
   });
   const profile = parseProfile(serializeProfile({ schemaVersion: 1, coreVersion, pins }));
-  safeStorage(storage)?.setItem(SAVED_ADDON_PROFILE_KEY, serializeProfile(profile));
+  const target = safeStorage(storage);
+  if (!target) throw new Error('local storage unavailable');
+  target.setItem(SAVED_ADDON_PROFILE_KEY, serializeProfile(profile));
   return profile;
 }
 
