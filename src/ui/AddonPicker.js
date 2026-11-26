@@ -163,7 +163,6 @@ export class AddonPicker {
       });
       this.catalog = catalog;
       this.catalogUrl = resolveCatalogUrl(url);
-      saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       const saved = loadSavedAddonProfile(this.storage);
       if (saved) {
         for (const pin of saved.pins) {
