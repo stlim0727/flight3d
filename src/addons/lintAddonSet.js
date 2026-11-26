@@ -91,10 +91,19 @@ export function lintAddonSet(manifests, { coreVersion } = {}) {
 
     if (addonType(manifest) === 'scenario') {
       const scenario = manifest.scenario ?? {};
+      const reachable = new Set();
+      const walk = id => {
+        if (reachable.has(id)) return;
+        reachable.add(id);
+        for (const dependency of byId.get(id)?.dependencies ?? []) walk(dependency.id);
+      };
+      walk(manifest.id);
       for (const requirement of scenario.requiredAddons ?? []) {
         const target = byId.get(requirement.id);
         if (!target || target.version !== requirement.version) {
           errors.push(`${manifest.id}: required addon ${requirement.id}@${requirement.version} is not pinned`);
+        } else if (!reachable.has(requirement.id)) {
+          errors.push(`${manifest.id}: required addon ${requirement.id} is not reachable from scenario dependencies`);
         }
       }
       const aircraftPacks = [...byId.values()].filter(item => item.aircraft);

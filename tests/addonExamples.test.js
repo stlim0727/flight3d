@@ -57,3 +57,12 @@ test('lint rejects cyclic dependencies and uses the addon ID type segment', asyn
   const typed = lintAddonSet([renamed[0]], { coreVersion: '1.8.0' });
   assert.equal(typed.ok, true);
 });
+
+test('lint requires scenario addons to be reachable through dependencies', async () => {
+  const manifests = await readPacks();
+  const scenario = manifests.find(item => item.id === 'studio/scenario/islander-coast-tour');
+  scenario.dependencies = [];
+  const result = lintAddonSet(manifests, { coreVersion: '1.8.0' });
+  assert.equal(result.ok, false);
+  assert.ok(result.errors.some(message => message.includes('is not reachable')));
+});

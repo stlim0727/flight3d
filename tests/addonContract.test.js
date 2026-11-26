@@ -148,3 +148,8 @@ test('profiles without a target core version round-trip through JSON', async () 
   assert.equal(profile.coreVersion, null);
   assert.equal(parseProfile(serializeProfile(profile)).coreVersion, null);
 });
+
+test('numeric SemVer identifiers sort before non-numeric identifiers', () => {
+  assert.equal(compareVersions('1.0.0-2', '1.0.0-10a'), -1);
+  assert.equal(compareVersions('1.0.0-10a', '1.0.0-2'), 1);
+});

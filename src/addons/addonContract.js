@@ -33,7 +33,8 @@ export function compareVersions(left, right) {
   for (let index = 0; index < Math.min(leftPre.length, rightPre.length); index++) {
     const leftNumeric = /^\d+$/.test(leftPre[index]);
     const rightNumeric = /^\d+$/.test(rightPre[index]);
-    if (leftNumeric && rightNumeric) {
+    if (leftNumeric !== rightNumeric) return leftNumeric ? -1 : 1;
+    if (leftNumeric) {
       const delta = Number(leftPre[index]) - Number(rightPre[index]);
       if (delta !== 0) return Math.sign(delta);
     } else if (leftPre[index] !== rightPre[index]) {
