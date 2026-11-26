@@ -6,6 +6,8 @@ const LABELS = {
   hint: '카탈로그 URL을 넣고 비행에 사용할 애드온을 고르세요. 저장하면 기본 주소에서도 적용됩니다.',
   catalogUrl: '카탈로그 URL',
   load: '불러오기',
+  clearUrl: '주소 지우기',
+  urlCleared: '카탈로그 주소를 지웠습니다.',
   search: '검색',
   all: '전체',
   region: '지역',
@@ -53,6 +55,7 @@ export class AddonPicker {
       <div class="addon-picker-url">
         <label><span>${this.labels.catalogUrl}</span><input type="url" class="addon-catalog-url" placeholder="https://.../catalog.json"></label>
         <button type="button" class="btn addon-catalog-load">${this.labels.load}</button>
+        <button type="button" class="btn addon-catalog-clear">${this.labels.clearUrl}</button>
       </div>
       <div class="addon-picker-filters" hidden>
         <input type="search" class="addon-search" placeholder="${this.labels.search}" aria-label="${this.labels.search}">
@@ -85,6 +88,7 @@ export class AddonPicker {
     this.syncRemoveButton();
 
     this.root.querySelector('.addon-catalog-load').addEventListener('click', () => this.load(resolveCatalogUrl(this.urlInput.value)));
+    this.root.querySelector('.addon-catalog-clear').addEventListener('click', () => this.clearUrl());
     this.root.querySelector('.addon-search').addEventListener('input', event => {
       this.search = event.target.value;
       this.render();
@@ -111,6 +115,23 @@ export class AddonPicker {
     this.shareActions.hidden = true;
     this.shareLink.removeAttribute('href');
     this.shareLink.textContent = '';
+  }
+
+  clearUrl() {
+    this.urlInput.value = '';
+    this.catalogUrl = '';
+    this.catalog = null;
+    this.selected.clear();
+    this.search = '';
+    this.kind = 'all';
+    this.filters.hidden = true;
+    this.list.replaceChildren();
+    this.applyBtn.hidden = true;
+    this.shareBtn.hidden = true;
+    this.hideShareLink();
+    clearSavedAddonProfile(this.storage);
+    this.syncRemoveButton();
+    this.status.textContent = this.labels.urlCleared;
   }
 
   async copyShareLink() {
