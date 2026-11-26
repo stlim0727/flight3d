@@ -24,7 +24,7 @@ node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json <owner>/<repo>
 Replace placeholder URLs (`packs.example`) and SHA-256 values before publishing.
 `catalog` computes the manifest SHA-256 from the file and accepts either a full
 HTTP(S) base URL or `owner/repo` shorthand for a GitHub repository. For the shorthand
-it writes `https://raw.githubusercontent.com/<owner>/<repo>/main/1.0.0/addon.json`.
+it writes `https://raw.githubusercontent.com/<owner>/<repo>/main/addon.json`.
 Binary asset checksums still need to be calculated by the publisher.
 
 ## User addon selection
@@ -32,8 +32,8 @@ Binary asset checksums still need to be calculated by the publisher.
 The lobby **Options** tab contains an addon picker. Enter a catalog URL or
 `<owner>/<repo>` for a GitHub-hosted addon, load it, filter by name or type, and
 select compatible addons. **선택 공유 링크 만들기** produces a URL that carries
-pinned addon versions and checksums through `profileShareParams()`; use **링크 복사**
-or **링크 열기** on the result.
+pinned addon versions and checksums through `profileShareParams()`; click the
+generated URL or use **링크 복사**.
 
 Catalog entries with invalid IDs, versions, URLs or checksums are rejected by
 `validateCatalog()`. Entries marked `compatible: false` are displayed but cannot

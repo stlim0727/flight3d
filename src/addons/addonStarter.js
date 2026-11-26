@@ -158,9 +158,9 @@ export function buildAddonStarter(options) {
       '',
       '## Use in Flight3d',
       '',
-      'Open **로비 → 애드온 관리**, enter `<owner>/<repo>` (or the catalog URL),',
-      'click **불러오기**, select the addon, then use **링크 복사** or **링크 열기**',
-      'on the generated share link.',
+      'Open **로비 → 옵션**, enter `<owner>/<repo>` (or the catalog URL),',
+      'click **불러오기**, select the addon, then click the generated URL or use',
+      '**링크 복사**.',
     ].join('\n') + '\n',
   };
   return { ok: true, errors: [], files };

@@ -35,6 +35,7 @@ function createFakeElement(tagName) {
     getAttribute(name) { return this.attributes.get(name) ?? null; },
     set href(value) { this.setAttribute('href', value); },
     get href() { return this.getAttribute('href') ?? ''; },
+    setAttribute(name, value) { this.attributes.set(name, String(value)); },
     appendChild(child) { this.children.push(child); return child; },
     append(...nodes) { this.children.push(...nodes); },
     replaceChildren(...nodes) { this.children = [...nodes]; },
@@ -116,6 +117,14 @@ test('catalog command computes the manifest checksum and exact URL', async () =>
   assert.equal(catalog.addons[0].url, 'https://packs.example/demo/region/sky/addon.json');
   const digest = createHash('sha256').update(await readFile(manifestPath)).digest('hex');
   assert.equal(catalog.addons[0].sha256, digest);
+});
+
+test('catalog command resolves owner/repo to the repository root manifest', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'addon-catalog-shorthand-'));
+  const manifestPath = join(dir, 'addon.json');
+  await writeFile(manifestPath, JSON.stringify({ id: 'demo/region/sky', version: '2.0.0' }));
+  const catalog = await buildCatalog(manifestPath, 'demo/sky-addon');
+  assert.equal(catalog.addons[0].url, 'https://raw.githubusercontent.com/demo/sky-addon/main/addon.json');
 });
 
 test('catalog URL accepts a GitHub owner/repo shorthand', () => {

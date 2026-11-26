@@ -17,7 +17,7 @@ const LABELS = {
   shareReady: '공유 링크가 준비되었습니다.',
   copy: '링크 복사',
   copied: '링크를 복사했습니다.',
-  open: '링크 열기',
+  copyFailed: '링크를 복사하지 못했습니다. 주소를 직접 선택해 복사하세요.',
   error: '애드온 카탈로그를 불러오지 못했습니다.',
 };
 
@@ -105,7 +105,7 @@ export class AddonPicker {
       await navigator.clipboard.writeText(this.shareLink.href);
       this.status.textContent = this.labels.copied;
     } catch {
-      this.status.textContent = `${this.labels.error}: clipboard`;
+      this.status.textContent = this.labels.copyFailed;
     }
   }
 

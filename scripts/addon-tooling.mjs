@@ -16,7 +16,7 @@ export async function initAddon(options, { outDir = process.cwd() } = {}) {
 export async function buildCatalog(manifestPath, baseUrl) {
   if (typeof baseUrl !== 'string' || !baseUrl) throw new Error('catalog needs a URL or owner/repo');
   if (/^[A-Za-z0-9][A-Za-z0-9._-]*\/[A-Za-z0-9._-]+$/.test(baseUrl.trim())) {
-    baseUrl = `https://raw.githubusercontent.com/${baseUrl.trim()}/main/1.0.0`;
+    baseUrl = `https://raw.githubusercontent.com/${baseUrl.trim()}/main`;
   }
   if (!/^https?:\/\//.test(baseUrl)) throw new Error('catalog needs an absolute http(s) base URL');
   const manifest = JSON.parse(await readFile(resolve(manifestPath), 'utf8'));
