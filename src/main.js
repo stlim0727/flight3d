@@ -965,6 +965,30 @@ class FlightSimulator {
     }
   }
 
+  /**
+   * Snapshot the flight held behind the lobby menu. Pending lobby choices must
+   * not leak into this card: the chosen region can change while a flight is held.
+   */
+  heldFlightForMenu() {
+    const metadata = this.flightRecorder?.active ? this.flightRecorder.metadata : null;
+    if (metadata) {
+      return {
+        airport: metadata.airport, aircraft: metadata.aircraft, scenario: metadata.scenario,
+        demoProfile: metadata.demoProfile, timeOfDay: metadata.timeOfDay,
+        deviceTime: false,
+        airportLabel: this.customLocationLabel || undefined,
+        scenarioLabel: undefined,
+      };
+    }
+    return {
+      airport: this.activeAirport, aircraft: this.currentAircraftId,
+      scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
+      demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
+      deviceTime: this.demoDirector?.userTimeOfDayOverridden === false,
+      airportLabel: this.customLocationLabel || undefined,
+    };
+  }
+
   /** Keep the toggle's icon and accessible label in sync with the flow state. */
   updateMenuToggle() {
     const btn = document.getElementById('menu-toggle');

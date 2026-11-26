@@ -275,6 +275,45 @@ test('UI State Contract: In-Flight Menu Management hides condition selectors and
   }
 });
 
+test('UI State Contract: held flight card shows flown sortie, not pending lobby choices', () => {
+  const { elements, mockDoc } = setupMockDOM();
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+
+  try {
+    initLobbyScreen({
+      getAirport: () => 'coastal',
+      getPreset: () => 'cruise',
+      getTime: () => 12.5,
+      getAircraft: () => 'B738',
+      onAirport: () => {},
+      onPreset: () => {},
+      onTime: () => {},
+      onAircraft: () => {},
+      onFly: () => {},
+      onRestart: () => {},
+      canResume: () => true,
+      canEnd: () => true,
+      onResume: () => {},
+      getHeldFlight: () => ({
+        airport: '-51.28557, -74.25806',
+        airportLabel: '-51.28557, -74.25806',
+        aircraft: 'F16',
+        scenario: 'cruise',
+        scenarioLabel: '한라산 순항 · 실제 비행',
+        timeOfDay: 12.5,
+        deviceTime: false,
+      }),
+    });
+
+    assert.equal(elements.get('lobby-managed-airport').textContent, '-51.28557, -74.25806');
+    assert.equal(elements.get('lobby-managed-scenario').textContent, '한라산 순항 · 실제 비행');
+    assert.match(elements.get('lobby-managed-aircraft').textContent, /F-16 Fighting Falcon/);
+  } finally {
+    globalThis.document = originalDoc;
+  }
+});
+
 test('UI State Contract: Camera selection hold freezes physics without stealing focus or opening pause menu', () => {
   const gameFlow = new GameFlowController();
   gameFlow.enterFlight();

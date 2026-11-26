@@ -69,7 +69,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {} }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {}, getHeldFlight }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -1292,6 +1292,12 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
 
     if (panelManaged && isHeld) {
+      const held = getHeldFlight?.() ?? {};
+      const heldAirport = held.airport ?? getAirport?.() ?? 'coastal';
+      const heldPreset = held.scenario ?? getPreset?.() ?? 'runway';
+      const heldAircraft = held.aircraft ?? getAircraft?.() ?? 'B738';
+      const heldTime = held.timeOfDay ?? getTime?.();
+      const heldDeviceTime = held.deviceTime ?? isDeviceTime?.();
       const managedAircraft = document.getElementById('lobby-managed-aircraft');
       const managedAirport = document.getElementById('lobby-managed-airport');
       const managedScenario = document.getElementById('lobby-managed-scenario');
@@ -1299,32 +1305,30 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
       if (managedAircraft) {
         bindText(managedAircraft, () => {
-          const id = getAircraft?.() ?? 'B738';
-          return AIRCRAFT_REGISTRY[id]?.name || id;
+          return AIRCRAFT_REGISTRY[heldAircraft]?.name || heldAircraft;
         });
       }
       if (managedAirport) {
         bindText(managedAirport, () => {
+          if (held.airportLabel) return held.airportLabel;
           const activePlace = currentMapPlace();
           if (activePlace) return activePlace.label;
-          const id = getAirport?.() ?? DEFAULT_AIRPORT;
+          const id = heldAirport ?? getAirport?.() ?? DEFAULT_AIRPORT;
           return t(REGION_NAME_KEYS[id] ?? id);
         });
       }
       if (managedScenario) {
         bindText(managedScenario, () => {
-          const airportId = getAirport?.() ?? DEFAULT_AIRPORT;
-          const presetId = getPreset?.() ?? 'runway';
-          if (presetId === 'demo') {
-            const profile = resolveDemoProfile(getAircraft?.(), airportId, getDemoProfile?.());
+          if (heldPreset === 'demo') {
+            const profile = resolveDemoProfile(heldAircraft, heldAirport, held.demoProfile ?? getDemoProfile?.());
             return t('demo.scenario.title', { title: t(profile.labelKey) });
           }
-          const key = scenarioLabelKey(airportId, presetId);
-          return key ? t(key) : presetId;
+          const key = scenarioLabelKey(heldAirport, heldPreset);
+          return held.scenarioLabel || (key ? t(key) : heldPreset);
         });
       }
       if (managedTime) {
-        bindText(managedTime, () => formatFlightTime(getTime?.(), isDeviceTime?.()));
+        bindText(managedTime, () => formatFlightTime(heldTime, heldDeviceTime));
       }
     }
 

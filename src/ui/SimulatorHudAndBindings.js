@@ -732,6 +732,7 @@ class SimulatorHudAndBindingsMethods {
         }
         registerExternalDestinations(this.mapPlaces.airports.map(airport => airport.code));
       },
+      getHeldFlight: () => this.heldFlightForMenu(),
       getPilotMode: () => this.lobby.pilotMode || 'human',
       onPilotMode: mode => { this.lobby.pilotMode = mode; },
       onToggleGyro: () => {
