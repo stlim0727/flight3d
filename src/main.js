@@ -695,7 +695,7 @@ class FlightSimulator {
     const held = state === FLOW.DEBRIEF || state === FLOW.PAUSED || this.gameFlow.canResumeFromLobby();
     this.syncAudioPause();
     document.body.dataset.flow = state;
-    if (state !== FLOW.FLIGHT && this.pilotageLayout) this.setPilotageLayout('');
+    if (state !== FLOW.FLIGHT && this.cameraSystem) this.cameraSystem.chartPitchOffset = 0;
     if (state === FLOW.FLIGHT) {
       collapseMapAttribution();
       if (this.touchControls?.gyroRequested && !this.touchControls.gyroActive && !this.demoDirector?.isActive) {
