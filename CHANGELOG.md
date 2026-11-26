@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **feat(map-ui):** pan the lobby map infinitely east and west
+  - Dragging past the world edge now continues into a repeating copy: Esri tiles, place pins and point clicks wrap with the view instead of stopping at the seam.
+  - Vertical pan remains clamped at the Web Mercator poles; zoom and place selection stay centred on the world copy currently on screen.
+  - Verified in hardware Chrome: a drag past the seam moved the viewBox to x=1228.8 with two repeated tiles and markers still drawn.
 - **feat(map-ui):** group nearby map bookmarks into one numbered marker
   - Dense clusters stay a single numbered badge at wide zooms; tapping or clicking one zooms in until the individual place markers separate again.
   - Grouping follows the existing marker screen scale, so the same area stays clustered at every zoom; the count is localized in English and Korean.

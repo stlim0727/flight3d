@@ -35,3 +35,13 @@ test('zoomed tiles cover the viewBox with valid geometry', () => {
   assert.deepEqual(tilesForViewBox('0 0 0 1024'), []);
   assert.deepEqual(tilesForViewBox('broken'), []);
 });
+
+test('tiles repeat horizontally across world copies', () => {
+  const east = tilesForViewBox('1100 0 100 100');
+  assert.ok(east.length > 0);
+  assert.ok(east.every(tile => tile.x >= 1024), 'tiles are positioned in the repeated copy');
+  assert.ok(east.some(tile => tile.url.endsWith('/3/0/0')), 'tile x wraps for the URL');
+
+  const west = tilesForViewBox('-100 0 100 100');
+  assert.ok(west.some(tile => tile.x < 0 && tile.url.endsWith('/3/0/7')));
+});

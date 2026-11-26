@@ -6,7 +6,7 @@ import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
 import { getLanguage, t } from '../src/i18n/index.js';
 import { airportDisplayName } from '../src/config/airportProfile.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
-import { mapViewBoxFor } from '../src/ui/mapBrowser.js';
+import { mapViewBoxFor, MAP_WIDTH } from '../src/ui/mapBrowser.js';
 import { installSimulatorHudAndBindings } from '../src/ui/SimulatorHudAndBindings.js';
 
 class MockElement {
@@ -747,6 +747,38 @@ test('UI State Contract: a cluster that cannot zoom further lists its members fo
     const memberButton = results.children.find(button => button.dataset.placeId === 'close-point');
     results.listeners.click[0]({ target: { closest: () => memberButton } });
     assert.equal(plan?.pointId, 'close-point', 'the listed member can still be selected');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.localStorage = originalStorage;
+  }
+});
+
+test('UI State Contract: horizontal pan wraps into repeating worlds', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalStorage = globalThis.localStorage;
+  globalThis.document = mockDoc;
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    const screen = initLobbyScreen({
+      getAirport: () => 'coastal', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+    });
+    const svg = elements.get('lobby-map-svg');
+    svg.getBoundingClientRect = () => ({ x: 0, y: 0, width: 400, height: 300 });
+    screen.enableMapTiles();
+    screen.setMapPlaces({
+      airports: [{ code: 'RKSI', name: 'Incheon', latitude: 37.4691, longitude: 126.451, runways: [] }],
+      points: [],
+    });
+
+    svg.listeners.pointerdown[0]({ pointerId: 1, clientX: 300, clientY: 150 });
+    svg.listeners.pointermove[0]({ pointerId: 1, clientX: -200, clientY: 150 });
+    const [x, , width] = svg.getAttribute('viewBox').split(/\s+/).map(Number);
+    assert.ok(x > MAP_WIDTH, 'dragging past the edge keeps panning instead of clamping');
+    assert.ok(elements.get('lobby-map-tiles').children.some(image => Number(image.getAttribute('x')) >= MAP_WIDTH), 'tiles repeat on the far side');
+    const markers = elements.get('lobby-map-markers').children;
+    assert.ok(markers.some(marker => Number(marker.dataset.mapX) > x && Number(marker.dataset.mapX) < x + width), 'a marker is drawn in the repeated copy');
+    svg.listeners.pointerup[0]({ pointerId: 1 });
   } finally {
     globalThis.document = originalDoc;
     globalThis.localStorage = originalStorage;
