@@ -325,3 +325,29 @@ test('splits a long road around an interior water or runway strip', () => {
     geometry.dispose();
   }
 });
+
+test('GeographicRoads updates quality defines and toggles lamp visibility', () => {
+  const origin = { latitude: 37.46, longitude: 126.44 };
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
+  const roads = new GeographicRoads({ origin, project, terrain: surface, quality: 'balanced' });
+  assert.equal(roads.material.defines.QUALITY_ULTRALOW, 0);
+  assert.equal(roads.material.defines.QUALITY_PERFORMANCE, 0);
+  assert.equal(roads.material.defines.QUALITY_FAST, 0);
+  assert.equal(roads.lampMesh.visible, true);
+  assert.equal(roads.lampPoints.visible, true);
+
+  roads.setQuality('performance');
+  assert.equal(roads.material.defines.QUALITY_ULTRALOW, 0);
+  assert.equal(roads.material.defines.QUALITY_PERFORMANCE, 1);
+  assert.equal(roads.material.defines.QUALITY_FAST, 1);
+  assert.equal(roads.lampMesh.visible, true);
+
+  roads.setQuality('ultraLow');
+  assert.equal(roads.material.defines.QUALITY_ULTRALOW, 1);
+  assert.equal(roads.material.defines.QUALITY_PERFORMANCE, 0);
+  assert.equal(roads.material.defines.QUALITY_FAST, 1);
+  assert.equal(roads.lampMesh.visible, false);
+  assert.equal(roads.lampPoints.visible, false);
+
+  roads.dispose();
+});

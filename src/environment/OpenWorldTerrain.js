@@ -131,8 +131,32 @@ function projectedTilePixels(mesh, camera, viewportHeight) {
   return Math.min(viewportHeight * 2, tileSphere.radius * camera.projectionMatrix.elements[5] * viewportHeight / depth);
 }
 
-function terrainMaterial(detail, distanceFade) {
+export function applyTerrainMaterialQuality(material, quality) {
+  const isUltraLow = quality === 'ultraLow';
+  const isPerformance = quality === 'performance';
+  const nextUl = isUltraLow ? 1 : 0;
+  const nextPerf = isPerformance ? 1 : 0;
+  if (!material.defines) material.defines = {};
+  if (material.defines.QUALITY_ULTRALOW !== nextUl || material.defines.QUALITY_PERFORMANCE !== nextPerf) {
+    material.defines.QUALITY_ULTRALOW = nextUl;
+    material.defines.QUALITY_PERFORMANCE = nextPerf;
+    material.needsUpdate = true;
+  }
+}
+
+function terrainMaterial(detail, distanceFade, quality = 'balanced') {
+  const isUltraLow = quality === 'ultraLow';
+  const isPerformance = quality === 'performance';
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  material.defines = {
+    QUALITY_ULTRALOW: isUltraLow ? 1 : 0,
+    QUALITY_PERFORMANCE: isPerformance ? 1 : 0,
+  };
+  material.customProgramCacheKey = () => (
+    isUltraLow ? 'open-world-terrain-ultralow'
+      : isPerformance ? 'open-world-terrain-performance'
+        : 'open-world-terrain-standard'
+  );
   material.onBeforeCompile = shader => {
     shader.uniforms.terrainBaseMap = detail.base;
     shader.uniforms.terrainDetailEdges = detail.edges;
@@ -140,53 +164,89 @@ function terrainMaterial(detail, distanceFade) {
     shader.uniforms.terrainDetailMap = detail.map;
     shader.uniforms.terrainDetailBlend = detail.blend;
     shader.uniforms.terrainDistanceFade = distanceFade;
-    shader.vertexShader = 'varying vec3 vTerrainViewPosition;\n' + shader.vertexShader.replace(
+    shader.vertexShader = `
+      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+        varying vec3 vTerrainViewPosition;
+      #endif
+    ` + shader.vertexShader.replace(
       '#include <project_vertex>',
-      '#include <project_vertex>\n vTerrainViewPosition = mvPosition.xyz;',
+      `#include <project_vertex>
+      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+        vTerrainViewPosition = mvPosition.xyz;
+      #endif`,
     );
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
-      if (terrainDistanceFade > 0.0) {
-        // Dither coverage so the ocean/sky shows through while terrain retains opaque depth writes.
-        float distanceM = length(vTerrainViewPosition);
-        if (distanceM > 26000.0) {
-          float fade = terrainDistanceFade * smoothstep(26000.0, 32000.0, distanceM);
-          float threshold = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
-          if (fade > threshold) discard;
+      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+        if (terrainDistanceFade > 0.0) {
+          // Dither coverage so the ocean/sky shows through while terrain retains opaque depth writes.
+          float distanceM = length(vTerrainViewPosition);
+          if (distanceM > 26000.0) {
+            float fade = terrainDistanceFade * smoothstep(26000.0, 32000.0, distanceM);
+            float threshold = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+            if (fade > threshold) discard;
+          }
         }
-      }
+      #endif
     `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
       #include <map_fragment>
       #ifdef USE_MAP
-        if (terrainDetailBlend > 0.0) {
-          diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
-        }
-        vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
-        vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
-        float centerX = 1.0 - proximity.x - proximity.z;
-        float centerY = 1.0 - proximity.y - proximity.w;
-        vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
-        vec4 cornerWeights = proximity * proximity.yzwx;
-        float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
-        vec2 uvDx = dFdx(vMapUv);
-        vec2 uvDy = dFdy(vMapUv);
-        if (edgeBlend > 0.0) {
-          diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
-        }
-        // Restore natural micro-contrast and chroma of baked satellite imagery.
-        float satLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
-        diffuseColor.rgb = mix(vec3(satLuma), diffuseColor.rgb, 1.14);
-        diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+        #if defined(QUALITY_ULTRALOW)
+          if (terrainDetailBlend > 0.0) {
+            diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
+          }
+        #elif defined(QUALITY_PERFORMANCE)
+          if (terrainDetailBlend > 0.0) {
+            diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
+          }
+          if (dot(terrainDetailEdges, vec4(1.0)) < 3.99 || dot(terrainDetailCorners, vec4(1.0)) < 3.99) {
+            vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
+            vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
+            float edgeBlend = max(max(proximity.x, proximity.y), max(proximity.z, proximity.w));
+            if (edgeBlend > 0.0) {
+              diffuseColor = mix(diffuseColor, texture2D(terrainBaseMap, vMapUv), edgeBlend);
+            }
+          }
+          // Fast contrast boost with 2 MADs instead of transcendental pow(x, 1.08)
+          diffuseColor.rgb = diffuseColor.rgb * (diffuseColor.rgb * 0.16 + 0.88);
+        #else
+          if (terrainDetailBlend > 0.0) {
+            diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
+          }
+          vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
+          vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
+          float centerX = 1.0 - proximity.x - proximity.z;
+          float centerY = 1.0 - proximity.y - proximity.w;
+          vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
+          vec4 cornerWeights = proximity * proximity.yzwx;
+          float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
+          vec2 uvDx = dFdx(vMapUv);
+          vec2 uvDy = dFdy(vMapUv);
+          if (edgeBlend > 0.0) {
+            diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
+          }
+          // Restore natural micro-contrast and chroma of baked satellite imagery.
+          float satLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+          diffuseColor.rgb = mix(vec3(satLuma), diffuseColor.rgb, 1.14);
+          diffuseColor.rgb = pow(max(diffuseColor.rgb, vec3(0.0)), vec3(1.08));
+        #endif
       #endif
     `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
       #include <lights_fragment_end>
       #ifdef USE_MAP
-        // Satellite tiles already carry baked overhead illumination. Trim excess
-        // ambient washout and direct over-exposure while keeping sunset/night/cloud shading.
-        reflectedLight.indirectDiffuse *= 0.68;
-        reflectedLight.directDiffuse *= 0.88;
+        #if defined(QUALITY_ULTRALOW)
+          // Unlit-style fast path: satellite imagery already contains baked solar illumination.
+          // Minimizes per-fragment ALU load and prevents double lighting.
+          reflectedLight.indirectDiffuse = diffuseColor.rgb * 0.95;
+          reflectedLight.directDiffuse = vec3(0.0);
+        #else
+          // Satellite tiles already carry baked overhead illumination. Trim excess
+          // ambient washout and direct over-exposure while keeping sunset/night/cloud shading.
+          reflectedLight.indirectDiffuse *= 0.68;
+          reflectedLight.directDiffuse *= 0.88;
+        #endif
       #endif
     `);
     shader.fragmentShader = `
@@ -195,8 +255,10 @@ function terrainMaterial(detail, distanceFade) {
       uniform vec4 terrainDetailCorners;
       uniform sampler2D terrainDetailMap;
       uniform float terrainDetailBlend;
-      uniform float terrainDistanceFade;
-      varying vec3 vTerrainViewPosition;
+      #if !defined(QUALITY_ULTRALOW) && !defined(QUALITY_PERFORMANCE)
+        uniform float terrainDistanceFade;
+        varying vec3 vTerrainViewPosition;
+      #endif
     ` + shader.fragmentShader;
   };
   return material;
@@ -589,8 +651,9 @@ function heightOnTriangle(positions, x, z, a, b, c, heights) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world }) {
+  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced' }) {
     this.origin = origin;
+    this.renderQuality = resolveRenderQuality(quality);
     this.protectedAreas = protectedAreas;
     this._authority = createAuthorityZones(authorityZonesFromBounds(protectedAreas || []));
     this.insets = insets;
@@ -791,7 +854,10 @@ export class OpenWorldTerrain {
   }
 
   setImageryQuality(renderQuality, maxAnisotropy = defaultAnisotropy) {
-    const preset = RENDER_QUALITY[resolveRenderQuality(renderQuality)];
+    const resolvedQuality = resolveRenderQuality(renderQuality);
+    const qualityChanged = this.renderQuality !== resolvedQuality;
+    this.renderQuality = resolvedQuality;
+    const preset = RENDER_QUALITY[resolvedQuality];
     const anisotropy = Math.max(1, Math.min(preset.terrainAnisotropy ?? defaultAnisotropy, maxAnisotropy || defaultAnisotropy));
     const next = {
       detailTileLimit: preset.terrainDetailTiles ?? detailTileLimit,
@@ -800,13 +866,26 @@ export class OpenWorldTerrain {
       anisotropy,
     };
     const prev = this.imageryBudget;
-    if (prev.detailTileLimit === next.detailTileLimit
-      && prev.highDetailTileLimit === next.highDetailTileLimit
-      && prev.ultraDetailTileLimit === next.ultraDetailTileLimit
-      && prev.anisotropy === next.anisotropy) return;
+    const budgetChanged = (prev.detailTileLimit !== next.detailTileLimit
+      || prev.highDetailTileLimit !== next.highDetailTileLimit
+      || prev.ultraDetailTileLimit !== next.ultraDetailTileLimit
+      || prev.anisotropy !== next.anisotropy);
+    if (!budgetChanged && !qualityChanged) return;
     const anisotropyChanged = prev.anisotropy !== next.anisotropy;
     this.imageryBudget = next;
     this.nextImagerySelection = 0;
+    if (qualityChanged) {
+      for (const entry of this.tiles.values()) {
+        if (entry.mesh?.material) {
+          applyTerrainMaterialQuality(entry.mesh.material, resolvedQuality);
+          entry.mesh.receiveShadow = resolvedQuality !== 'ultraLow';
+        }
+        if (entry.localMesh?.material) {
+          applyTerrainMaterialQuality(entry.localMesh.material, resolvedQuality);
+          entry.localMesh.receiveShadow = resolvedQuality !== 'ultraLow';
+        }
+      }
+    }
     if (anisotropyChanged) {
       for (const entry of this.tiles.values()) {
         for (const tex of [entry.baseMap, entry.detailMap, entry.previousDetailMap]) {
@@ -1316,10 +1395,10 @@ export class OpenWorldTerrain {
         edges: { value: new THREE.Vector4(1, 1, 1, 1) },
         corners: { value: new THREE.Vector4(1, 1, 1, 1) },
       };
-      const material = terrainMaterial(detail, this.distanceFade);
+      const material = terrainMaterial(detail, this.distanceFade, this.renderQuality);
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
-      mesh.receiveShadow = true;
+      mesh.receiveShadow = this.renderQuality !== 'ultraLow';
       entry = { mesh, fullGeometry: geometry, cellOffsets, runwayCutouts: cutouts, runwayVisibilityKey: this.runwayVisibilityKey(), detail, water, raster, waterRetryAt: performance.now() + 8000, baseMap: null, detailLevel: zoom, bounds };
       if (this.localImagery) {
         const [west, north, eastEdge, southEdge] = bounds;
@@ -1329,7 +1408,7 @@ export class OpenWorldTerrain {
           const localGeometry = buildLocalImageryGeometry(this.localImagery, x, y);
           if (localGeometry) {
             entry.localMesh = new THREE.Mesh(localGeometry, material);
-            entry.localMesh.receiveShadow = true;
+            entry.localMesh.receiveShadow = this.renderQuality !== 'ultraLow';
             entry.localMesh.visible = false;
             mesh.add(entry.localMesh);
           }
@@ -1492,6 +1571,7 @@ export function updateOpenWorldTerrain(sim) {
         protectedAreas,
         localSurface,
         world: sim.world,
+        quality: sim.renderQuality,
       });
       surface.mesh.add(surface.openWorld.group);
     }
