@@ -548,6 +548,12 @@ class FlightSimulator {
     await startupDetail('startup.detail.selectedAirport');
     inputLatency?.mark('startup-airport-start');
     await this.setAirport(savedSelection.airport);
+    if (savedSelection.airport === 'patagonia' && !this.patagoniaTerrain?.isLoaded) {
+      await new Promise(resolve => {
+        this.patagoniaTerrain.onLoaded = resolve;
+        if (this.patagoniaTerrain.loadError) resolve();
+      });
+    }
     inputLatency?.mark('startup-airport-end');
 
     // Resize handler
@@ -1687,7 +1693,7 @@ class FlightSimulator {
     }
 
     // 3. Update Environment Animations & Explosion Particles
-    if (this.activeAirport !== 'lukla') {
+    if (!['lukla', 'patagonia'].includes(this.activeAirport)) {
       this.water.update(frameDelta, this.camera ? this.camera.position : this.position);
       if (this.activeAirport === 'coastal') this.ships?.update(frameDelta, this.totalSimTime);
     }

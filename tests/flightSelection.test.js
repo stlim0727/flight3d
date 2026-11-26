@@ -58,7 +58,7 @@ test('default selection constants are valid', () => {
   assert.equal(DEFAULT_AIRPORT, 'incheon');
   assert.equal(DEFAULT_AIRCRAFT, 'B738');
   assert.equal(DEFAULT_SCENARIO, 'runway');
-  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju']);
+  assert.deepEqual([...VALID_AIRPORTS], ['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju', 'patagonia']);
 });
 
 test('resolveAirport accepts known airports and degrades unknown ones', () => {

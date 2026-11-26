@@ -19,6 +19,7 @@ export function aircraftSpec(aircraftId) {
 export function airportSpec(airportKey) {
   const data = APPROACH_DATA[airportKey];
   if (!data) return airportKey === 'valley' ? t('lobby.spec.valley') : '';
+  if (airportKey === 'patagonia') return t('lobby.spec.patagonia');
   const heading = String(Math.round(data.headingDeg)).padStart(3, '0');
   return `RWY ${heading}° · ${Math.round(data.elevationFt).toLocaleString('en-US')} FT · GS ${data.gsAngleDeg}°`;
 }

@@ -29,8 +29,8 @@ export const SPAWN_SCENARIOS = {
     lobbyButtonId: 'lobby-preset-challenge',
   },
   cruise: {
-    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju'],
-    labelKeys: { incheon: 'incheon.cruise', jeju: 'jeju.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise' },
+    airports: ['coastal', 'lukla', 'incheon', 'neon', 'jeju', 'patagonia'],
+    labelKeys: { incheon: 'incheon.cruise', jeju: 'jeju.cruise', coastal: 'cruise.6.000.ft', lukla: 'himalayan.cruise.13.000.ft', neon: 'neon.cruise', patagonia: 'patagonia.fitz.roy' },
     briefingKey: 'lobby.briefing.scenario.cruise',
     lobbyButtonId: 'lobby-preset-cru',
   },

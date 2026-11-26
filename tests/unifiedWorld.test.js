@@ -274,7 +274,7 @@ test('facade excludes modeled buildings in translated regions', () => {
 });
 
 test('every lobby airport has a distinct world slot', () => {
-  assert.deepEqual([...WORLD_REGIONS].sort(), ['coastal', 'incheon', 'jeju', 'lukla', 'neon', 'valley']);
+  assert.deepEqual([...WORLD_REGIONS].sort(), ['coastal', 'incheon', 'jeju', 'lukla', 'neon', 'patagonia', 'valley']);
   const ids = [...WORLD_REGIONS];
   for (let i = 0; i < ids.length; i++) {
     for (let j = i + 1; j < ids.length; j++) {

@@ -20,6 +20,7 @@ import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { castFarSunShadow } from '../environment/FarSunShadow.js';
 import { RENDER_QUALITY } from '../config/renderQuality.js';
+import patagoniaGrid from '../config/patagoniaTerrainGrid.json' with { type: 'json' };
 import { APPROACH_DATA } from '../config/approachData.js';
 import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
@@ -411,6 +412,26 @@ class PresetSpawnerMethods {
 
         this.showToast(() => t('preset.himalayan.cruise.13.000.ft'));
       }
+    } else if (this.activeAirport === 'patagonia') {
+      // Mountain-context cruise near Fitz Roy (49.271278 S, 73.043222 W).
+      // Heights come directly from the measured DEM; no grading is applied.
+      const headingRad = THREE.MathUtils.degToRad(215);
+      const speedMs = this.currentAircraftId === 'C172' ? 48 : 96;
+      const startX = 0, startZ = 1600;
+      const ground = this.currentTerrain?.getHeight?.(startX, startZ) ?? 2492;
+      this.position.set(startX, ground + 500, startZ);
+      this.linearVelocity.set(speedMs * Math.sin(headingRad), 0, -speedMs * Math.cos(headingRad));
+      this.angularVelocity.set(0, 0, 0);
+      this.quaternion.setFromEuler(new THREE.Euler(0, -headingRad, 0, 'YXZ'));
+      this.controls.throttle = 0.65;
+      this.engines.setThrottle(0.65);
+      this.engines.setReverser(false, true);
+      this.gear.setGearTarget(false);
+      this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
+      this.aero.setFlapPosition(0);
+      this.aero.spoilers = 0;
+      this.aero.pitchTrim = 0.9;
+      this.showToast(() => t('patagonia.fitz.roy'));
     } else if (this.activeAirport === 'valley' || type === 'valley') {
       const ground = this.currentTerrain?.getHeight?.(0, 0) ?? 2100;
       const safeAltitude = Math.max(ground + 100, 2200);
@@ -727,6 +748,13 @@ class PresetSpawnerMethods {
         },
       });
     }
+    if (this.patagoniaTerrain) world.register('patagonia', {
+      terrain: this.patagoniaTerrain,
+      airport: null,
+      group: null,
+      mesh: this.patagoniaTerrain.mesh,
+      extent: REGION_EXTENTS.patagonia,
+    });
     world.syncMeshes();
     // Coastal foliage and ships are separate scene groups; keep them aligned
     // with the coastal terrain group when the world anchor moves.
@@ -982,6 +1010,36 @@ class PresetSpawnerMethods {
     return this._luklaLoad;
   }
 
+  async ensurePatagoniaRegion() {
+    if (this.patagoniaTerrain) return this.patagoniaTerrain;
+    this._patagoniaLoad ??= import('../environment/RasterRegionSurface.js')
+      .then(({ RasterRegionSurface }) => {
+        const config = {
+          size: patagoniaGrid.worldSize,
+          gridSize: patagoniaGrid.gridSize,
+          segments: 255,
+          demUrl: 'terrain/patagonia/patagonia_dem.bin',
+          imageryUrl: 'terrain/patagonia/patagonia_satellite.jpg',
+          runway: { headingDeg: 215, lengthM: 0, widthM: 0, gradient: 0,
+            threshold06ElevationM: 2492, threshold24ElevationM: 2492, midElevationM: 2492 },
+          grading: { runwayFadeM: 0, widthFadeM: 0 },
+          terrace: { lengthM: 0, widthM: 0, segmentsX: 2, segmentsZ: 2,
+            depressionM: 0, coarseDepressionM: 0 },
+        };
+        this.patagoniaTerrain = new RasterRegionSurface(config, {
+          castShadow: mesh => castFarSunShadow(mesh),
+        });
+        this.patagoniaTerrain.mesh.visible = false;
+        this.scene?.add(this.patagoniaTerrain.mesh);
+        return this.patagoniaTerrain;
+      })
+      .catch(error => {
+        this._patagoniaLoad = null;
+        throw error;
+      });
+    return this._patagoniaLoad;
+  }
+
   async ensureIncheonRegion() {
     if (this.incheonAirport) return this.incheonAirport;
     this.incheonLoad ??= import('../environment/IncheonAirport.js')
@@ -1029,6 +1087,7 @@ class PresetSpawnerMethods {
     if (id === 'lukla') return this.ensureLuklaRegion();
     if (id === 'incheon') return this.ensureIncheonRegion();
     if (id === 'jeju') return this.ensureJejuRegion();
+    if (id === 'patagonia') return this.ensurePatagoniaRegion();
     return Promise.resolve(null);
   }
 
@@ -1037,6 +1096,7 @@ class PresetSpawnerMethods {
     if (id === 'lukla') return Boolean(this.luklaTerrain);
     if (id === 'incheon') return Boolean(this.incheonAirport);
     if (id === 'jeju') return Boolean(this.jejuSurface);
+    if (id === 'patagonia') return Boolean(this.patagoniaTerrain?.isLoaded) && !this.patagoniaTerrain.loadError;
     if (id === 'neon') return Boolean(this.neonCity);
     if (id === 'valley') return Boolean(this.persistentValley);
     return false;
@@ -1047,6 +1107,7 @@ class PresetSpawnerMethods {
     if (id === 'lukla') return Boolean(this.luklaTerrain || this._luklaLoad);
     if (id === 'incheon') return Boolean(this.incheonAirport || this.incheonLoad);
     if (id === 'jeju') return Boolean(this.jejuSurface);
+    if (id === 'patagonia') return Boolean(this.patagoniaTerrain || this._patagoniaLoad);
     if (id === 'neon') return Boolean(this.neonCity || this._neonLoad);
     if (id === 'valley') return Boolean(this.persistentValley || this._valleyLoad);
     return false;
@@ -1116,7 +1177,7 @@ class PresetSpawnerMethods {
     if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('airport-changed');
     this.renderDiagnosticsPanel?.close();
-    if (!['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju'].includes(id)) return;
+    if (!['coastal', 'lukla', 'incheon', 'neon', 'valley', 'jeju', 'patagonia'].includes(id)) return;
     if (this.activeAirport === id) {
       if (this.syncUnifiedWorld(id)) return;
       if (id === 'incheon' && this.incheonAirport) {
@@ -1193,6 +1254,7 @@ class PresetSpawnerMethods {
     const isCoastal = id === 'coastal';
     const isNeon = id === 'neon';
     const isValley = id === 'valley';
+    const isPatagonia = id === 'patagonia';
     if (isCoastal && this.startupReady && this.ships) this.ships.loadAssets();
     if (isIncheon || isJeju || isLukla) this.ensureGeographicLayers?.();
     setMapAttributionSource('incheon-attribution', isIncheon);
@@ -1200,11 +1262,12 @@ class PresetSpawnerMethods {
     // Toggle 3D mesh visibility
     if (this.terrain?.mesh) this.terrain.mesh.visible = isCoastal;
     if (this.airport?.group) this.airport.group.visible = isCoastal;
-    if (this.water?.mesh) this.water.mesh.visible = !isLukla && !isNeon && !isValley;
+    if (this.water?.mesh) this.water.mesh.visible = !isLukla && !isNeon && !isValley && !isPatagonia;
     if (this.ships?.group) this.ships.group.visible = isCoastal;
     if (this.foliage?.group) this.foliage.group.visible = isCoastal;
 
     if (this.luklaTerrain?.mesh) this.luklaTerrain.mesh.visible = isLukla;
+    if (this.patagoniaTerrain?.mesh) this.patagoniaTerrain.mesh.visible = isPatagonia;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
     if (this.neonCity?.group) this.neonCity.group.visible = isNeon;
@@ -1213,6 +1276,7 @@ class PresetSpawnerMethods {
       : isIncheon ? this.incheonAirport.terrain
       : isLukla ? this.luklaTerrain
       : isValley ? this.persistentValley
+      : isPatagonia ? this.patagoniaTerrain
       : this.terrain;
     this.currentAirport = isNeon ? this.neonCity.airport
       : isIncheon ? this.incheonAirport

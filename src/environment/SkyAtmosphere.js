@@ -492,7 +492,7 @@ export class SkyAtmosphere {
     this.sky.visible = !isNeon;
     this.cloudsGroup.visible = !isNeon;
     // Elevate fair-weather cloud deck high above Himalayan peaks (base ~6,200m / 20,300 FT)
-    this.cloudsGroup.position.y = airportId === 'lukla' ? 3400 : 0;
+    this.cloudsGroup.position.y = airportId === 'lukla' ? 3400 : airportId === 'patagonia' ? 4100 : 0;
     this.updateSun();
   }
 }

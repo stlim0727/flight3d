@@ -38,6 +38,7 @@ export const BASE_OFFSETS = Object.freeze({
   lukla: Object.freeze([LUKLA_IN_INCHEON[0], LUKLA_IN_INCHEON[1]]),
   coastal: Object.freeze([-80000, -60000]),
   neon: Object.freeze([80000, -60000]),
+  patagonia: Object.freeze([12369532.889003957, 13037392.137705116]),
   valley: Object.freeze([0, -180000]),
 });
 
@@ -52,6 +53,7 @@ export const REGION_EXTENTS = Object.freeze({
   lukla: Object.freeze({ minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 }),
   coastal: Object.freeze({ minX: -12000, maxX: 12000, minZ: -12000, maxZ: 12000 }),
   neon: Object.freeze({ minX: -10000, maxX: 10000, minZ: -10000, maxZ: 10000 }),
+  patagonia: Object.freeze({ minX: -22000, maxX: 22000, minZ: -22000, maxZ: 22000 }),
   valley: Object.freeze({ minX: -30000, maxX: 30000, minZ: -30000, maxZ: 30000 }),
 });
 
@@ -61,12 +63,14 @@ export const REGION_NAME_KEYS = Object.freeze({
   jeju: 'jeju.airport',
   lukla: 'lukla.vnlk',
   neon: 'neon.metropolis',
+  patagonia: 'patagonia.fitz.roy',
   valley: 'valley.region',
 });
 
 export const REGION_CODES = Object.freeze({
   coastal: 'CST', incheon: 'ICN', jeju: 'CJU',
   lukla: 'LUK', neon: 'NEO', valley: 'VAL',
+  patagonia: 'PTR',
 });
 
 const _normal = new THREE.Vector3();
