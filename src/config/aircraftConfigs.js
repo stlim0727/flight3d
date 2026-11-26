@@ -22,3 +22,27 @@ export const AIRCRAFT_SPECS = Object.freeze({
 });
 
 export const AircraftSpecs = AIRCRAFT_SPECS;
+
+const addonConfigs = new Map();
+const addonSpecs = new Map();
+
+export function registerAddonAircraft(descriptors = []) {
+  for (const descriptor of descriptors) {
+    if (!descriptor?.id || !descriptor.config) continue;
+    addonConfigs.set(descriptor.id, descriptor.config);
+    addonSpecs.set(descriptor.id, descriptor.spec);
+  }
+  return addonConfigs.size;
+}
+
+export function resolveAircraftConfig(aircraftId) {
+  return AIRCRAFT_REGISTRY[aircraftId] ?? addonConfigs.get(aircraftId) ?? null;
+}
+
+export function resolveAircraftSpec(aircraftId) {
+  return AIRCRAFT_SPECS[aircraftId] ?? addonSpecs.get(aircraftId) ?? null;
+}
+
+export function addonAircraftIds() {
+  return [...addonConfigs.keys()];
+}

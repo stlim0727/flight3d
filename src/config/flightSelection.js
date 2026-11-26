@@ -1,4 +1,4 @@
-import { AIRCRAFT_REGISTRY, DEFAULT_AIRCRAFT_ID } from './aircraftConfigs.js';
+import { AIRCRAFT_REGISTRY, DEFAULT_AIRCRAFT_ID, resolveAircraftConfig } from './aircraftConfigs.js';
 import { EXTERNAL_DESTINATION_CODES } from './externalDestinations.js';
 import { DEFAULT_SCENARIO, defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from './scenarioRegistry.js';
 
@@ -40,7 +40,7 @@ export function resolveFlightSelection({ airport: airportWish, aircraft: aircraf
 }
 
 export function resolveAircraft(aircraft) {
-  return Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) ? aircraft : DEFAULT_AIRCRAFT;
+  return resolveAircraftConfig(aircraft) ? aircraft : DEFAULT_AIRCRAFT;
 }
 
 export function resolveScenario(scenario, airport = DEFAULT_AIRPORT, aircraft = DEFAULT_AIRCRAFT) {

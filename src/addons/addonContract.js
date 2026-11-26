@@ -142,6 +142,55 @@ function validateAircraftBinding(aircraft, errors) {
     }
   }
   if (aircraft.script) errors.push('external scripts are not allowed in v1');
+  validateAircraftAnimation(aircraft.animation, errors);
+}
+
+const ANIMATION_CONTROLS = new Set(['azimuth', 'elevator', 'rudder', 'flaps', 'gear', 'ailerons']);
+const ANIMATION_INPUTS = new Set(['elevator', 'aileron', 'rudder', 'normalized', 'rpm', 'gearState', 'flapsIndex', 'compressions']);
+
+function validateAircraftAnimation(animation, errors) {
+  if (animation === undefined) return;
+  if (!animation || animation.schema !== 'transform-v1' || !animation.controls
+    || typeof animation.controls !== 'object' || Array.isArray(animation.controls)) {
+    errors.push('aircraft.animation needs schema transform-v1 and a controls object');
+    return;
+  }
+  if (animation.script) errors.push('aircraft.animation.script is forbidden');
+  const nodes = new Set();
+  for (const [control, binding] of Object.entries(animation.controls)) {
+    const where = `aircraft.animation.controls.${control}`;
+    if (!ANIMATION_CONTROLS.has(control)) {
+      errors.push(`${where} is unsupported`);
+      continue;
+    }
+    if (!binding || typeof binding !== 'object' || Array.isArray(binding)) {
+      errors.push(`${where} must be an object`);
+      continue;
+    }
+    if (typeof binding.node !== 'string' || !binding.node) errors.push(`${where}.node is required`);
+    else if (nodes.has(binding.node)) errors.push(`${where}.node duplicates ${binding.node}`);
+    else nodes.add(binding.node);
+    if (!['x', 'y', 'z'].includes(binding.axis)) errors.push(`${where}.axis must be x, y or z`);
+    if (!ANIMATION_INPUTS.has(binding.input)) errors.push(`${where}.input is unsupported`);
+    if (!Number.isFinite(binding.neutralDeg ?? 0)) errors.push(`${where}.neutralDeg must be finite`);
+    if (binding.rangeDeg !== undefined && (!Array.isArray(binding.rangeDeg)
+      || binding.rangeDeg.length !== 2 || !binding.rangeDeg.every(Number.isFinite)
+      || binding.rangeDeg[0] >= binding.rangeDeg[1])) {
+      errors.push(`${where}.rangeDeg needs a finite [min, max] pair`);
+    }
+    if (binding.rpmRange !== undefined && (!Array.isArray(binding.rpmRange)
+      || binding.rpmRange.length !== 2 || !binding.rpmRange.every(value => Number.isFinite(value) && value >= 0)
+      || binding.rpmRange[0] >= binding.rpmRange[1])) {
+      errors.push(`${where}.rpmRange needs a finite [min, max] pair`);
+    }
+    if (binding.smoothingSec !== undefined && (!Number.isFinite(binding.smoothingSec) || binding.smoothingSec < 0)) {
+      errors.push(`${where}.smoothingSec must be non-negative`);
+    }
+    if (binding.pivot !== undefined && (!binding.pivot || typeof binding.pivot !== 'object'
+      || !['x', 'y', 'z'].every(axis => Number.isFinite(binding.pivot[axis])))) {
+      errors.push(`${where}.pivot needs finite x, y and z`);
+    }
+  }
 }
 
 function validateScenarioDeclaration(scenario, errors) {
