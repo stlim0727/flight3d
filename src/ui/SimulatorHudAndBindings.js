@@ -253,16 +253,9 @@ class SimulatorHudAndBindingsMethods {
       if (!available && map.open) map.open = false;
       // The Busan cruise stays a chart-reading flight without landmark pins.
       this.pilotageFlight = available && busanCruise;
-      let layout = '';
-      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
-        if (this.cameraSystem.mode === CameraSystem.MODES.COCKPIT) layout = 'cockpit';
-        else {
-          this.mobileChartQuery ??= window.matchMedia('(pointer: coarse), (max-width: 600px)');
-          if (this.mobileChartQuery.matches) layout = 'external';
-        }
-      }
-      this.setPilotageLayout(layout);
-      if (available && map.open && this.gameFlow.state === FLOW.FLIGHT) {
+      const chartOpen = available && map.open && this.gameFlow.state === FLOW.FLIGHT;
+      this.cameraSystem.chartPitchOffset = chartOpen && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT ? -0.12 : 0;
+      if (chartOpen) {
         if (this.pilotageFrame?.origin !== chartOrigin || this.chartBusanCruise !== busanCruise) {
           this.pilotageChart?.hide();
           this.pilotageFrame = chartSceneFrame(this);
@@ -1075,20 +1068,9 @@ class SimulatorHudAndBindingsMethods {
     }
   }
 
-  setPilotageLayout(layout) {
-    if ((this.pilotageLayout || '') === layout) return;
-    const resize = layout === 'external' || this.pilotageLayout === 'external';
-    this.pilotageLayout = layout;
-    document.body.dataset.pilotageLayout = layout;
-    this.cameraSystem.chartPitchOffset = layout === 'cockpit' ? -0.12 : 0;
-    if (resize) this.handleResize();
-  }
-
   handleResize() {
     applyUiScale(computeUiScale(window.innerWidth, window.innerHeight));
-    const split = this.pilotageLayout === 'external';
-    const width = split ? this.container.clientWidth : window.innerWidth;
-    const height = split ? this.container.clientHeight : window.innerHeight;
+    const width = window.innerWidth, height = window.innerHeight;
     this.camera.aspect = width / height;
     const isCockpit = this.cameraSystem && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT;
     let targetFov = isCockpit ? 60 : 54;
