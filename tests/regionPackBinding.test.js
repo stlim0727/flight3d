@@ -72,3 +72,16 @@ test('PMTiles packs stay archive URLs and share profiles use browser-safe base64
   assert.doesNotMatch(params.get('profile'), /[+/=]/);
   assert.equal(readProfileShareParams(params.toString()).pins.length, 1);
 });
+
+test('xyz tile URLs preserve query strings when a version segment is added', async () => {
+  const withQuery = { ...manifest, region: { ...manifest.region,
+    tiles: { ...manifest.region.tiles, url: 'https://packs.example/poc/tiles/{z}/{y}/{x}.png?token=secret' } } };
+  const catalogQuery = { schemaVersion: 1, addons: [{ id: withQuery.id, version: withQuery.version,
+    url: manifestUrl, sha256: hash(withQuery) }] };
+  const full = await resolveProfile(catalogQuery, [withQuery.id], {
+    coreVersion: '1.8.0',
+    fetchImpl: async () => ({ ok: true, arrayBuffer: async () => Buffer.from(JSON.stringify(withQuery)) }),
+  });
+  const binding = regionPackFromProfile(full, withQuery.id, { coreVersion: '1.8.0' });
+  assert.equal(binding.urlTemplate, 'https://packs.example/poc/tiles/1.0.0/{z}/{y}/{x}.png?token=secret');
+});

@@ -132,3 +132,9 @@ test('coreRange is validated even without a target core version', () => {
   invalid.coreRange = { min: 'garbage', maxExclusive: 'also-invalid' };
   assert.equal(validateAddonManifest(invalid).ok, false);
 });
+
+test('catalogs reject duplicate id and version pins', () => {
+  const manifest = fixture();
+  const entry = { id: manifest.id, version: manifest.version, url: 'https://packs.example/a', sha256: schemaHash(manifest) };
+  assert.equal(validateCatalog({ schemaVersion: 1, addons: [entry, { ...entry }] }).ok, false);
+});

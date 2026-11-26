@@ -311,8 +311,10 @@ export function validateCatalog(catalog) {
       continue;
     }
     validResource({ url: entry.url, sha256: entry.sha256 }, errors, `catalog ${entry.id}`);
-    if (seen.has(entry.id) && seen.get(entry.id) !== entry.version) {
-      errors.push(`conflicting pins for ${entry.id}`);
+    if (seen.has(entry.id)) {
+      errors.push(seen.get(entry.id) === entry.version
+        ? `duplicate catalog entry for ${entry.id}@${entry.version}`
+        : `conflicting pins for ${entry.id}`);
     }
     seen.set(entry.id, entry.version);
   }

@@ -26,7 +26,7 @@ export function regionPackFromProfile(profile, packId, { coreVersion, baseUrl } 
     }
     const rest = segments.slice(segments.findIndex(segment => segment === versionSegment || segment === pin.version) + 1);
     if (!rest.some(segment => /[{[](?:z|x|y)[}\]]/.test(segment))) segments.push('{z}', '{y}', '{x}');
-    urlTemplate = `${url.origin}/${segments.join('/')}`;
+    urlTemplate = `${url.origin}/${segments.join('/')}${url.search}`;
   }
   const bounds = manifest.region.bounds;
   return Object.freeze({
