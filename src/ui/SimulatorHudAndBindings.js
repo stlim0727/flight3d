@@ -19,6 +19,7 @@ import { LobbyCameraModal } from './LobbyCameraModal.js';
 import { RenderDiagnosticsPanel } from './RenderDiagnosticsPanel.js';
 import { defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from '../config/scenarioRegistry.js';
 import { saveSimulatorPreferences } from '../config/simulatorPreferences.js';
+import { addonAircraftIds } from '../config/aircraftConfigs.js';
 import { computeUiScale, applyUiScale } from './UiScale.js';
 import { bindMapAttribution } from './mapAttribution.js';
 import { SoutheastAtlas } from './SoutheastAtlas.js';
@@ -702,6 +703,7 @@ class SimulatorHudAndBindingsMethods {
       // Without a chosen time a flight starts on the device clock, whatever the backdrop demo shows.
       isDeviceTime: () => this.demoDirector?.userTimeOfDayOverridden === false,
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
+      getAircraftOptions: () => addonAircraftIds(),
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getDestination: () => this.lobby.destination || 'none',

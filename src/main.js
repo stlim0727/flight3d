@@ -18,7 +18,7 @@ import { cockpitCasterState } from './aircraft/CockpitLighting.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
-import { AIRCRAFT_REGISTRY, BOEING_737_800 } from './config/aircraftConfigs.js';
+import { BOEING_737_800, registerAddonAircraft, resolveAircraftConfig } from './config/aircraftConfigs.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
 import { PilotPhysiology } from './physics/PilotPhysiology.js';
 import { SIM_CONFIG } from './config/simConfig.js';
@@ -79,6 +79,7 @@ import {
 } from './config/flightSelection.js';
 import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
 import { resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
+import { AddonAircraft } from './aircraft/AddonAircraft.js';
 import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
@@ -176,6 +177,7 @@ class FlightSimulator {
     await startupStage(0, 'startup.scene');
     try {
       this.pinnedAddonPack = await resolveAddonPinnedPack(window.location.search);
+      if (this.pinnedAddonPack?.config) registerAddonAircraft([this.pinnedAddonPack]);
     } catch (error) {
       startupProgress.failure?.(error.message);
       throw error;
@@ -341,7 +343,7 @@ class FlightSimulator {
       this.showToast(() => t('camera.view.centered'));
     };
     this.cameraSystem.onGazeClick = (clientX, clientY) => this.handleGazeCanvasClick(clientX, clientY);
-    this.loadAircraftConfig(AIRCRAFT_REGISTRY[savedSelection.aircraft] || BOEING_737_800);
+    this.loadAircraftConfig(resolveAircraftConfig(savedSelection.aircraft) || BOEING_737_800);
     this.diagnostics = new DiagnosticsInspector(this);
     if (typeof window !== 'undefined' && (new URLSearchParams(window.location.search).has('fps') || new URLSearchParams(window.location.search).has('diagnostics'))) {
       this.diagnostics.show();
@@ -1169,7 +1171,10 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
-    const instance = aircraftId === 'F16'
+    const addon = this.pinnedAddonPack?.id === aircraftId ? this.pinnedAddonPack : null;
+    const instance = addon
+      ? new AddonAircraft(addon)
+      : aircraftId === 'F16'
       ? new F16()
       : aircraftId === 'C172'
         ? new Cessna172(this.pfdCanvas, this.ndCanvas)
@@ -1195,7 +1200,7 @@ class FlightSimulator {
    * first-draw uploads, instead of those uploads and the whole geometry build.
    */
   prebuildAircraftInstance(aircraftId) {
-    if (!AIRCRAFT_REGISTRY[aircraftId]) return false;
+    if (!resolveAircraftConfig(aircraftId)) return false;
     if (this.aircraftInstances.has(aircraftId)) return false;
     let instance;
     try {
@@ -1392,7 +1397,7 @@ class FlightSimulator {
   setAircraft(aircraftId = 'B738', pilotPreparation = false) {
     if (this.multiplayer?.locked) return;
     if (this.pilotArena?.active && !pilotPreparation) this.pilotArena.stop('aircraft-changed');
-    const config = AIRCRAFT_REGISTRY[aircraftId];
+    const config = resolveAircraftConfig(aircraftId) || BOEING_737_800;
     if (!config) return;
     this.bridgeFlight?.stop();
     this.renderDiagnosticsPanel?.close();

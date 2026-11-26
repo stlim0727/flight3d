@@ -3,7 +3,7 @@ import { demoProfiles, resolveDemoProfile } from '../director/demoProfiles.js';
 import { bindText, getLanguage, setLanguage, t } from '../i18n/index.js';
 import { lobbyBriefing } from './lobbyBriefing.js';
 import { aircraftSpec } from './lobbySpecs.js';
-import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
 import { DEFAULT_AIRPORT, DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
@@ -69,7 +69,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {}, getHeldFlight }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, getAircraftOptions = () => [], onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {}, getHeldFlight }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -1023,6 +1023,23 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       }
     });
   }
+  if (aircraftPicker) {
+    for (const aircraftId of getAircraftOptions().filter(id => !AIRCRAFT_BUTTONS[id])) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.id = `lobby-aircraft-${aircraftId}`;
+      button.className = 'btn btn-aircraft';
+      const label = document.createElement('span');
+      label.textContent = resolveAircraftConfig(aircraftId)?.name ?? aircraftId;
+      button.append(label);
+      button.addEventListener('click', () => {
+        onAircraft?.(aircraftId);
+        aircraftPicker.open = false;
+        aircraftPicker.querySelector('summary')?.focus();
+      });
+      aircraftPicker.querySelector('.lobby-buttons')?.append(button);
+    }
+  }
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
     if (type === 'demo') continue;
     const button = document.getElementById(scenario.lobbyButtonId);
@@ -1123,7 +1140,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       place: placeName(),
       length: (placeProfile?.longestRunwayM ?? 0).toLocaleString('en-US'),
       min: (placeProfile?.minRunwayM ?? 0).toLocaleString('en-US'),
-      aircraft: AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name ?? getAircraft?.() ?? 'B738',
+      aircraft: resolveAircraftConfig(getAircraft?.() ?? 'B738')?.name ?? getAircraft?.() ?? 'B738',
     });
     if (place) {
       // Just the place name; why a start is locked is said under the start buttons.
@@ -1148,10 +1165,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       return;
     }
     const aircraft = getAircraft?.() ?? 'B738';
-    if (aircraftSummary) bindText(aircraftSummary, () => AIRCRAFT_REGISTRY[aircraft]?.name ?? aircraft);
+    if (aircraftSummary) bindText(aircraftSummary, () => resolveAircraftConfig(aircraft)?.name ?? aircraft);
     const lockedAircraft = requiredAircraft(getPreset()) ?? (airport === 'valley' ? aircraft : null);
     setReason(aircraftReason, lockedAircraft ? 'lobby.reason.aircraftLocked' : null,
-      { aircraft: AIRCRAFT_REGISTRY[lockedAircraft]?.name ?? lockedAircraft });
+      { aircraft: resolveAircraftConfig(lockedAircraft)?.name ?? lockedAircraft });
     for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
       const el = document.getElementById(id);
       if (!el) continue;
@@ -1188,7 +1205,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       const scenarioTitle = preset === 'demo'
         ? t('demo.scenario.title', { title: t(resolveDemoProfile(getAircraft?.(), airport, getDemoProfile?.()).labelKey) })
         : (labelKey && t(labelKey));
-      return [...new Set(['Flight3d', AIRCRAFT_REGISTRY[getAircraft?.() ?? 'B738']?.name,
+      return [...new Set(['Flight3d', resolveAircraftConfig(getAircraft?.() ?? 'B738')?.name,
         lobbyBriefing(airport, preset)[0], scenarioTitle].filter(Boolean))].join(' | ');
     });
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
@@ -1305,7 +1322,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
       if (managedAircraft) {
         bindText(managedAircraft, () => {
-          return AIRCRAFT_REGISTRY[heldAircraft]?.name || heldAircraft;
+          return resolveAircraftConfig(heldAircraft)?.name || heldAircraft;
         });
       }
       if (managedAirport) {

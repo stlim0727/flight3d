@@ -1,5 +1,6 @@
 import { resolveProfile, sha256Hex, validateAddonManifest, validateCatalog } from './addonContract.js';
 import { profileShareParams, readProfileShareParams, regionPackFromProfile } from './regionPackBinding.js';
+import { aircraftPackFromProfile } from './aircraftPackBinding.js';
 
 const KIND_FROM_ID = /^[a-z0-9][a-z0-9._-]*\/(region|aircraft|scenario)\/[a-z0-9][a-z0-9._-]*$/;
 
@@ -83,6 +84,12 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
     : resolved.pins.find(pin => pin.manifest?.region);
   if (regionPin) {
     return regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore });
+  }
+  const aircraftPin = requestedPin?.manifest?.aircraft
+    ? requestedPin
+    : resolved.pins.find(pin => pin.manifest?.aircraft);
+  if (aircraftPin) {
+    return aircraftPackFromProfile(resolved, aircraftPin.id, { coreVersion: effectiveCore });
   }
   const primaryPin = requestedPin ?? resolved.pins[0];
   return Object.freeze({

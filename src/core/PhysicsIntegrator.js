@@ -207,6 +207,13 @@ export class PhysicsIntegratorMethods {
 
     // Enrich telemetry with simulator/app-level fields
     this.telemetry = result.telemetry;
+    this.telemetry.controlInputs = {
+      elevator: this.controls.elevator,
+      aileron: this.controls.aileron,
+      rudder: this.controls.rudder,
+      flaps: this.aero?.flapsIndex ?? 0,
+      gear: this.gear?.gearState ?? this.telemetry.gearState ?? 1,
+    };
     this.telemetry.apEngaged = this.autopilot.master;
     this.telemetry.airportKey = this.world?.customOrigin ? null : this.activeAirport;
     this.telemetry.destination = this.destinationAirport && this.destinationAirport !== 'none'
