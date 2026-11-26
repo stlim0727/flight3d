@@ -34,6 +34,7 @@ export class LobbyCameraModal {
     this.cameraSystem = simulator?.cameraSystem || simulator;
 
     this.dialog = typeof document !== 'undefined' ? document.getElementById('lobby-camera-modal') : null;
+    if (this.dialog?.style) this.dialog.style.pointerEvents = 'auto';
     this.lobbyBtn = typeof document !== 'undefined' ? document.getElementById('btn-lobby-camera') : null;
     this.lobbyBtnLabel = typeof document !== 'undefined' ? document.getElementById('lobby-camera-btn-label') : null;
     this.titleEl = typeof document !== 'undefined' ? document.getElementById('lobby-camera-title') : null;
@@ -137,6 +138,11 @@ export class LobbyCameraModal {
           this.close();
         }
       });
+
+      // Keep the 3D canvas from treating dialog gestures as camera drags.
+      for (const type of ['mousedown', 'pointerdown', 'touchstart', 'wheel']) {
+        this.dialog.addEventListener(type, event => event.stopPropagation(), { passive: true });
+      }
     }
 
     if (this.cameraSystem) {
@@ -249,6 +255,7 @@ export class LobbyCameraModal {
     this.cameraSystem?.loadCockpitUserOffset?.(aircraftId);
 
     this.isOpen = true;
+    this.dialog.removeAttribute('hidden');
     this.dialog.hidden = false;
     if (typeof this.dialog.showModal === 'function' && !this.dialog.open) {
       try { this.dialog.showModal(); } catch { this.dialog.setAttribute('open', ''); }
@@ -283,12 +290,13 @@ export class LobbyCameraModal {
   close() {
     if (!this.dialog) return;
     this.isOpen = false;
+    this.dialog.hidden = true;
+    this.dialog.setAttribute('hidden', '');
     if (typeof this.dialog.close === 'function' && this.dialog.open) {
       try { this.dialog.close(); } catch { this.dialog.removeAttribute('open'); }
     } else {
       this.dialog.removeAttribute('open');
     }
-    this.dialog.hidden = true;
     this.lobbyBtn?.setAttribute('aria-expanded', 'false');
 
     // Restore prior camera mode and selection state

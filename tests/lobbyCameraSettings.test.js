@@ -80,6 +80,7 @@ test('CameraSystem saves and resets cockpit user offset per aircraft', () => {
 test('LobbyCameraModal syncs with CameraSystem and controls', () => {
   const previousDocument = globalThis.document;
   const previousLocalStorage = globalThis.localStorage;
+  const previousWindow = globalThis.window;
   const store = new Map();
   globalThis.localStorage = {
     getItem: (key) => store.get(key) ?? null,
@@ -94,11 +95,13 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
       id,
       hidden: true,
       value: '0',
+      style: {},
       textContent: '',
-      attributes: {},
+      attributes: id === 'lobby-camera-modal' ? { hidden: '' } : {},
       setAttribute: (k, v) => { el.attributes[k] = v; },
       getAttribute: (k) => el.attributes[k] ?? null,
       removeAttribute: (k) => { delete el.attributes[k]; },
+      containsAttribute: (k) => Object.hasOwn(el.attributes, k),
       addEventListener: (evt, fn) => {
         listeners[evt] = listeners[evt] || [];
         listeners[evt].push(fn);
@@ -136,6 +139,9 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
   globalThis.document = {
     getElementById: (id) => elements.get(id) || null,
   };
+  globalThis.window = {
+    addEventListener: () => {},
+  };
 
   try {
     const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
@@ -168,6 +174,11 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     modal.open();
     assert.equal(setAircraftCalledWith, 'F16');
     assert.equal(elements.get('lobby-camera-modal').open, true);
+    assert.equal(elements.get('lobby-camera-modal').hidden, false);
+    assert.equal(elements.get('lobby-camera-modal').containsAttribute('hidden'), false,
+      'native hidden must be removed so the modal accepts UI clicks');
+    assert.equal(elements.get('lobby-camera-modal').style.pointerEvents, 'auto',
+      'modal must opt back into pointer events inside the pointer-transparent HUD overlay');
     assert.equal(elements.get('lobby-camera-title').textContent, '카메라 설정 · F-16');
     assert.equal(cam.mode, CameraSystem.MODES.COCKPIT);
 
@@ -201,6 +212,7 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     // Close modal: userModeSelected must be restored to original false
     modal.close();
     assert.equal(elements.get('lobby-camera-modal').open, false);
+    assert.equal(elements.get('lobby-camera-modal').containsAttribute('hidden'), true);
     assert.equal(cam.userModeSelected, false);
 
     // Test with held sortie (canResumeFromLobby = true): must NOT switch aircraft
@@ -233,6 +245,8 @@ test('LobbyCameraModal syncs with CameraSystem and controls', () => {
     else globalThis.document = previousDocument;
     if (previousLocalStorage === undefined) delete globalThis.localStorage;
     else globalThis.localStorage = previousLocalStorage;
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
   }
 });
 
