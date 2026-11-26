@@ -82,6 +82,7 @@ dialog.lobby-addon-dialog {
   border: 0;
   background: transparent;
   color: #e2e8f0;
+  pointer-events: auto;
 }
 dialog.lobby-addon-dialog::backdrop {
   background: rgba(5, 10, 24, .72);
@@ -105,6 +106,7 @@ dialog.lobby-addon-dialog::backdrop {
 }
 .lobby-addon-dialog-header h2 { margin: 0; font-size: 16px; font-weight: 700; color: #f1f5f9; }
 .lobby-addon-dialog-body { padding: 14px 18px 18px; overflow-y: auto; max-height: calc(88dvh - 70px); box-sizing: border-box; }
+.lobby-addon-dialog-body .addon-picker h3 { display: none; }
 .addon-picker { margin-bottom: 0; }
 .addon-picker h3 { margin: 0 0 .25rem; font-size: 1rem; }
 .addon-picker-hint { margin: 0 0 .6rem; font-size: .85rem; opacity: .8; }
