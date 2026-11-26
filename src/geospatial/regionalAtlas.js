@@ -1,10 +1,10 @@
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
-import { PMTiles } from 'pmtiles';
+import { RetryablePMTiles } from './RetryablePMTiles.js';
 import { tileToWgs84 } from './TileCoordinateSystem.js';
 
 export const ATLAS_ZOOM = 7;
-export const regionalAtlas = new PMTiles(`${import.meta.env?.BASE_URL ?? '/'}data/regional-chart/atlas.pmtiles`);
+export const regionalAtlas = new RetryablePMTiles(`${import.meta.env?.BASE_URL ?? '/'}data/regional-chart/atlas.pmtiles`);
 
 /** Decode once per tile. Keep WGS84 so every sheet uses the aircraft's projection. */
 export function decodeAtlasTile(data, tile) {
