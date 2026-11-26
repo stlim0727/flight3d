@@ -79,6 +79,7 @@ import {
 } from './config/flightSelection.js';
 import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
 import { resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
+import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -132,7 +133,14 @@ async function startupStage(value, message) {
 }
 
 async function resolveAddonPinnedPack(search) {
-  return resolveSharedAddonPack(search);
+  if (hasExplicitAddonParams(search)) return resolveSharedAddonPack(search);
+  try {
+    return await resolveSharedAddonPack(resolveAddonSearch(search));
+  } catch (error) {
+    if (!savedAddonSearchParams()) throw error;
+    console.warn('Saved addons could not be loaded:', error);
+    return resolveSharedAddonPack(search);
+  }
 }
 
 async function startupDetail(key) {

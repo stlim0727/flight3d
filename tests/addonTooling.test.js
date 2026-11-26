@@ -11,6 +11,10 @@ import { profileShareParams } from '../src/addons/regionPackBinding.js';
 import { buildCatalog } from '../scripts/addon-tooling.mjs';
 import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack, resolveCatalogUrl } from '../src/addons/addonCatalogBrowser.js';
 import { AddonPicker } from '../src/ui/AddonPicker.js';
+import {
+  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
+  hasExplicitAddonParams, resolveAddonSearch, saveSelectedAddons,
+} from '../src/addons/savedAddonProfile.js';
 import { installAddonPicker } from '../src/ui/installAddonPicker.js';
 
 function createFakeElement(tagName) {
@@ -25,17 +29,17 @@ function createFakeElement(tagName) {
     hidden: false,
     textContent: '',
     dataset: {},
-    attributes: new Map(),
     children: [],
     _innerHTML: '',
     set innerHTML(html) { this._innerHTML = html; },
     get innerHTML() { return this._innerHTML; },
-    setAttribute(name, value) { this.attributes.set(name, String(value)); },
-    removeAttribute(name) { this.attributes.delete(name); },
+    attributes: new Map(),
+    _href: '',
+    set href(value) { this._href = String(value); this.attributes.set('href', String(value)); },
+    get href() { return this._href; },
+    setAttribute(name, value) { this.attributes.set(name, String(value)); if (name === 'href') this._href = String(value); },
     getAttribute(name) { return this.attributes.get(name) ?? null; },
-    set href(value) { this.setAttribute('href', value); },
-    get href() { return this.getAttribute('href') ?? ''; },
-    setAttribute(name, value) { this.attributes.set(name, String(value)); },
+    removeAttribute(name) { this.attributes.delete(name); if (name === 'href') this._href = ''; },
     appendChild(child) { this.children.push(child); return child; },
     append(...nodes) { this.children.push(...nodes); },
     replaceChildren(...nodes) { this.children = [...nodes]; },
@@ -56,6 +60,15 @@ function createFakeElement(tagName) {
   return el;
 }
 
+function memoryStorage() {
+  const values = new Map();
+  return {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => values.set(key, String(value)),
+    removeItem: key => values.delete(key),
+  };
+}
+
 function withFakeDocument(fn) {
   const prevDocument = globalThis.document;
   const slots = {
@@ -65,6 +78,8 @@ function withFakeDocument(fn) {
     '.addon-search': createFakeElement('input'),
     '.addon-list': createFakeElement('div'),
     '.addon-picker-status': createFakeElement('p'),
+    '.addon-apply': createFakeElement('button'),
+    '.addon-remove': createFakeElement('button'),
     '.addon-share': createFakeElement('button'),
     '.addon-share-actions': createFakeElement('div'),
     '.addon-share-link': createFakeElement('a'),
@@ -118,19 +133,6 @@ test('catalog command computes the manifest checksum and exact URL', async () =>
   assert.equal(catalog.addons[0].url, 'https://packs.example/demo/region/sky/addon.json');
   const digest = createHash('sha256').update(await readFile(manifestPath)).digest('hex');
   assert.equal(catalog.addons[0].sha256, digest);
-});
-
-test('catalog command resolves owner/repo to the repository root manifest', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'addon-catalog-shorthand-'));
-  const manifestPath = join(dir, 'addon.json');
-  await writeFile(manifestPath, JSON.stringify({ id: 'demo/region/sky', version: '2.0.0' }));
-  const catalog = await buildCatalog(manifestPath, 'demo/sky-addon');
-  assert.equal(catalog.addons[0].url, 'https://raw.githubusercontent.com/demo/sky-addon/main/addon.json');
-});
-
-test('catalog URL accepts a GitHub owner/repo shorthand', () => {
-  assert.equal(resolveCatalogUrl('stlim0727/flight3d-addon-jeju-coast-tour'), 'https://raw.githubusercontent.com/stlim0727/flight3d-addon-jeju-coast-tour/main/catalog.json');
-  assert.equal(resolveCatalogUrl(' https://example.com/catalog.json '), 'https://example.com/catalog.json');
 });
 
 test('catalog browser filters and builds a share URL from selected pins', () => {
@@ -339,4 +341,163 @@ test('share URL round-trips through resolveSharedAddonPack for profile and legac
   );
   assert.equal(legacyPack.id, 'demo/region/sky');
   assert.equal(await resolveSharedAddonPack(''), null);
+});
+
+
+test('owner/repo catalog shorthand resolves without altering raw picker input', async () => {
+  assert.equal(resolveCatalogUrl('owner/repo'), 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
+  await withFakeDocument(async ({ parent, slots }) => {
+    const requested = [];
+    const catalog = { schemaVersion: 1, addons: [] };
+    const picker = new AddonPicker({
+      fetchImpl: async url => { requested.push(url); return { ok: true, json: async () => catalog }; },
+      validateCatalog,
+    });
+    picker.mount(parent);
+    slots['.addon-catalog-url'].value = 'owner/repo';
+    slots['.addon-catalog-load'].dispatch('click');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(slots['.addon-catalog-url'].value, 'owner/repo');
+    assert.deepEqual(requested, ['https://raw.githubusercontent.com/owner/repo/main/catalog.json']);
+    assert.equal(picker.catalogUrl, 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
+  });
+});
+
+test('saved addon profile applies selected pins to a plain URL and loads again', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
+  const regionManifest = buildAddonStarter({
+    publisher: 'demo', name: 'sky', kind: 'region',
+    version: '1.0.0', coreVersion: '1.8.0', title: 'Sky',
+  }).files['addon.json'];
+  const aircraftManifest = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft',
+    version: '1.0.0', coreVersion: '1.8.0', title: 'Jet',
+  }).files['addon.json'];
+  const bytes = new Map([
+    ['https://packs.example/sky.json', Buffer.from(JSON.stringify(regionManifest), 'utf8')],
+    ['https://packs.example/jet.json', Buffer.from(JSON.stringify(aircraftManifest), 'utf8')],
+  ]);
+  const catalog = { schemaVersion: 1, addons: [
+    { id: regionManifest.id, version: regionManifest.version, url: 'https://packs.example/sky.json', sha256: createHash('sha256').update(bytes.get('https://packs.example/sky.json')).digest('hex') },
+    { id: aircraftManifest.id, version: aircraftManifest.version, url: 'https://packs.example/jet.json', sha256: createHash('sha256').update(bytes.get('https://packs.example/jet.json')).digest('hex') },
+  ] };
+  const storage = memoryStorage();
+  saveSelectedAddons(catalog, [regionManifest.id, aircraftManifest.id], { coreVersion: '1.8.0', storage });
+  assert.equal(loadSavedAddonProfile(storage).pins.length, 2);
+
+  const search = resolveAddonSearch('?quality=high', { storage });
+  assert.equal(new URLSearchParams(search).get('quality'), 'high');
+  assert.equal(new URLSearchParams(search).get('pack'), regionManifest.id);
+  const bound = await resolveSharedAddonPack(search, {
+    coreVersion: '1.8.0',
+    fetchImpl: async url => ({ ok: bytes.has(url), arrayBuffer: async () => bytes.get(url) }),
+  });
+  assert.equal(bound.id, regionManifest.id);
+  assert.equal(bound.version, regionManifest.version);
+  assert.match(bound.urlTemplate, /https:\/\/packs\.example/);
+
+  clearSavedAddonProfile(storage);
+  assert.equal(storage.getItem(SAVED_ADDON_PROFILE_KEY), null);
+  assert.equal(resolveAddonSearch('?quality=high', { storage }), '?quality=high');
+  assert.equal(resolveAddonSearch('?pack=other%2Fregion%2Ftown', { storage }), '?pack=other%2Fregion%2Ftown');
+  assert.equal(hasExplicitAddonParams('?pack=other%2Fregion%2Ftown'), true);
+  assert.equal(hasExplicitAddonParams('?airport=jeju'), false);
+});
+
+test('saveSelectedAddons rejects unavailable storage and empty selection', () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+  ] };
+  assert.throws(() => saveSelectedAddons(catalog, ['demo/region/sky'], { storage: null }), /local storage unavailable/);
+  assert.throws(() => saveSelectedAddons(catalog, [], { storage: memoryStorage() }), /select at least one addon/);
+});
+
+test('saved addon profile ignores corrupt and unreadable storage', () => {
+  const corrupt = memoryStorage();
+  corrupt.setItem(SAVED_ADDON_PROFILE_KEY, '{not json');
+  assert.equal(loadSavedAddonProfile(corrupt), null);
+  assert.equal(resolveAddonSearch('', { storage: corrupt }), '');
+
+  const unreadable = {
+    getItem() { throw new Error('storage blocked'); },
+    setItem() { throw new Error('storage blocked'); },
+    removeItem() { throw new Error('storage blocked'); },
+  };
+  assert.equal(loadSavedAddonProfile(unreadable), null);
+  assert.equal(resolveAddonSearch('?airport=jeju', { storage: unreadable }), '?airport=jeju');
+  assert.doesNotThrow(() => clearSavedAddonProfile(unreadable));
+});
+
+test('AddonPicker saves, restores, and removes the default-flight addons', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+    { id: 'demo/aircraft/jet', version: '1.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+  ] };
+  const storage = memoryStorage();
+  await withFakeDocument(async ({ parent, slots }) => {
+    const picker = new AddonPicker({
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      validateCatalog,
+      storage,
+    });
+    picker.mount(parent);
+    assert.equal(slots['.addon-remove'].hidden, true);
+    await picker.load('https://packs.example/catalog.json');
+    assert.equal(slots['.addon-apply'].hidden, true);
+    assert.equal(slots['.addon-remove'].hidden, true);
+
+    picker.selected.add('demo/region/sky');
+    picker.selected.add('demo/aircraft/jet');
+    picker.render();
+    assert.equal(slots['.addon-apply'].hidden, false);
+    assert.equal(picker.apply(), true);
+    assert.match(slots['.addon-picker-status'].textContent, /기본 주소/);
+    assert.equal(slots['.addon-remove'].hidden, false);
+
+    const reopened = new AddonPicker({
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      validateCatalog,
+      storage,
+    });
+    reopened.mount(parent);
+    await reopened.load('https://packs.example/catalog.json');
+    assert.deepEqual([...reopened.selected], ['demo/region/sky', 'demo/aircraft/jet']);
+    assert.equal(reopened.remove(), true);
+    assert.equal(loadSavedAddonProfile(storage), null);
+    assert.equal(reopened.removeBtn.hidden, true);
+
+    saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
+    const offline = new AddonPicker({
+      fetchImpl: async () => ({ ok: false, status: 503 }),
+      validateCatalog,
+      storage,
+    });
+    offline.mount(parent);
+    assert.equal(offline.removeBtn.hidden, false);
+    await offline.load('https://packs.example/unavailable.json');
+    assert.equal(offline.removeBtn.hidden, false);
+    assert.equal(offline.remove(), true);
+    assert.equal(offline.removeBtn.hidden, true);
+  });
+});
+
+test('incompatible saved pins are not restored into the picker', async () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64), compatible: false },
+  ] };
+  const storage = memoryStorage();
+  saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
+  await withFakeDocument(async ({ parent }) => {
+    const picker = new AddonPicker({
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      validateCatalog,
+      storage,
+    });
+    picker.mount(parent);
+    await picker.load('https://packs.example/catalog.json');
+    assert.equal(picker.selected.size, 0);
+  });
 });

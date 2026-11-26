@@ -31,9 +31,16 @@ Binary asset checksums still need to be calculated by the publisher.
 
 The lobby **Options** tab contains an addon picker. Enter a catalog URL or
 `<owner>/<repo>` for a GitHub-hosted addon, load it, filter by name or type, and
-select compatible addons. **선택 공유 링크 만들기** produces a URL that carries
-pinned addon versions and checksums through `profileShareParams()`; click the
-generated URL or use **링크 복사**.
+select compatible addons, then click
+**선택 추가** to save the selected addons in local storage, or
+**저장된 애드온 제거** to remove them. Saved pins are restored when the
+catalog is loaded again and are applied by `resolveAddonSearch()` whenever the
+game opens without addon URL parameters, so the ordinary default URL loads them.
+An invalid or unreachable saved profile is skipped so the simulator can still
+start; explicit URL parameters always override the saved profile and still fail
+closed. **선택 공유 링크 만들기** produces a share URL that carries pinned addon
+versions and checksums through `profileShareParams()`; click the generated URL
+or use **링크 복사**.
 
 Catalog entries with invalid IDs, versions, URLs or checksums are rejected by
 `validateCatalog()`. Entries marked `compatible: false` are displayed but cannot
