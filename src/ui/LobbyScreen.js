@@ -12,7 +12,7 @@ import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../con
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
-import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth } from './mapBrowser.js';
+import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, mapViewBoxFor, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints } from './mapBrowser.js';
 import { tilesForViewBox } from './lobbyMapTiles.js';
 import { airportDisplayName, airportProfile } from '../config/airportProfile.js';
 const MAP_SEARCH_LIMIT = 20;
@@ -137,6 +137,8 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   let mapPlanTileId = null;
   const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
   let mapCatalog = { airports: [], points: [], regions: specialRegionPlaces() };
+
+  let mapClusters = [];
   // The global artifact is fetched only when the place browser is used. Its
   // state is separate from the local catalog so a load failure cannot hide
   // Korean places or bookmarks.
@@ -203,6 +205,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (!mapAirportSelect?.value) return null;
     const airport = findMapPlace('airport', mapAirportSelect.value);
     return airport ? { ...airport, kind: 'airport', label: airport.name } : null;
+  }
+
+  function mapActiveKey() {
+    const active = currentMapPlace();
+    if (active) return `${active.kind}:${active.id ?? active.code}`;
+    const airport = getAirport();
+    return BUILTIN_REGION_AIRPORT_CODES[airport]
+      ? `airport:${BUILTIN_REGION_AIRPORT_CODES[airport]}`
+      : (airport ? `region:${airport}` : '');
   }
   function bookmarkFromPlace(place) {
     return {
@@ -397,7 +408,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     mapZoom = Number.isFinite(zoom)
       ? Math.max(0, Math.min(12, Math.round(zoom)))
       : Math.max(0, Math.min(12, Math.round(Math.log2(MAP_WIDTH / box.width))));
-    updatePinScale();
+    renderMapMarkers();
     renderMapTiles();
     return box;
   }
@@ -418,6 +429,102 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const [x, y, width, height] = mapViewBox().split(/\s+/).map(Number);
     return mapCoordinates(x + width / 2, y + height / 2);
   }
+  function mapPlaces() {
+    return [
+      ...mapCatalog.airports.map(airport => ({ ...airport, kind: 'airport', id: airport.code, label: airport.name })),
+      ...mapCatalog.points.map(point => ({ ...point, kind: 'point', label: point.label })),
+      ...(customPoint ? [customPoint] : []),
+    ];
+  }
+  function renderMapMarkers(activeKey = mapActiveKey()) {
+    if (!mapMarkers?.replaceChildren) return;
+    mapMarkers.replaceChildren();
+    const { width } = svgViewBox();
+    mapClusters = clusterMapPoints(
+      mapPlaces().flatMap(place => {
+        const projected = projectToMap(place.latitude, place.longitude);
+        return projected ? [{ ...projected, place }] : [];
+      }),
+      width,
+    );
+    for (const [index, cluster] of mapClusters.entries()) {
+      const marker = document.createElementNS(svgNamespace, 'g');
+      marker.setAttribute('transform', `translate(${cluster.x.toFixed(2)} ${cluster.y.toFixed(2)})`);
+      marker.dataset.mapX = cluster.x.toFixed(2);
+      marker.dataset.mapY = cluster.y.toFixed(2);
+      if (cluster.places.length > 1) {
+        const containsActive = cluster.places.some(place =>
+          (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey);
+        marker.setAttribute('class', `lobby-map-marker lobby-map-cluster${containsActive ? ' active' : ''}`);
+        marker.dataset.clusterIndex = String(index);
+        const hit = document.createElementNS(svgNamespace, 'circle');
+        hit.setAttribute('class', 'lobby-map-marker-hit');
+        hit.setAttribute('cx', '0');
+        hit.setAttribute('cy', '0');
+        hit.setAttribute('r', '13');
+        const badge = document.createElementNS(svgNamespace, 'circle');
+        badge.setAttribute('class', 'lobby-map-cluster-badge');
+        badge.setAttribute('cx', '0');
+        badge.setAttribute('cy', '0');
+        badge.setAttribute('r', '10');
+        const count = document.createElementNS(svgNamespace, 'text');
+        count.setAttribute('class', 'lobby-map-cluster-count');
+        count.setAttribute('text-anchor', 'middle');
+        count.setAttribute('dy', '0.35em');
+        count.textContent = String(cluster.places.length);
+        const title = document.createElementNS(svgNamespace, 'title');
+        title.textContent = t('lobby.map.cluster.title', { count: cluster.places.length });
+        marker.append(hit, badge, count, title);
+        mapMarkers.append(marker);
+        continue;
+      }
+      const place = cluster.places[0];
+      const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
+      // Pins mark places this aircraft can take off from and land at; a
+      // gold centre marks full scenery. Everything else is a cruise-only dot.
+      const profile = mapPlaceProfile(place, getAircraft?.());
+      const landable = profile.landable;
+      const tierClass = profile.tier === 'full' && landable ? ' full' : (landable ? '' : ' cruise-only');
+      marker.setAttribute('class', `lobby-map-marker${tierClass}${active ? ' active' : ''}`);
+      marker.dataset.placeKind = place.kind;
+      marker.dataset.placeId = place.id;
+      marker.dataset.landable = String(landable);
+      marker.dataset.tier = profile.tier;
+      const hit = document.createElementNS(svgNamespace, 'circle');
+      hit.setAttribute('class', 'lobby-map-marker-hit');
+      hit.setAttribute('cx', '0');
+      hit.setAttribute('cy', landable ? '-9' : '0');
+      hit.setAttribute('r', '11');
+      marker.append(hit);
+      if (landable) {
+        const pin = document.createElementNS(svgNamespace, 'path');
+        pin.setAttribute('class', 'lobby-map-marker-pin');
+        pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
+        const dot = document.createElementNS(svgNamespace, 'circle');
+        dot.setAttribute('class', 'lobby-map-marker-dot');
+        dot.setAttribute('cx', '0');
+        dot.setAttribute('cy', '-12');
+        dot.setAttribute('r', profile.tier === 'full' ? '3.2' : '2.6');
+        marker.append(pin);
+        marker.append(dot);
+      } else {
+        const ring = document.createElementNS(svgNamespace, 'circle');
+        ring.setAttribute('class', 'lobby-map-marker-pin');
+        ring.setAttribute('cx', '0');
+        ring.setAttribute('cy', '0');
+        ring.setAttribute('r', '4.5');
+        marker.append(ring);
+      }
+      const title = document.createElementNS(svgNamespace, 'title');
+      const name = place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label;
+      const tierKey = !landable ? 'lobby.map.tier.cruise' : (profile.tier === 'full' ? 'lobby.map.tier.full' : 'lobby.map.tier.runway');
+      title.textContent = `${name} · ${t(tierKey)}`;
+      marker.append(title);
+      mapMarkers.append(marker);
+    }
+    updatePinScale();
+  }
+
   function renderMapBrowser() {
     if (!mapSearchInput && !mapDefaultBookmarks && !mapBookmarksEl && !mapMarkers) return;
     if (mapSearchInput) mapSearchInput.placeholder = t('lobby.map.search.placeholder');
@@ -429,12 +536,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       MAP_SEARCH_LIMIT,
     );
     const active = currentMapPlace();
-    const airport = getAirport();
-    const activeKey = active
-      ? `${active.kind}:${active.id ?? active.code}`
-      : (BUILTIN_REGION_AIRPORT_CODES[airport]
-        ? `airport:${BUILTIN_REGION_AIRPORT_CODES[airport]}`
-        : (airport ? `region:${airport}` : ''));
+    const activeKey = mapActiveKey();
     if (mapSvg && active && activeKey !== mapCenteredKey) setMapView(active, 6);
     mapCenteredKey = activeKey;
     const formatPlaceItem = item => item.kind === 'region'
@@ -454,65 +556,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     renderPlaceList(mapDefaultBookmarks, defaultMapBookmarks(mapCatalog).map(withBookmarkLabels),
       'lobby.map.search.empty', activeKey);
 
-    if (mapMarkers) {
-      mapMarkers.replaceChildren();
-      const places = [
-        ...mapCatalog.airports.map(airport => ({ ...airport, kind: 'airport', id: airport.code, label: airport.name })),
-        ...mapCatalog.points.map(point => ({ ...point, kind: 'point', label: point.label })),
-        ...(customPoint ? [customPoint] : []),
-      ];
-      for (const place of places) {
-        const projected = projectToMap(place.latitude, place.longitude);
-        if (!projected) continue;
-        const marker = document.createElementNS(svgNamespace, 'g');
-        const active = (place.kind === 'airport' ? `airport:${place.id}` : `point:${place.id}`) === activeKey;
-        // Pins mark places this aircraft can take off from and land at; a
-        // gold centre marks full scenery. Everything else is a cruise-only dot.
-        const profile = mapPlaceProfile(place, getAircraft?.());
-        const landable = profile.landable;
-        const tierClass = profile.tier === 'full' && landable ? ' full' : (landable ? '' : ' cruise-only');
-        marker.setAttribute('class', `lobby-map-marker${tierClass}${active ? ' active' : ''}`);
-        marker.setAttribute('transform', `translate(${projected.x.toFixed(2)} ${projected.y.toFixed(2)})`);
-        marker.dataset.mapX = projected.x.toFixed(2);
-        marker.dataset.mapY = projected.y.toFixed(2);
-        marker.dataset.placeKind = place.kind;
-        marker.dataset.placeId = place.id;
-        marker.dataset.landable = String(landable);
-        marker.dataset.tier = profile.tier;
-        const hit = document.createElementNS(svgNamespace, 'circle');
-        hit.setAttribute('class', 'lobby-map-marker-hit');
-        hit.setAttribute('cx', '0');
-        hit.setAttribute('cy', landable ? '-9' : '0');
-        hit.setAttribute('r', '11');
-        marker.append(hit);
-        if (landable) {
-          const pin = document.createElementNS(svgNamespace, 'path');
-          pin.setAttribute('class', 'lobby-map-marker-pin');
-          pin.setAttribute('d', 'M0 0C-1.6-2.6-7-7.5-7-12A7 7 0 1 1 7-12C7-7.5 1.6-2.6 0 0Z');
-          const dot = document.createElementNS(svgNamespace, 'circle');
-          dot.setAttribute('class', 'lobby-map-marker-dot');
-          dot.setAttribute('cx', '0');
-          dot.setAttribute('cy', '-12');
-          dot.setAttribute('r', profile.tier === 'full' ? '3.2' : '2.6');
-          marker.append(pin);
-          marker.append(dot);
-        } else {
-          const ring = document.createElementNS(svgNamespace, 'circle');
-          ring.setAttribute('class', 'lobby-map-marker-pin');
-          ring.setAttribute('cx', '0');
-          ring.setAttribute('cy', '0');
-          ring.setAttribute('r', '4.5');
-          marker.append(ring);
-        }
-        const title = document.createElementNS(svgNamespace, 'title');
-        const name = place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label;
-        const tierKey = !landable ? 'lobby.map.tier.cruise' : (profile.tier === 'full' ? 'lobby.map.tier.full' : 'lobby.map.tier.runway');
-        title.textContent = `${name} · ${t(tierKey)}`;
-        marker.append(title);
-        mapMarkers.append(marker);
-      }
-      updatePinScale();
-    }
+    renderMapMarkers(activeKey);
     renderMapSearchStatus(query, results.length);
     if (mapBookmarkToggle) {
       bindText(mapBookmarkToggle, () => t(active && isBookmarked(bookmarkFromPlace(active)) ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
@@ -640,8 +684,40 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   mapResults?.addEventListener('click', onMapPlaceClick);
   mapBookmarksEl?.addEventListener('click', onMapPlaceClick);
   mapDefaultBookmarks?.addEventListener('click', onMapPlaceClick);
+  function zoomToCluster(cluster) {
+    const points = cluster.places
+      .map(place => projectToMap(place.latitude, place.longitude))
+      .filter(Boolean);
+    if (!points.length) return;
+    const xs = points.map(point => point.x);
+    const ys = points.map(point => point.y);
+    const center = mapCoordinates((Math.min(...xs) + Math.max(...xs)) / 2, (Math.min(...ys) + Math.max(...ys)) / 2);
+    if (!center) return;
+    const span = Math.max(1, Math.max(...xs) - Math.min(...xs), Math.max(...ys) - Math.min(...ys));
+    const fit = Math.ceil(Math.log2(MAP_WIDTH / (span * 3)));
+    const nextZoom = Math.max(0, Math.min(12, Math.max(mapZoom + 1, fit)));
+    if (nextZoom <= mapZoom) {
+      renderPlaceList(mapResults, cluster.places.map(place => ({
+        ...place,
+        key: `${place.kind}:${place.id}`,
+        label: place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label,
+        detail: place.iata || place.code || '',
+      })), 'lobby.map.search.empty', mapActiveKey());
+      if (mapStatus) mapStatus.textContent = t('lobby.map.cluster.choose');
+      return;
+    }
+    enableMapTiles();
+    setMapView(center, nextZoom);
+  }
+
   mapSvg?.addEventListener('click', event => {
     if (mapSelectionBusy || Date.now() < suppressClickUntil) return;
+    const clusterTarget = event.target?.closest?.('[data-cluster-index]');
+    if (clusterTarget) {
+      const cluster = mapClusters[Number(clusterTarget.dataset.clusterIndex)];
+      if (cluster) zoomToCluster(cluster);
+      return;
+    }
     if (event.target.closest('[data-place-kind]')) {
       onMapPlaceClick(event);
       return;

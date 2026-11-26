@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
+import { mapCoordinates, projectToMap, mapViewBoxFor, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, MAP_WIDTH, MAP_HEIGHT } from '../src/ui/mapBrowser.js';
 
 test('projection covers airports worldwide and keeps south below north', () => {
   const gimpo = projectToMap(37.5583, 126.791);
@@ -61,4 +61,21 @@ test('map markers stay readable and tappable from overview to deep zoom', () => 
     assert.ok(hitPx >= 44, `hit target should stay tappable at ${viewBoxWidth}`);
   }
   assert.ok(markerScaleForViewBoxWidth(NaN) > 0, 'invalid widths must not collapse markers');
+});
+
+test('nearby map points collapse into one cluster that splits when zoomed in', () => {
+  const seoul = [
+    { x: 871.4, y: 444.2, place: { id: 'RKSI' } },
+    { x: 872.2, y: 443.8, place: { id: 'RKSS' } },
+  ];
+  const distant = { x: 300, y: 420, place: { id: 'KJFK' } };
+  const overview = clusterMapPoints([...seoul, distant], MAP_WIDTH);
+  assert.equal(overview.length, 2, 'dense pins share a marker while distant pins stay separate');
+  assert.deepEqual(overview[0].places.map(place => place.id), ['RKSI', 'RKSS']);
+  assert.ok(Math.abs(overview[0].x - (871.4 + 872.2) / 2) < 1e-6, 'cluster sits at the pins’ centre');
+  assert.equal(overview[1].places[0].id, 'KJFK');
+
+  const zoomed = clusterMapPoints([...seoul, distant], MAP_WIDTH / 4096);
+  assert.equal(zoomed.length, 3, 'the same pins separate once the view is zoomed in');
+  assert.equal(clusterMapPoints([{ x: NaN, y: 1, place: {} }, seoul[0]], MAP_WIDTH).length, 1);
 });
