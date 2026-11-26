@@ -37,9 +37,28 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     if (fuelCapacityKg >= physics.massKg) {
       throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
     }
-    if (physics.massDistribution && fuelCapacityKg > 0
-      && !physics.massDistribution.tanks?.some(tank => Number.isFinite(tank?.capacityKg) && tank.capacityKg > 0)) {
-      throw new Error(`${packId} physics.massDistribution needs a positive-capacity tank`);
+    if (physics.massDistribution) {
+      const distribution = physics.massDistribution;
+      const tanks = distribution.tanks ?? [];
+      if (tanks.length === 0) {
+        throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+      }
+      const tankCapacityKg = tanks.reduce((total, tank) => {
+        if (!Number.isFinite(tank?.capacityKg) || tank.capacityKg <= 0) {
+          throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+        }
+        return total + tank.capacityKg;
+      }, 0);
+      if (tankCapacityKg !== fuelCapacityKg) {
+        throw new Error(`${packId} physics.massDistribution tank capacity must match declared fuel capacity`);
+      }
+      const referenceMassKg = distribution.referenceMassKg ?? physics.massKg;
+      if (referenceMassKg - (physics.massKg - fuelCapacityKg) - tankCapacityKg < 0) {
+        throw new Error(`${packId} physics.massDistribution tank capacity exceeds the reference payload`);
+      }
+      if (Number.isFinite(distribution.initialFuelKg) && distribution.initialFuelKg > tankCapacityKg) {
+        throw new Error(`${packId} physics.massDistribution initial fuel exceeds tank capacity`);
+      }
     }
     if (physics.massProperties && physics.massProperties.currentMassKg < physics.massKg - fuelCapacityKg) {
       throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);

@@ -189,8 +189,32 @@ test('derived addon physics rejects fuel and tank configurations that cannot loa
       schemaVersion: 1, coreVersion: '1.8.0',
       pins: [{ id: invalidTanks.id, version: invalidTanks.version, sha256: 'a'.repeat(64), manifest: invalidTanks }],
     }, invalidTanks.id, { coreVersion: '1.8.0' }),
-    /positive-capacity tank/,
+    /tanks need positive capacity/,
   );
+  for (const [label, fuelCapacityKg, tanks, initialFuelKg] of [
+    ['oversized tank capacity', 120, [120, 120], 120],
+    ['fuel without declared capacity', 0, [120], 0],
+    ['initial fuel above capacity', 120, [120], 200],
+  ]) {
+    const invalid = structuredClone(starter);
+    invalid.aircraft.physics.fuelCapacityKg = fuelCapacityKg;
+    invalid.aircraft.physics.massDistribution = {
+      referenceMassKg: 1200,
+      initialFuelKg,
+      tanks: tanks.map((capacityKg, index) => ({
+        id: `tank${index}`, capacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0,
+      })),
+      stations: [{ id: 'payload', capacityKg: 1200, position: { x: 0, y: 0, z: 0 } }],
+    };
+    assert.throws(
+      () => aircraftPackFromProfile({
+        schemaVersion: 1, coreVersion: '1.8.0',
+        pins: [{ id: invalid.id, version: invalid.version, sha256: 'a'.repeat(64), manifest: invalid }],
+      }, invalid.id, { coreVersion: '1.8.0' }),
+      undefined,
+      label,
+    );
+  }
   assert.ok(aircraftPackFromProfile(profile(), starter.id, { coreVersion: '1.8.0' }));
 });
 
