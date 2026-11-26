@@ -7,7 +7,7 @@ import { OpenWorldRegionSurface } from '../src/environment/OpenWorldRegionSurfac
 import { CorridorFlightSurface } from '../src/environment/CorridorFlightSurface.js';
 import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { JEJU_ORIGIN } from '../src/geospatial/CorridorCoordinateSystem.js';
-import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
+import { wgs84ToTile, tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld } from '../src/world/UnifiedWorld.js';
 
 test('TERRAIN_INSETS defines declarative high-resolution data for RKPC', () => {
@@ -309,6 +309,51 @@ test('Chuja strip is exposed for streamed DEM flattening', () => {
   assert.ok(Math.abs(surface.getHeight(sideX, sideZ) - expected) < 1e-6,
     'contact beside the strip must follow the same grading as rendered DEM');
   surface.dispose();
+});
+
+
+test('contact height matches raycast on a loaded graded tile', async () => {
+  const config = REGION_SURFACES.jeju;
+  const surface = new OpenWorldRegionSurface({
+    ...config,
+    strips: [{ ...config.strips[0], center: [0, 0] }],
+    fallback: new CorridorFlightSurface({ activeOrigin: config.origin }),
+  });
+  const strip = surface.runways[0];
+  const tileX = 1744, tileY = 822;
+  const origin = tileToWgs84(tileX + 0.5, tileY + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    elevationCache: { get: async () => null, prefetch() {}, dispose() {} },
+  });
+  const raster = new Float32Array(256 ** 2).fill(25);
+  openWorld.raster = async () => raster;
+  openWorld.fetchWater = async () => null;
+  await openWorld.load({ x: tileX, y: tileY, key: `${tileX}/${tileY}` });
+  const tile = openWorld.tiles.get(`${tileX}/${tileY}`);
+  assert.ok(tile);
+  surface.openWorld = openWorld;
+
+  const angle = strip.ends[0].physical.z === 0 ? 0 : Math.atan2(
+    strip.ends[1].physical.x - strip.ends[0].physical.x,
+    -(strip.ends[1].physical.z - strip.ends[0].physical.z),
+  );
+  const sampleWorldX = Math.sin(angle) * 100;
+  const sampleWorldZ = -Math.cos(angle) * 100;
+  const contactHeight = surface.getHeight(sampleWorldX, sampleWorldZ);
+  const samplerHeight = openWorld.sampleContact(sampleWorldX, sampleWorldZ)?.height;
+  const mesh = tile.fullGeometry ?? tile.mesh.geometry;
+  const raycaster = new THREE.Raycaster(
+    new THREE.Vector3(sampleWorldX, 1000, sampleWorldZ), new THREE.Vector3(0, -1, 0),
+  );
+  const meshObject = new THREE.Mesh(mesh);
+  const hit = raycaster.intersectObject(meshObject)[0];
+  assert.ok(hit);
+  assert.ok(Math.abs(contactHeight - samplerHeight) < 0.01);
+  assert.ok(Math.abs(contactHeight - hit.point.y) < 0.01,
+    'physics contact height must match the rendered mesh at a graded strip');
+  surface.dispose();
+  openWorld.dispose();
 });
 
 
