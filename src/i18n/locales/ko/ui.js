@@ -381,6 +381,8 @@ export default {
   "lobby.tab.single": "자유비행",
   "lobby.tab.multi": "멀티",
   "lobby.tab.option": "옵션",
+  "lobby.addon.open": "애드온 관리",
+  "lobby.addon.title": "애드온",
   "lobby.tab.managed": "진행 중 비행",
   "lobby.managed.title": "진행 중인 비행",
   "lobby.managed.hint": "비행이 일시정지 상태로 보관되어 있습니다. 다른 기체·지역·시간을 선택하려면 먼저 비행을 종료하세요.",

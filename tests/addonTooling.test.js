@@ -69,6 +69,7 @@ function withFakeDocument(fn) {
     return btn;
   });
   globalThis.document = {
+    getElementById: () => null,
     createElement(tag) {
       const node = createFakeElement(tag);
       if (tag === 'section') {
@@ -223,6 +224,32 @@ test('installAddonPicker fetches an initial catalogUrl only once', async () => {
     });
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.equal(fetchCount, 1);
+  });
+});
+
+test('installAddonPicker opens and closes the separate detail dialog', async () => {
+  await withFakeDocument(async ({ parent }) => {
+    const dialog = createFakeElement('dialog');
+    dialog.open = false;
+    let shown = 0;
+    let closed = 0;
+    dialog.showModal = () => { dialog.open = true; shown += 1; };
+    dialog.close = () => { dialog.open = false; closed += 1; };
+    const openButton = createFakeElement('button');
+    const closeButton = createFakeElement('button');
+    const picker = installAddonPicker(parent, { dialog, openButton, closeButton });
+
+    openButton.dispatch('click');
+    assert.equal(dialog.open, true);
+    assert.equal(shown, 1);
+    closeButton.dispatch('click');
+    assert.equal(dialog.open, false);
+    assert.equal(closed, 1);
+
+    picker.open();
+    dialog.dispatch('click', { target: dialog });
+    assert.equal(dialog.open, false);
+    assert.equal(closed, 2);
   });
 });
 
