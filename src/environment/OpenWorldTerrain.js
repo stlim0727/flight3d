@@ -202,11 +202,13 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
         #elif defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1
           if (terrainDetailBlend > 0.0) {
             diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
-          }
-          if (dot(terrainDetailEdges, vec4(1.0)) < 3.99 || dot(terrainDetailCorners, vec4(1.0)) < 3.99) {
             vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
             vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
-            float edgeBlend = max(max(proximity.x, proximity.y), max(proximity.z, proximity.w));
+            float centerX = 1.0 - proximity.x - proximity.z;
+            float centerY = 1.0 - proximity.y - proximity.w;
+            vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
+            vec4 cornerWeights = proximity * proximity.yzwx;
+            float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
             if (edgeBlend > 0.0) {
               diffuseColor = mix(diffuseColor, texture2D(terrainBaseMap, vMapUv), edgeBlend);
             }
@@ -216,18 +218,18 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
         #else
           if (terrainDetailBlend > 0.0) {
             diffuseColor = mix(diffuseColor, texture2D(terrainDetailMap, vMapUv), terrainDetailBlend);
-          }
-          vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
-          vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
-          float centerX = 1.0 - proximity.x - proximity.z;
-          float centerY = 1.0 - proximity.y - proximity.w;
-          vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
-          vec4 cornerWeights = proximity * proximity.yzwx;
-          float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
-          vec2 uvDx = dFdx(vMapUv);
-          vec2 uvDy = dFdy(vMapUv);
-          if (edgeBlend > 0.0) {
-            diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
+            vec4 edgeDistances = vec4(vMapUv.x, 1.0 - vMapUv.y, 1.0 - vMapUv.x, vMapUv.y);
+            vec4 proximity = 1.0 - smoothstep(0.0, ${detailEdgeWidth}, edgeDistances);
+            float centerX = 1.0 - proximity.x - proximity.z;
+            float centerY = 1.0 - proximity.y - proximity.w;
+            vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
+            vec4 cornerWeights = proximity * proximity.yzwx;
+            float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
+            vec2 uvDx = dFdx(vMapUv);
+            vec2 uvDy = dFdy(vMapUv);
+            if (edgeBlend > 0.0) {
+              diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
+            }
           }
           // Restore natural micro-contrast and chroma of baked satellite imagery.
           float satLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
