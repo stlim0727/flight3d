@@ -2,6 +2,7 @@ import { parseProfile, serializeProfile } from './addonContract.js';
 import { profileShareParams } from './regionPackBinding.js';
 
 export const SAVED_ADDON_PROFILE_KEY = 'flight3d.addons.v1';
+export const SAVED_ADDON_CATALOG_KEY = 'flight3d.addons.catalog.v1';
 
 function safeStorage(storage) {
   if (storage !== undefined) return storage;
@@ -40,6 +41,24 @@ export function saveSelectedAddons(catalog, selectedIds, { coreVersion = null, s
 export function clearSavedAddonProfile(storage) {
   try { safeStorage(storage)?.removeItem(SAVED_ADDON_PROFILE_KEY); }
   catch { /* Storage unavailable. */ }
+}
+
+export function loadSavedAddonCatalogUrl(storage) {
+  try {
+    const saved = safeStorage(storage)?.getItem(SAVED_ADDON_CATALOG_KEY);
+    return saved && /^https?:\/\//.test(saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAddonCatalogUrl(url, { storage } = {}) {
+  const target = safeStorage(storage);
+  if (!target) return;
+  try {
+    if (url) target.setItem(SAVED_ADDON_CATALOG_KEY, String(url));
+    else target.removeItem(SAVED_ADDON_CATALOG_KEY);
+  } catch { /* Storage unavailable. */ }
 }
 
 export function savedAddonSearchParams(storage) {

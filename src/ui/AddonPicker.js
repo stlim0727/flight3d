@@ -1,5 +1,8 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
-import { clearSavedAddonProfile, loadSavedAddonProfile, saveSelectedAddons } from '../addons/savedAddonProfile.js';
+import {
+  clearSavedAddonProfile, loadSavedAddonProfile,
+  saveAddonCatalogUrl, saveSelectedAddons,
+} from '../addons/savedAddonProfile.js';
 
 const LABELS = {
   title: '애드온',
@@ -130,6 +133,7 @@ export class AddonPicker {
     this.shareBtn.hidden = true;
     this.hideShareLink();
     clearSavedAddonProfile(this.storage);
+    saveAddonCatalogUrl('', { storage: this.storage });
     this.syncRemoveButton();
     this.status.textContent = this.labels.urlCleared;
   }
@@ -159,6 +163,7 @@ export class AddonPicker {
       });
       this.catalog = catalog;
       this.catalogUrl = resolveCatalogUrl(url);
+      saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       const saved = loadSavedAddonProfile(this.storage);
       if (saved) {
         for (const pin of saved.pins) {
@@ -227,6 +232,7 @@ export class AddonPicker {
         coreVersion: this.coreVersion ?? null,
         storage: this.storage,
       });
+      saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       this.status.textContent = this.labels.applyReady;
       this.render();
       return true;
