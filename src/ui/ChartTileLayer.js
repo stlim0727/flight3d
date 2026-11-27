@@ -48,7 +48,14 @@ export class ChartTileLayer {
     }
   }
 
-  async load(entry) {
+  prefetch(tiles) {
+    this.select(tiles);
+    for (const entry of this.visible) {
+      if (entry.state === 'new') this.load(entry, true);
+    }
+  }
+
+  async load(entry, speculative = false) {
     entry.state = 'loading';
     entry.controller = new AbortController();
     const signal = AbortSignal.any([entry.controller.signal, AbortSignal.timeout(TIMEOUT_MS)]);
@@ -60,6 +67,11 @@ export class ChartTileLayer {
       this.revision++;
     } catch {
       if (entry.controller.signal.aborted) return;
+      // A failed background attempt must not delay the first user request.
+      if (speculative) {
+        entry.state = 'new';
+        return;
+      }
       entry.state = 'failed';
       entry.retryAt = performance.now() + CHART_RETRY_MS;
     } finally {

@@ -25,7 +25,7 @@ import { bindMapAttribution } from './mapAttribution.js';
 import { SoutheastAtlas } from './SoutheastAtlas.js';
 import { RegionalChart } from './RegionalChart.js';
 import { insideSoutheastAtlas } from '../geospatial/busanChart.js';
-import { chartSceneFrame, chartSceneOrigin } from '../geospatial/regionalChart.js';
+import { chartCenterWaterTiles, chartSceneFrame, chartSceneOrigin } from '../geospatial/regionalChart.js';
 
 export function hasActiveModal() {
   if (typeof document === 'undefined') return false;
@@ -178,6 +178,33 @@ class SimulatorHudAndBindingsMethods {
     };
   }
 
+  updateChartPrefetch(map, origin, busanCruise, chartOpen) {
+    let warm = this.chartPrefetch;
+    if (warm && (warm.origin !== origin || warm.busanCruise !== busanCruise)) {
+      if (!this.regionalChart?.session) this.regionalChart?.water.select([]);
+      this.chartPrefetch = warm = null;
+    }
+    if (!origin) return;
+    if (!warm) {
+      warm = this.chartPrefetch = { origin, busanCruise, after: performance.now() + 2000 };
+    }
+    if (chartOpen) warm.opened = true;
+    if (warm.opened || warm.done || performance.now() < warm.after) return;
+    warm.done = true;
+    const run = () => {
+      // Flow or position may change between this HUD tick and the idle slot.
+      if (this.chartPrefetch !== warm || warm.opened || map.open || this.gameFlow.state !== FLOW.FLIGHT ||
+          this.startingFlight || this.airportLoading || this.browserBackgrounded || this.isCrashed ||
+          this.multiplayer?.active || this.demoDirector?.isActive || chartSceneOrigin(this) !== origin) return;
+      const here = chartSceneFrame(this).toWgs(this.position.x, this.position.z);
+      if (!here || (busanCruise && insideSoutheastAtlas(here))) return;
+      const chart = this.regionalChart ??= new RegionalChart(map);
+      chart.water.prefetch(chartCenterWaterTiles(here));
+    };
+    if (window.requestIdleCallback) window.requestIdleCallback(run, { timeout: 2000 });
+    else window.setTimeout(run, 0);
+  }
+
   updateHUD() {
     const elIas = document.getElementById('hud-ias');
     const elAlt = document.getElementById('hud-alt');
@@ -255,6 +282,8 @@ class SimulatorHudAndBindingsMethods {
       // The Busan cruise stays a chart-reading flight without landmark pins.
       this.pilotageFlight = available && busanCruise;
       const chartOpen = available && map.open && this.gameFlow.state === FLOW.FLIGHT;
+      const canPrefetch = available && this.gameFlow.state === FLOW.FLIGHT && !this.startingFlight && !this.airportLoading;
+      this.updateChartPrefetch(map, canPrefetch ? chartOrigin : null, busanCruise, chartOpen);
       this.cameraSystem.chartPitchOffset = chartOpen && this.cameraSystem.mode === CameraSystem.MODES.COCKPIT ? -0.12 : 0;
       if (chartOpen) {
         if (this.pilotageFrame?.origin !== chartOrigin || this.chartBusanCruise !== busanCruise) {
@@ -266,6 +295,7 @@ class SimulatorHudAndBindingsMethods {
           this.pilotageChart = busanCruise && insideSoutheastAtlas(this.pilotageFrame.toWgs(this.position.x, this.position.z))
             ? (this.busanChart ??= new SoutheastAtlas(map))
             : (this.regionalChart ??= new RegionalChart(map));
+          if (this.pilotageChart === this.busanChart) this.regionalChart?.water.select([]);
           this.pilotageChart.show();
         }
         this.pilotageChart.update(this.position, this.quaternion, this.pilotageFrame);

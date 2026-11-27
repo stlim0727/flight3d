@@ -32,8 +32,8 @@ function ringsPath(rings) {
 
 /**
  * North-up paper chart centred where it was unfolded: Overture water tiles for
- * coastline, OurAirports runways and the aircraft at one scale. Requests start
- * only while the paper is shown and are dropped when it folds.
+ * coastline, OurAirports runways and the aircraft at one scale. The centre
+ * water tiles may already be in the cache when the paper opens.
  */
 export class RegionalChart {
   constructor(map, { waterSource = overtureBase, atlasSource = regionalAtlas, loadManifest = loadAirportManifest, findAirports = findAirportsInRegion } = {}) {
