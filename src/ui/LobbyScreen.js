@@ -1023,8 +1023,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       }
     });
   }
+  const aircraftButtons = { ...AIRCRAFT_BUTTONS };
   if (aircraftPicker) {
-    for (const aircraftId of getAircraftOptions().filter(id => !AIRCRAFT_BUTTONS[id])) {
+    for (const aircraftId of getAircraftOptions().filter(id => !aircraftButtons[id])) {
       const button = document.createElement('button');
       button.type = 'button';
       button.id = `lobby-aircraft-${aircraftId}`;
@@ -1038,6 +1039,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         aircraftPicker.querySelector('summary')?.focus();
       });
       aircraftPicker.querySelector('.lobby-buttons')?.append(button);
+      aircraftButtons[aircraftId] = button.id;
     }
   }
   for (const [type, scenario] of Object.entries(SPAWN_SCENARIOS)) {
@@ -1169,7 +1171,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const lockedAircraft = requiredAircraft(getPreset()) ?? (airport === 'valley' ? aircraft : null);
     setReason(aircraftReason, lockedAircraft ? 'lobby.reason.aircraftLocked' : null,
       { aircraft: resolveAircraftConfig(lockedAircraft)?.name ?? lockedAircraft });
-    for (const [key, id] of Object.entries(AIRCRAFT_BUTTONS)) {
+    for (const [key, id] of Object.entries(aircraftButtons)) {
       const el = document.getElementById(id);
       if (!el) continue;
       el.classList.toggle('active', key === aircraft);
@@ -1328,8 +1330,10 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (managedAirport) {
         bindText(managedAirport, () => {
           if (held.airportLabel) return held.airportLabel;
-          const activePlace = currentMapPlace();
-          if (activePlace) return activePlace.label;
+          if (!getHeldFlight) {
+            const activePlace = currentMapPlace();
+            if (activePlace) return activePlace.label;
+          }
           const id = heldAirport ?? getAirport?.() ?? DEFAULT_AIRPORT;
           return t(REGION_NAME_KEYS[id] ?? id);
         });
