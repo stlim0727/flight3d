@@ -295,6 +295,23 @@ test('installAddonPicker fetches an initial catalogUrl only once', async () => {
   });
 });
 
+test('installAddonPicker surfaces a saved-addon startup failure in its status', async () => {
+  const previous = globalThis.window?.addonStartupError;
+  globalThis.window ??= {};
+  globalThis.window.addonStartupError = 'checksum mismatch for demo/aircraft/skyhawk@1.0.0';
+  try {
+    await withFakeDocument(async ({ parent }) => {
+      const picker = installAddonPicker(parent);
+      assert.match(picker.status.textContent, /checksum mismatch/);
+      assert.equal(picker.status.dataset.addonStartupError,
+        'checksum mismatch for demo/aircraft/skyhawk@1.0.0');
+    });
+  } finally {
+    if (previous === undefined) delete globalThis.window.addonStartupError;
+    else globalThis.window.addonStartupError = previous;
+  }
+});
+
 test('installAddonPicker opens and closes the separate detail dialog', async () => {
   await withFakeDocument(async ({ parent }) => {
     const dialog = createFakeElement('dialog');

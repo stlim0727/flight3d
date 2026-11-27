@@ -14,6 +14,11 @@ export function installAddonPicker(parent, options = {}) {
     validateCatalog,
   });
   picker.mount(parent);
+  const startupError = globalThis.window?.addonStartupError;
+  if (startupError && picker.status) {
+    picker.status.textContent = `${picker.labels.saveError}: ${startupError}`;
+    picker.status.dataset.addonStartupError = startupError;
+  }
   const dialog = typeof options.dialog === 'undefined'
     ? document.getElementById('lobby-addon-dialog')
     : options.dialog;

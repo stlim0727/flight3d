@@ -23,6 +23,7 @@ export default {
   "startup.failed": "시작을 완료하지 못했습니다. 다시 시도해 주세요.",
   "startup.retry": "다시 시도",
   "startup.details": "진행 내역",
+  "notice.addon.loadFailed": "저장된 애드온을 불러오지 못했습니다: {error}",
   "startup.step": "{current} / {total} 단계",
   "startup.elapsed": "전체 {total}초 · 현재 작업 {current}초",
   "startup.active": "진행 중 · {seconds}초",
