@@ -259,7 +259,7 @@ class PresetSpawnerMethods {
       this.aero.spoilers = 0;
       this.showToast(() => t(`regional.cruise.${type}`));
     } else if (this.activeAirport === 'incheon') {
-      this.currentAirport.resetTraffic();
+      this.currentAirport?.resetTraffic?.();
       const spawn = airportSpawnPlan('RKSI', type, {
         groundClearanceM: groundClearance,
         aircraftId: this.currentAircraftId,
@@ -1262,7 +1262,7 @@ class PresetSpawnerMethods {
     const isValley = id === 'valley';
     const isPatagonia = id === 'patagonia';
     if (isCoastal && this.startupReady && this.ships) this.ships.loadAssets();
-    if (isIncheon || isJeju || isLukla) this.ensureGeographicLayers?.();
+    if (isIncheon || isJeju || isLukla || isPatagonia) this.ensureGeographicLayers?.();
     setMapAttributionSource('incheon-attribution', isIncheon);
 
     // Toggle 3D mesh visibility

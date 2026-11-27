@@ -673,7 +673,10 @@ function heightOnTriangle(positions, x, z, a, b, c, heights) {
 
 export class OpenWorldTerrain {
   constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, fallbackImagery = false, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced', seaPalette = null }) {
-    this.origin = origin;
+    this.origin = {
+      latitude: origin.latitude ?? origin.lat,
+      longitude: origin.longitude ?? origin.lon,
+    };
     this.renderQuality = resolveRenderQuality(quality);
     this.protectedAreas = protectedAreas;
     this._authority = createAuthorityZones(authorityZonesFromBounds(protectedAreas || []));
@@ -1589,7 +1592,7 @@ const frames = {
     insets: getInsetsForRegion('incheon'),
   },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
-  patagonia: { origin: PATAGONIA_ORIGIN },
+  patagonia: { origin: { latitude: PATAGONIA_ORIGIN.lat, longitude: PATAGONIA_ORIGIN.lon } },
 };
 
 function originWithinBounds(origin, bounds) {

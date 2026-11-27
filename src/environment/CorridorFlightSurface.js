@@ -38,7 +38,11 @@ export class CorridorFlightSurface {
    * @param {Object} [options.incheonSurface] - IncheonFlightSurface instance
    */
   constructor(options = {}) {
-    this.activeOrigin = options.activeOrigin || JEJU_ORIGIN;
+    const rawOrigin = options.activeOrigin || JEJU_ORIGIN;
+    this.activeOrigin = {
+      latitude: rawOrigin.latitude ?? rawOrigin.lat,
+      longitude: rawOrigin.longitude ?? rawOrigin.lon,
+    };
     this.incheonSurface = options.incheonSurface || null;
     this.isLoaded = true;
   }

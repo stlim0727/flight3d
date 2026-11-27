@@ -81,7 +81,7 @@ export const REGION_SURFACES = Object.freeze({
     }),
   }),
   patagonia: Object.freeze({
-    origin: Object.freeze({ lat: -49.271278, lon: -73.043222 }),
+    origin: Object.freeze({ latitude: -49.271278, longitude: -73.043222, lat: -49.271278, lon: -73.043222 }),
     elevationM: 2492,
     precinctExtent: Object.freeze([-22000, -22000, 22000, 22000]),
   }),
