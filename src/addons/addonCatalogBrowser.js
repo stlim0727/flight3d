@@ -24,6 +24,12 @@ export function listAddons(catalog, { search = '', kind = 'all' } = {}) {
   }));
 }
 
+/** All aircraft descriptors pinned by a shared addon profile. */
+export function pinnedAddonAircraftList(pack) {
+  if (Array.isArray(pack?.aircrafts) && pack.aircrafts.length > 0) return pack.aircrafts;
+  return pack?.aircraft ? [pack.aircraft] : [];
+}
+
 export function buildAddonProfileUrl(
   catalog,
   selectedIds,

@@ -347,3 +347,31 @@ test('flight_ended carries the sortie duration, G-LOC count and peak load', () =
   assert.equal(ended[0].glocIncidents, 1);
   assert.equal(ended[0].maxG, 9.2);
 });
+
+test('beginFlightRecording and heldFlightForMenu preserve deviceTime state during active flights', () => {
+  const sim = Object.assign(Object.create(SimulatorClass.prototype), recorders(), {
+    activeAirport: 'coastal',
+    currentAircraftId: 'B738',
+    lastPresetType: 'runway',
+    lobby: { demoProfile: 'standard' },
+    sky: { timeOfDay: 15.5 },
+    demoDirector: { isActive: false, userTimeOfDayOverridden: false },
+    deviceTimeOfDay: true,
+  });
+
+  sim.beginFlightRecording();
+  assert.equal(sim.flightRecorder.metadata.deviceTime, true);
+  assert.equal(sim.replayRecorder.metadata.deviceTime, true);
+  assert.equal(sim.heldFlightForMenu().deviceTime, true);
+
+  sim.deviceTimeOfDay = false;
+  sim.beginFlightRecording();
+  assert.equal(sim.flightRecorder.metadata.deviceTime, false);
+  assert.equal(sim.heldFlightForMenu().deviceTime, false);
+
+  delete sim.flightRecorder.metadata.deviceTime;
+  assert.equal(sim.heldFlightForMenu().deviceTime, false);
+  sim.flightRecorder.active = false;
+  sim.deviceTimeOfDay = true;
+  assert.equal(sim.heldFlightForMenu().deviceTime, true);
+});

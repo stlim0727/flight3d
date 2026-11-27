@@ -124,6 +124,7 @@ function applySkyTime(sim, hours) {
  */
 export function applyDeviceTimeOfDay(sim, now = new Date()) {
   applySkyTime(sim, deviceTimeOfDay(now));
+  sim.deviceTimeOfDay = true;
 }
 
 /** Run before UI bindings and automatic flight start, without starting Web Audio. */
@@ -131,6 +132,7 @@ export function restoreSimulatorPreferences(sim, preferences, { now = new Date()
   // A saved choice wins and overrides demo times; a first visit starts at device time.
   if (preferences.timeOfDay !== undefined) {
     applySkyTime(sim, preferences.timeOfDay);
+    sim.deviceTimeOfDay = false;
     sim.demoDirector.onUserTimeOfDayChange();
   } else if (sim.sky) {
     applyDeviceTimeOfDay(sim, now);

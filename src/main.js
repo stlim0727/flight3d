@@ -79,7 +79,7 @@ import {
   saveSavedAircraft,
 } from './config/flightSelection.js';
 import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
-import { resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
+import { pinnedAddonAircraftList, resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
 import { AddonAircraft } from './aircraft/AddonAircraft.js';
 import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
@@ -173,12 +173,14 @@ const startupTrace = installStartupLoadMonitor(inputLatency);
 class FlightSimulator {
   async initialize() {
     startupProgress.reset();
+    this.deviceTimeOfDay = false;
     this.startupProgress = startupProgress;
     initUiScale();
     await startupStage(0, 'startup.scene');
     try {
       this.pinnedAddonPack = await resolveAddonPinnedPack(window.location.search);
-      if (this.pinnedAddonPack?.aircraft) registerAddonAircraft([this.pinnedAddonPack.aircraft]);
+      const addonAircrafts = pinnedAddonAircraftList(this.pinnedAddonPack);
+      if (addonAircrafts.length > 0) registerAddonAircraft(addonAircrafts);
     } catch (error) {
       startupProgress.failure?.(error.message);
       throw error;
@@ -859,6 +861,7 @@ class FlightSimulator {
     const sortie = { airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
       demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
+      deviceTime: this.deviceTimeOfDay === true,
       ...(this.activeMapPlace?.label ? { placeLabel: this.activeMapPlace.label } : {}),
       ...(this.activeMapPlace?.code ? { airportCode: this.activeMapPlace.code } : {}),
       ...(this.activeMapPlace?.tileId ? { airportTileId: this.activeMapPlace.tileId } : {}),
@@ -1000,7 +1003,7 @@ class FlightSimulator {
       return {
         airport: metadata.airport, aircraft: metadata.aircraft, scenario: metadata.scenario,
         demoProfile: metadata.demoProfile, timeOfDay: metadata.timeOfDay,
-        deviceTime: false,
+        deviceTime: Boolean(metadata.deviceTime),
         airportLabel: this.customLocationLabel || undefined,
         scenarioLabel: undefined,
       };
@@ -1009,7 +1012,7 @@ class FlightSimulator {
       airport: this.activeAirport, aircraft: this.currentAircraftId,
       scenario: this.demoDirector?.isActive ? 'demo' : this.lastPresetType,
       demoProfile: this.lobby.demoProfile, timeOfDay: this.sky.timeOfDay,
-      deviceTime: this.demoDirector?.userTimeOfDayOverridden === false,
+      deviceTime: this.deviceTimeOfDay === true,
       airportLabel: this.customLocationLabel || undefined,
     };
   }
@@ -1056,6 +1059,7 @@ class FlightSimulator {
   setTimeOfDay(hours, { persist = true, userChoice = true } = {}) {
     if (this.multiplayer?.locked) return;
     if (userChoice) this.demoDirector?.onUserTimeOfDayChange();
+    this.deviceTimeOfDay = false;
     this.sky.setTimeOfDay(hours, this.position, this.camera.position);
     if (persist) saveSimulatorPreferences({ timeOfDay: this.sky.timeOfDay });
     this.foliage?.setTimeOfDay(this.sky.timeOfDay);
@@ -1175,7 +1179,7 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
-    const addon = this.pinnedAddonPack?.aircraft?.id === aircraftId ? this.pinnedAddonPack.aircraft : null;
+    const addon = pinnedAddonAircraftList(this.pinnedAddonPack).find(item => item.id === aircraftId) ?? null;
     const instance = addon
       ? new AddonAircraft(addon, { pfdCanvas: this.pfdCanvas, ndCanvas: this.ndCanvas })
       : aircraftId === 'F16'
