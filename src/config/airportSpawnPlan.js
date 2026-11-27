@@ -6,6 +6,7 @@
  * an entry point cannot silently change the spawn geometry.
  */
 import { getAirportOverride } from './airportOverrides.js';
+import { spawnProfileAircraftId } from './aircraftConfigs.js';
 import {
   headingToDirection,
   takeoffSpawnPlan,
@@ -15,7 +16,11 @@ import {
 const DEG = Math.PI / 180;
 
 function speedFor(speeds, aircraftId, fallback) {
-  return Number.isFinite(speeds?.[aircraftId]) ? speeds[aircraftId] : fallback;
+  if (Number.isFinite(speeds?.[aircraftId])) return speeds[aircraftId];
+  const profileId = spawnProfileAircraftId(aircraftId);
+  if (Number.isFinite(speeds?.[profileId])) return speeds[profileId];
+  if (Number.isFinite(speeds?.B738)) return speeds.B738;
+  return fallback;
 }
 
 function scenicSpawn(pose, aircraftId) {
@@ -34,7 +39,7 @@ function scenicSpawn(pose, aircraftId) {
 }
 
 function declaredSpawn(pose, { groundClearanceM = 3.5, aircraftId }) {
-  const specific = pose.byAircraft?.[aircraftId];
+  const specific = pose.byAircraft?.[aircraftId] ?? pose.byAircraft?.[spawnProfileAircraftId(aircraftId)];
   const poseForAircraft = specific ? { ...pose, ...specific } : pose;
   const speed = speedFor(poseForAircraft.speedMps, aircraftId, 0);
   const direction = headingToDirection(poseForAircraft.velocityHeadingDeg ?? poseForAircraft.headingDeg);

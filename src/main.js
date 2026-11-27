@@ -19,6 +19,7 @@ import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
 import { BOEING_737_800, registerAddonAircraft, resolveAircraftConfig } from './config/aircraftConfigs.js';
+import { BODY_SUPPORT_POINTS, resolveBodySupportPoints } from './physics/groundContacts.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
 import { PilotPhysiology } from './physics/PilotPhysiology.js';
 import { SIM_CONFIG } from './config/simConfig.js';
@@ -1092,6 +1093,12 @@ class FlightSimulator {
       this.engines.bindMassProperties(this.aero.massProperties);
     }
     if (this.gear?.loadConfig) this.gear.loadConfig(config);
+    if (this.gear) {
+      this.gear.bodySupportPoints = resolveBodySupportPoints(
+        config?.landingGear?.bodySupportPoints,
+        BODY_SUPPORT_POINTS,
+      );
+    }
     if (this.cameraSystem?.loadAircraftConfig) this.cameraSystem.loadAircraftConfig(config);
     if (this.collisionDetector?.loadAircraftConfig) this.collisionDetector.loadAircraftConfig(config);
   }

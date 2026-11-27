@@ -8,6 +8,11 @@ import { buildAddonStarter } from '../src/addons/addonStarter.js';
 import { Aerodynamics } from '../src/physics/Aerodynamics.js';
 import { EngineModel } from '../src/physics/EngineModel.js';
 import { createHeadlessSimulation } from '../src/core/HeadlessSimulation.js';
+import { stepPhysics } from '../src/core/physicsTiming.js';
+import { BODY_CONTACTS, BODY_SUPPORT_POINTS } from '../src/physics/groundContacts.js';
+import { airportSpawnPlan } from '../src/config/airportSpawnPlan.js';
+import { approachSpawnPlan, cruiseSpawnPlan, runwayEndFrame, takeoffSpawnPlan } from '../src/config/mapFlightPlan.js';
+import { REGIONAL_CRUISES, regionalCruiseSpawn } from '../src/config/regionalCruises.js';
 
 const manifest = {
   schemaVersion: 1,
@@ -239,4 +244,263 @@ test('headless approach preset starts and advances with an addon aircraft', () =
   }
   assert.ok(Math.abs(sim.position.x - startX) > 1);
   assert.equal(Number.isFinite(sim.telemetry.iasKnots), true);
+});
+
+function skyhawkObjectSupportManifest() {
+  return {
+    schemaVersion: 1,
+    id: 'demo/aircraft/skyhawk',
+    publisher: 'demo',
+    version: '1.0.0',
+    coreRange: { min: '1.8.0', maxExclusive: '2.0.0' },
+    dependencies: [],
+    license: 'CC-BY-4.0',
+    attribution: 'Skyhawk Sport by demo',
+    aircraft: {
+      id: 'skyhawk',
+      physics: {
+        profile: 'rigid-body-v1',
+        massKg: 1050,
+        wingAreaM2: 16.2,
+        wingspanM: 11,
+        lengthM: 8.2,
+        id: 'SKYHAWK',
+        name: 'Skyhawk Sport',
+        configurationLimits: { flap: [0, 110, 85, 85], gearOperating: 85, gearExtended: 85 },
+        massDistribution: {
+          referenceMassKg: 1050,
+          initialFuelKg: 110,
+          initialPayloadKg: 173,
+          tanks: [{ id: 'main', capacityKg: 144, priority: 0, position: { x: 0, y: 0, z: 0 } }],
+          stations: [{ id: 'payload', capacityKg: 387, position: { x: 0, y: 0, z: 0 } }],
+        },
+        massProperties: {
+          emptyWeightKg: 767,
+          maxTakeoffWeightKg: 1157,
+          currentMassKg: 1050,
+          Ixx: 1285,
+          Iyy: 1825,
+          Izz: 2667,
+        },
+        aerodynamics: {
+          wingspanM: 11,
+          wingAreaM2: 16.2,
+          meanChordM: 1.47,
+          tailArmM: 4,
+          tailAreaM2: 4,
+          tailInducedFactor: 0.1,
+          oswaldEfficiency: 0.8,
+          cl0Clean: 0.35,
+          claPerRad: 5.1,
+          alphaStallDeg: 14,
+          clFlapBoostMax: 0.65,
+          spoilerLiftDump: 0,
+          cd0Clean: 0.027,
+          gearDrag: 0.015,
+          spoilerDrag: 0,
+          transonicMachBuffet: 0.6,
+          cm0: -0.04,
+          cma: -0.75,
+          cmDe: -1.35,
+          cmQ: -14,
+          clBeta: -0.09,
+          clDa: 0.22,
+          clP: -0.5,
+          cnBeta: 0.12,
+          cnDr: -0.09,
+          cnR: -0.18,
+          adverseYaw: -0.02,
+          flapAngles: [0, 10, 20, 30],
+        },
+        stallWarning: { type: 'pneumaticHorn', referenceMarginKnots: 7.5 },
+        propulsion: {
+          numEngines: 1,
+          engineName: 'Lycoming IO-360-L2A',
+          maxStaticThrustPerEngineN: 3200,
+          idleN1Percent: 25,
+          togaN1Percent: 100,
+          spoolUpTimeSec: 0.8,
+          spoolDownTimeSec: 0.8,
+          reverseThrustEfficiency: 0,
+          baseFuelFlowKgPerHour: 28,
+          maxFuelFlowKgPerHour: 48,
+          fuelCapacityKg: 144,
+          momentArmMeters: 0,
+        },
+        audio: { engineType: 'piston', idleRpm: 700, maxRpm: 2700, cylinders: 4, propellerBlades: 2 },
+        landingGear: {
+          isFixed: true,
+          cgGroundHeightM: 1.35,
+          gearTransitTimeSec: 0.1,
+          bodySupportPoints: {
+            nose: { x: 0, y: -1.1, z: -1.5 },
+            mainLeft: { x: -1.05, y: -1.15, z: 0.4 },
+            mainRight: { x: 1.05, y: -1.15, z: 0.4 },
+          },
+          contacts: [
+            { id: 'nose', name: 'Nose Gear', localPos: { x: 0, y: -1.1, z: -1.5 }, wheelRadius: 0.2, restLength: 0.5, kSpring: 120000, cDamper: 15000, isSteerable: true, maxSteeringDeg: 30 },
+            { id: 'mainLeft', name: 'Left Main Gear', localPos: { x: -1.05, y: -1.15, z: 0.4 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000, isSteerable: false },
+            { id: 'mainRight', name: 'Right Main Gear', localPos: { x: 1.05, y: -1.15, z: 0.4 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000, isSteerable: false },
+          ],
+          rollingFriction: 0.025,
+          maxBrakingFriction: 0.4,
+          tireLateralFriction: 0.7,
+        },
+        specs: { id: 'SKYHAWK', name: 'Skyhawk Sport', type: 'generalAviation' },
+      },
+      model: { url: 'https://example.com/skyhawk.glb', sha256: 'a'.repeat(64) },
+      controlBindings: { elevator: 'elevator_node' },
+    },
+    assets: [{ url: 'https://example.com/skyhawk.glb', sha256: 'a'.repeat(64) }],
+  };
+}
+
+function applyInPlaceAircraftSwitch(sim, aircraftId, config) {
+  sim.currentAircraftId = aircraftId;
+  sim.currentAircraftConfig = config;
+  sim.aero.loadConfig(config);
+  sim.engines.loadConfig(config);
+  sim.engines.bindMassProperties(sim.aero.massProperties);
+  sim.gear.loadConfig(config);
+  sim.collisionDetector.loadAircraftConfig(config);
+}
+
+test('full-config addon with map bodySupportPoints normalizes and runs across scenarios without freezing', () => {
+  const skyManifest = skyhawkObjectSupportManifest();
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: skyManifest.id, version: skyManifest.version, sha256: 'a'.repeat(64), manifest: skyManifest }],
+  }, skyManifest.id, { coreVersion: '1.8.0' });
+  registerAddonAircraft([descriptor]);
+
+  const validIds = new Set(BODY_CONTACTS.map(point => point.id));
+  const points = descriptor.config.landingGear.bodySupportPoints;
+  assert.ok(Array.isArray(points));
+  assert.equal(points.length, 3);
+  for (const point of points) {
+    assert.ok(validIds.has(point.id), `unexpected canonical body ID: ${point.id}`);
+    assert.equal(typeof point.key, 'string');
+    assert.equal(Array.isArray(point.position), true);
+    assert.equal(point.position.length, 3);
+    assert.ok(point.position.every(Number.isFinite));
+    assert.ok(Number.isFinite(point.weight) && point.weight > 0);
+  }
+
+  const sim = createHeadlessSimulation({ aircraftId: 'B738', airportId: 'coastal' });
+  sim.setPreset('runway');
+  for (let tick = 0; tick < 10; tick++) stepPhysics(sim);
+
+  applyInPlaceAircraftSwitch(sim, descriptor.id, descriptor.config);
+  sim.setPreset('cruise');
+  const startPos = sim.position.clone();
+  for (let tick = 0; tick < 240; tick++) stepPhysics(sim);
+  assert.equal(sim.isCrashed, false);
+  assert.ok(sim.position.distanceTo(startPos) > 40, 'cruise sortie must advance');
+  assert.ok(sim.telemetry.massKg > 900 && sim.telemetry.massKg < 1200, `unexpected mass ${sim.telemetry.massKg}`);
+  assert.ok(sim.telemetry.iasKnots > 70 && sim.telemetry.iasKnots < 120, `unexpected IAS ${sim.telemetry.iasKnots}`);
+
+  sim.setPreset('approach');
+  for (let tick = 0; tick < 120; tick++) stepPhysics(sim);
+  assert.equal(sim.isCrashed, false);
+  assert.ok(Number.isFinite(sim.telemetry.iasKnots) && sim.telemetry.iasKnots > 50);
+
+  sim.setPreset('runway');
+  for (let tick = 0; tick < 240; tick++) stepPhysics(sim);
+  assert.equal(sim.isCrashed, false);
+  assert.equal(sim.telemetry.onGround, true);
+  assert.deepEqual(Object.values(sim.telemetry.bodyDamage), [0, 0, 0, 0, 0, 0, 0]);
+
+  // Forced body ground contact must not throw BODY_DAMAGE_LIMITS lookup errors.
+  sim.position.y -= 1.5;
+  for (let tick = 0; tick < 10; tick++) stepPhysics(sim);
+  assert.ok(Number.isFinite(sim.telemetry.altitudeFt));
+});
+
+test('derived starter addon scales bodySupportPoints and survives runway transition from B738', () => {
+  const starter = buildAddonStarter({
+    publisher: 'demo', name: 'trainer', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: starter.id, version: starter.version, sha256: 'a'.repeat(64), manifest: starter }],
+  }, starter.id, { coreVersion: '1.8.0' });
+  registerAddonAircraft([descriptor]);
+
+  assert.notEqual(descriptor.config.landingGear.bodySupportPoints, BODY_SUPPORT_POINTS);
+  assert.equal(descriptor.config.landingGear.bodySupportPoints.length, BODY_CONTACTS.length);
+
+  const sim = createHeadlessSimulation({ aircraftId: 'B738', airportId: 'coastal' });
+  sim.setPreset('runway');
+  for (let tick = 0; tick < 10; tick++) stepPhysics(sim);
+
+  applyInPlaceAircraftSwitch(sim, descriptor.id, descriptor.config);
+  sim.setPreset('runway');
+  for (let tick = 0; tick < 240; tick++) stepPhysics(sim);
+  assert.equal(sim.isCrashed, false);
+  assert.equal(sim.telemetry.bodyDamage.belly, 0);
+});
+
+test('partial physics.id addon fills missing runtime defaults for headless stepping', () => {
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: manifest.id, version: manifest.version, sha256: 'a'.repeat(64), manifest }],
+  }, manifest.id, { coreVersion: '1.8.0' });
+  registerAddonAircraft([descriptor]);
+
+  const sim = createHeadlessSimulation({ aircraftId: descriptor.id, airportId: 'coastal' });
+  sim.setPreset('cruise');
+  const startX = sim.position.x;
+  for (let tick = 0; tick < 120; tick++) stepPhysics(sim);
+  assert.equal(sim.isCrashed, false);
+  assert.ok(Math.abs(sim.position.x - startX) > 10);
+});
+
+test('spawn planners give GA addon aircraft non-zero GA speeds and configured ground clearance', () => {
+  const skyManifest = skyhawkObjectSupportManifest();
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: skyManifest.id, version: skyManifest.version, sha256: 'a'.repeat(64), manifest: skyManifest }],
+  }, skyManifest.id, { coreVersion: '1.8.0' });
+  registerAddonAircraft([descriptor]);
+
+  for (const code of ['RKPC', 'RKSI', 'VNLK']) {
+    const cruise = airportSpawnPlan(code, 'cruise', { aircraftId: descriptor.id });
+    assert.ok(cruise, `${code} cruise spawn missing`);
+    const speed = Math.hypot(cruise.vx, cruise.vz);
+    assert.ok(speed >= 45 && speed <= 60, `${code} GA cruise speed expected ~48-53 m/s, got ${speed}`);
+    const approach = airportSpawnPlan(code, 'approach', { aircraftId: descriptor.id });
+    assert.ok(approach, `${code} approach spawn missing`);
+    assert.ok(Math.hypot(approach.vx, approach.vz) > 25, `${code} approach speed must be non-zero`);
+  }
+
+  const regional = regionalCruiseSpawn(REGIONAL_CRUISES.jamsil, descriptor.id);
+  assert.ok(Math.abs(Math.hypot(regional.vx, regional.vz) - 48) < 1e-6);
+
+  const synthetic = {
+    latitude: 37.4,
+    longitude: 126.4,
+    elevationM: 20,
+    runways: [{
+      id: '09/27',
+      ends: [
+        { ident: '09', physical: { x: -1500, z: 0, elevationM: 20 }, threshold: { x: -1400, z: 0, elevationM: 20 } },
+        { ident: '27', physical: { x: 1500, z: 0, elevationM: 20 }, threshold: { x: 1500, z: 0, elevationM: 20 } },
+      ],
+    }],
+  };
+  const frame = runwayEndFrame(synthetic, '09/27', '09');
+  const takeoff = takeoffSpawnPlan({ frame, aircraftId: descriptor.id });
+  assert.equal(takeoff.groundClearanceM, 1.35);
+  assert.equal(takeoff.y, 21.35);
+  const mapApproach = approachSpawnPlan({ frame, aircraftId: descriptor.id });
+  assert.ok(Math.abs(Math.hypot(mapApproach.vx, mapApproach.vz) - 33) < 1e-6);
+  assert.equal(mapApproach.groundClearanceM, 1.35);
+  const mapCruise = cruiseSpawnPlan({
+    latitude: 37.5, longitude: 127.1, headingDeg: 90, altitudeM: 1000, aircraftId: descriptor.id,
+  });
+  assert.ok(Math.abs(Math.hypot(mapCruise.vx, mapCruise.vz) - 48) < 1e-6);
 });
