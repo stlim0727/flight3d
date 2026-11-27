@@ -1307,14 +1307,16 @@ export function createExternalAirportLighting(descriptors, { apronLamps = [] } =
         if (distAlong > 30) {
           const angleDeg = THREE.MathUtils.radToDeg(Math.atan2(dy, distAlong));
           const gs = papi.glideslopeDeg;
-          const thresholds = [gs - 0.5, gs - 0.2, gs + 0.2, gs + 0.5];
+          // Unit 0 is nearest the runway (steepest angle, turns red first) and unit 3 is
+          // farthest away (shallowest angle), displaying White-White-Red-Red left-to-right.
+          const thresholds = [gs + 0.5, gs + 0.2, gs - 0.2, gs - 0.5];
           papi.units.forEach((unit, idx) => {
             const isWhite = angleDeg >= thresholds[idx];
             unit.lensMat.color.setHex(isWhite ? 0xffffff : 0xff1a1a);
           });
         } else {
           papi.units.forEach((unit, idx) => {
-            unit.lensMat.color.setHex(idx < 2 ? 0xffffff : 0xff1a1a);
+            unit.lensMat.color.setHex(idx < 2 ? 0xff1a1a : 0xffffff);
           });
         }
       }

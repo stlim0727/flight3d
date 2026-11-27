@@ -128,6 +128,7 @@ export class OpenWorldRegionSurface {
 
   dispose() {
     this.geometry.dispose();
+    this.localSurface?.geometry?.dispose?.();
     this.airportMesh.material.dispose();
     for (const mesh of this.stripMeshes) mesh.geometry.dispose();
     this.stripMaterial.dispose();

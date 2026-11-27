@@ -4,9 +4,12 @@ const DEFAULT_LIMIT = 20;
 
 const EXACT = 0;
 const PREFIX = 1;
-const NAME_PREFIX = 2;
-const TOKEN_PREFIX = 3;
-const SUBSTRING = 4;
+const NAME_EXACT = 2;
+const NAME_PREFIX = 3;
+const TOKEN_PREFIX = 4;
+const SUBSTRING = 5;
+
+const normalizedPlaceCache = new WeakMap();
 
 /**
  * Fold a user query or catalog field for comparison: lowercase, no accents,
@@ -35,12 +38,23 @@ function identifierScore(identifiers, query) {
 
 function textScore(text, query) {
   if (!text) return -1;
+  if (text === query) return NAME_EXACT;
   const words = text.split(' ');
   if (text.startsWith(query)) return NAME_PREFIX;
   const terms = query.split(' ');
   if (terms.every(term => words.some(word => word.startsWith(term)))) return TOKEN_PREFIX;
   if (text.includes(query)) return SUBSTRING;
   return -1;
+}
+
+function bestNormalizedTextScore(normalizedTexts, query) {
+  let best = -1;
+  for (const text of normalizedTexts) {
+    if (!text) continue;
+    const score = textScore(text, query);
+    if (score >= 0 && (best < 0 || score < best)) best = score;
+  }
+  return best;
 }
 
 function bestTextScore(texts, query) {
@@ -133,6 +147,7 @@ function compareText(a, b) {
 }
 function rankedMatches(matches, max, scored) {
   matches.sort((a, b) => a.score - b.score
+    || (b.population ?? 0) - (a.population ?? 0)
     || compareText(a.result.kind, b.result.kind)
     || compareText(a.result.id, b.result.id)
     || compareText(a.result.label, b.result.label));
@@ -200,16 +215,57 @@ export function placeCruiseAltitude(entry) {
   return Math.max(600, Math.round((elevation + 700) / 50) * 50);
 }
 
+function preparedPlaces(places) {
+  let cached = normalizedPlaceCache.get(places);
+  if (cached && cached.length === places.length) return cached;
+  cached = places.map(entry => {
+    if (!hasCoordinates(entry)) return null;
+    const id = typeof entry.id === 'string' ? entry.id.trim() : '';
+    const label = typeof entry.label === 'string' ? entry.label.trim() : '';
+    const aliases = Array.isArray(entry.aliases) ? entry.aliases : [entry.ko, entry.en].filter(Boolean);
+    const texts = [label, id, ...aliases].map(normalizeSearchText).filter(Boolean);
+    return {
+      entry,
+      id,
+      label,
+      detail: typeof entry.detail === 'string' && entry.detail ? entry.detail : 'cruise',
+      population: Number.isFinite(entry.population) ? entry.population : 0,
+      texts,
+    };
+  });
+  normalizedPlaceCache.set(places, cached);
+  return cached;
+}
+
 /** Ranked matches from the offline GeoNames place index, using the local point rules. */
 export function searchPlaceIndexScored(index, query, limit = DEFAULT_LIMIT) {
+  const normalized = normalizeSearchText(query);
+  if (!normalized) return [];
+  const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
+  if (max === 0) return [];
   const places = Array.isArray(index) ? index : index?.places;
   if (!Array.isArray(places)) return [];
-  const points = places.map(entry => ({
-    ...entry,
-    altitudeM: placeCruiseAltitude(entry),
-    headingDeg: 90,
-  }));
-  return searchMapPlacesScored({ points }, query, limit);
+  const matches = [];
+  for (const item of preparedPlaces(places)) {
+    if (!item) continue;
+    const score = bestNormalizedTextScore(item.texts, normalized);
+    if (score < 0) continue;
+    matches.push({
+      score,
+      population: item.population,
+      result: {
+        kind: 'point',
+        id: item.id,
+        label: item.label,
+        detail: item.detail,
+        latitude: item.entry.latitude,
+        longitude: item.entry.longitude,
+        altitudeM: placeCruiseAltitude(item.entry),
+        headingDeg: 90,
+      },
+    });
+  }
+  return rankedMatches(matches, max, true);
 }
 
 /** Plain (unscored) results from the offline place index. */
@@ -221,17 +277,17 @@ export function searchPlaceIndex(index, query, limit = DEFAULT_LIMIT) {
 export function mergeScoredResults(localResults, globalResults, limit = DEFAULT_LIMIT) {
   const max = Number.isFinite(limit) ? Math.max(0, Math.trunc(limit)) : DEFAULT_LIMIT;
   const candidates = new Map();
+  let order = 0;
   for (const result of localResults) {
     const key = `${result.kind}:${result.id}`;
-    if (!candidates.has(key)) candidates.set(key, { result, source: 'local', tie: 0 });
+    if (!candidates.has(key)) candidates.set(key, { result, source: 'local', tie: 0, order: order++ });
   }
   for (const result of globalResults) {
     const key = `${result.kind}:${result.id}`;
-    if (!candidates.has(key)) candidates.set(key, { result, source: 'global', tie: 1 });
+    if (!candidates.has(key)) candidates.set(key, { result, source: 'global', tie: 1, order: order++ });
   }
   return [...candidates.values()]
-    .sort((a, b) => a.result.score - b.result.score || a.tie - b.tie
-      || compareText(a.result.id, b.result.id))
+    .sort((a, b) => a.result.score - b.result.score || a.tie - b.tie || a.order - b.order)
     .slice(0, max)
     .map(({ result, source }) => {
       const { score, ...place } = result;

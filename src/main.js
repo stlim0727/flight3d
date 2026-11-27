@@ -19,7 +19,7 @@ import { applyAircraftLivery } from './aircraft/applyAircraftLivery.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
-import { BOEING_737_800, registerAddonAircraft, resolveAircraftConfig } from './config/aircraftConfigs.js';
+import { BOEING_737_800, registerAddonAircraft, resolveAircraftConfig, unregisterAddonAircraft } from './config/aircraftConfigs.js';
 import { BODY_SUPPORT_POINTS, resolveBodySupportPoints } from './physics/groundContacts.js';
 import { Aerodynamics, createAeroResult } from './physics/Aerodynamics.js';
 import { PilotPhysiology } from './physics/PilotPhysiology.js';
@@ -88,7 +88,7 @@ import {
 } from './addons/baseAddonRegistry.js';
 import { AddonAircraft } from './aircraft/AddonAircraft.js';
 import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
-import { applyRegionPalette } from './addons/regionVisuals.js';
+import { applyRegionPalette, regionPackForOrigin } from './addons/regionVisuals.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -354,7 +354,7 @@ class FlightSimulator {
       this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }
     this.water.syncWithAtmosphere(this.sky);
-    applyRegionPalette(this.pinnedAddonPack, { water: this.water, sky: this.sky });
+    this.syncRegionVisuals();
 
     await startupStage(3, 'startup.controls');
 
@@ -1951,6 +1951,56 @@ class FlightSimulator {
   handleGazeCanvasClick(clientX, clientY) {
     this.inputCoordinator.handleGazeCanvasClick(this, clientX, clientY);
   }
+  syncRegionVisuals() {
+    if (!this.water || !this.sky) return;
+    const origin = this.world?.customOrigin ?? this.world?.origin ?? null;
+    const activeRegion = regionPackForOrigin(this.pinnedAddonPack, origin);
+    applyRegionPalette(activeRegion, { water: this.water, sky: this.sky });
+  }
+
+  async reloadAddons() {
+    const seq = (this._addonReloadSeq = (this._addonReloadSeq ?? 0) + 1);
+    const pack = await resolveAddonPinnedPack(window.location.search);
+    if (seq !== this._addonReloadSeq) return;
+    const nextDescriptors = new Map();
+    for (const descriptor of pinnedAddonAircraftList(pack)) {
+      if (descriptor?.id) nextDescriptors.set(descriptor.id, descriptor);
+    }
+    if (!hasExplicitAddonParams(window.location.search) && savedAddonSearchParams()) {
+      try {
+        const baseCatalog = await loadDefaultBaseAddonCatalog();
+        if (seq !== this._addonReloadSeq) return;
+        const aircraftEntries = (baseCatalog?.addons ?? [])
+          .filter(entry => entry.id?.includes('/aircraft/') && entry.compatible !== false);
+        if (aircraftEntries.length > 0) {
+          const basePack = await resolveCatalogAddons({ schemaVersion: 1, addons: aircraftEntries });
+          if (seq !== this._addonReloadSeq) return;
+          for (const descriptor of pinnedAddonAircraftList(basePack)) {
+            if (descriptor?.id && !nextDescriptors.has(descriptor.id)) {
+              nextDescriptors.set(descriptor.id, descriptor);
+            }
+          }
+        }
+      } catch (error) {
+        console.warn('Default base aircraft addons skipped:', error);
+      }
+    }
+    const previousIds = [...(this.addonAircraftDescriptors?.keys?.() ?? [])];
+    for (const id of previousIds) {
+      if (!nextDescriptors.has(id)) unregisterAddonAircraft(id);
+    }
+    this.pinnedAddonPack = pack ?? null;
+    this.addonAircraftDescriptors = nextDescriptors;
+    if (this.addonAircraftDescriptors.size > 0) {
+      registerAddonAircraft([...this.addonAircraftDescriptors.values()]);
+    }
+    if (this.openWorldSurface?.openWorld) {
+      this.openWorldSurface.openWorld.dispose();
+      this.openWorldSurface.openWorld = null;
+    }
+    this.syncRegionVisuals();
+    this.lobby?.refresh?.();
+  }
 }
 
 installPresetSpawner(FlightSimulator);
@@ -1965,17 +2015,7 @@ async function initFlightSimulator() {
       defaultCatalogUrl: BASE_ADDON_CATALOG_URL,
       onApplied: async () => {
         try {
-          const pack = await resolveAddonPinnedPack(window.location.search);
-          this.pinnedAddonPack = pack ?? null;
-          this.addonAircraftDescriptors = new Map();
-          for (const descriptor of pinnedAddonAircraftList(this.pinnedAddonPack)) {
-            if (descriptor?.id) this.addonAircraftDescriptors.set(descriptor.id, descriptor);
-          }
-          if (this.addonAircraftDescriptors.size > 0) {
-            registerAddonAircraft([...this.addonAircraftDescriptors.values()]);
-          }
-          if (this.water && this.sky) applyRegionPalette(this.pinnedAddonPack, { water: this.water, sky: this.sky });
-          this.lobbyScreen?.refresh();
+          await window.simulator?.reloadAddons?.();
         } catch (error) {
           console.warn('Addons could not be applied to the active session:', error);
         }

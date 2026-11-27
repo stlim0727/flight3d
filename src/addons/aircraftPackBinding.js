@@ -364,7 +364,11 @@ function mergeLivery(baseLivery, overrideLivery) {
   if (!baseLivery && !overrideLivery) return null;
   if (!baseLivery) return cloneValue(overrideLivery);
   if (!overrideLivery) return cloneValue(baseLivery);
-  return deepMerge(baseLivery, overrideLivery);
+  const merged = deepMerge(baseLivery, overrideLivery);
+  if (overrideLivery.tailEmblem && (overrideLivery.tailEmblem.map || overrideLivery.tailEmblem.kind)) {
+    merged.tailEmblem = cloneValue(overrideLivery.tailEmblem);
+  }
+  return merged;
 }
 
 function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set() } = {}) {

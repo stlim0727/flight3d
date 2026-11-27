@@ -423,7 +423,10 @@ export class SkyAtmosphere {
     if (hazeColor) {
       this.hazePalette = new THREE.Color(hazeColor);
       this.fogColor.copy(this.hazePalette);
-      this.sky.material.uniforms.uHazeColor.value.copy(this.hazePalette);
+      this.sky?.material?.uniforms?.uHazeColor?.value?.copy(this.hazePalette);
+    } else {
+      this.hazePalette = null;
+      if (this.sky) this.updateSun();
     }
   }
 

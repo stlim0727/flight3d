@@ -96,6 +96,11 @@ function parseRow(line) {
   const longitude = Number(fields[5]);
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)
     || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) return null;
+  const rawElev = fields[15] !== '' && fields[15] !== undefined ? Number(fields[15]) : Number.NaN;
+  const rawDem = fields[16] !== '' && fields[16] !== undefined ? Number(fields[16]) : Number.NaN;
+  const elevationM = Number.isFinite(rawElev)
+    ? rawElev
+    : (Number.isFinite(rawDem) && rawDem > -9999 ? rawDem : 0);
   return {
     id: fields[0],
     name: fields[1],
@@ -107,7 +112,7 @@ function parseRow(line) {
     featureCode: fields[7],
     country: fields[8],
     population: Number(fields[14]) || 0,
-    elevationM: Number(fields[15]) || 0,
+    elevationM,
   };
 }
 
@@ -250,8 +255,11 @@ function aliasesFor(row) {
   const other = [];
   for (const alternate of alternates) {
     const value = alternate.trim();
-    if (!value || value.length < 3 || value.length > 40) continue;
-    if (/^[\p{Script=Hangul}\s]+$/u.test(value)) hangul.push(value);
+    if (!value || value.length > 40) continue;
+    const isHangul = /^[\p{Script=Hangul}\s]+$/u.test(value);
+    const isCjk = /^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\s]+$/u.test(value);
+    if (value.length < (isHangul || isCjk ? 2 : 3)) continue;
+    if (isHangul) hangul.push(value);
     else if (/^[\p{Script=Latin}\p{N}\s'’.-]+$/u.test(value)) latin.push(value);
     else other.push(value);
   }
@@ -272,7 +280,7 @@ function toEntry(row) {
     longitude: row.longitude,
     country: row.country,
     kind,
-    detail: `${kind} · ${row.country}`,
+    detail: row.country ? `${kind} · ${row.country}` : kind,
     population: row.population,
     elevationM: row.elevationM,
   });

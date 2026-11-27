@@ -10,6 +10,42 @@ function cloneMaterial(material) {
   return material.clone();
 }
 
+export function disposeLiveryGroup(group) {
+  if (!group) return;
+  const textures = new Set();
+  group.traverse(obj => {
+    if (!obj.isMesh) return;
+    obj.geometry?.dispose?.();
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    for (const mat of mats) {
+      if (!mat) continue;
+      if (mat.map) textures.add(mat.map);
+      mat.dispose?.();
+    }
+  });
+  for (const texture of textures) texture.dispose?.();
+}
+
+export function restoreBaseLiveryMaterials(model) {
+  if (!model) return;
+  model.traverse(mesh => {
+    if (!mesh.isMesh || !mesh.material) return;
+    if (!mesh.userData.baseLiveryMaterial) {
+      mesh.userData.baseLiveryMaterial = mesh.material;
+    } else if (mesh.material !== mesh.userData.baseLiveryMaterial) {
+      mesh.material = mesh.userData.baseLiveryMaterial;
+    }
+  });
+}
+
+function ensureClonedMaterial(mesh, clonedMeshes) {
+  if (clonedMeshes.has(mesh)) return mesh.material;
+  const cloned = cloneMaterial(mesh.material);
+  mesh.material = cloned;
+  clonedMeshes.add(mesh);
+  return cloned;
+}
+
 function applyMaterialEntry(material, entry, loader) {
   if (entry.color && material.color) material.color.set(entry.color);
   if (Number.isFinite(entry.roughness) && 'roughness' in material) material.roughness = entry.roughness;
@@ -27,15 +63,14 @@ function applyMaterialEntry(material, entry, loader) {
   material.needsUpdate = true;
 }
 
-function applyMaterialOverrides(model, materials, loader) {
+function applyMaterialOverrides(model, materials, loader, clonedMeshes) {
   const wildcard = materials['*'] ?? null;
   model.traverse(mesh => {
     if (!mesh.isMesh || !mesh.material) return;
     const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
     const matched = list.map(mat => materials[mesh.name] ?? materials[mat.name] ?? wildcard);
     if (!matched.some(Boolean)) return;
-    const cloned = cloneMaterial(mesh.material);
-    mesh.material = cloned;
+    const cloned = ensureClonedMaterial(mesh, clonedMeshes);
     const clonedList = Array.isArray(cloned) ? cloned : [cloned];
     clonedList.forEach((mat, index) => {
       if (matched[index]) applyMaterialEntry(mat, matched[index], loader);
@@ -43,7 +78,7 @@ function applyMaterialOverrides(model, materials, loader) {
   });
 }
 
-function applySchemeShader(model, root, scheme) {
+function applySchemeShader(model, root, scheme, clonedMeshes) {
   root.updateMatrixWorld(true);
   const inverse = root.matrixWorld.clone().invert();
   const topColor = new THREE.Color(scheme.topColor);
@@ -56,8 +91,7 @@ function applySchemeShader(model, root, scheme) {
 
   model.traverse(mesh => {
     if (!mesh.isMesh || !mesh.material || SKIP_SCHEME_MESHES.has(mesh.name)) return;
-    const material = cloneMaterial(mesh.material);
-    mesh.material = material;
+    const material = ensureClonedMaterial(mesh, clonedMeshes);
     const transform = new THREE.Matrix4().multiplyMatrices(inverse, mesh.matrixWorld);
     const list = Array.isArray(material) ? material : [material];
     for (const mat of list) {
@@ -155,13 +189,13 @@ function applyDecals(model, root, container, livery, loader) {
   const airframe = model.getObjectByName('B737');
   if (!airframe || !airframe.isMesh) return;
 
-  root.updateMatrixWorld(true);
-  const inverse = root.matrixWorld.clone().invert();
   const decals = new THREE.Group();
   decals.name = LIVERY_GROUP_NAME;
   container.add(decals);
 
   const project = (name, position, size, side, map) => {
+    root.updateMatrixWorld(true);
+    const inverse = root.matrixWorld.clone().invert();
     const point = root.localToWorld(new THREE.Vector3(...position));
     const orientation = new THREE.Euler(0, side * Math.PI / 2, 0);
     const rotation = new THREE.Quaternion()
@@ -212,13 +246,12 @@ function applyDecals(model, root, container, livery, loader) {
   }
 
   if (livery.tailEmblem) {
-    if (livery.tailEmblem.kind === 'taegeuk') {
-      const symbolMap = createTaegeukTexture(livery.tailEmblem);
-      for (const side of [-1, 1]) {
-        project(`AddonLivery-tail-${side}`, [side * 0.18, 5.7, 15.3], [3.5, 3.5, 0.8], side, symbolMap);
-      }
-    } else if (livery.tailEmblem.map?.url && loader) {
+    if (livery.tailEmblem.map?.url && loader) {
       loader.load(livery.tailEmblem.map.url, texture => {
+        if (!decals.parent) {
+          texture.dispose();
+          return;
+        }
         texture.colorSpace = THREE.SRGBColorSpace;
         for (const side of [-1, 1]) {
           project(`AddonLivery-tail-${side}`, [side * 0.18, 5.7, 15.3], [3.5, 3.5, 0.8], side, texture);
@@ -226,6 +259,11 @@ function applyDecals(model, root, container, livery, loader) {
       }, undefined, error => {
         console.error('Addon tail emblem texture failed to load:', error);
       });
+    } else if (livery.tailEmblem.kind === 'taegeuk') {
+      const symbolMap = createTaegeukTexture(livery.tailEmblem);
+      for (const side of [-1, 1]) {
+        project(`AddonLivery-tail-${side}`, [side * 0.18, 5.7, 15.3], [3.5, 3.5, 0.8], side, symbolMap);
+      }
     }
   }
 }
@@ -237,11 +275,16 @@ function applyDecals(model, root, container, livery, loader) {
 export function applyAircraftLivery(model, root, container, livery, { textureLoader } = {}) {
   if (!model || !livery) return;
   const existing = container?.getObjectByName(LIVERY_GROUP_NAME);
-  if (existing) container.remove(existing);
+  if (existing) {
+    container.remove(existing);
+    disposeLiveryGroup(existing);
+  }
 
+  restoreBaseLiveryMaterials(model);
+  const clonedMeshes = new Set();
   const loader = textureLoader ?? new THREE.TextureLoader();
-  if (livery.materials) applyMaterialOverrides(model, livery.materials, loader);
-  if (livery.scheme) applySchemeShader(model, root, livery.scheme);
+  if (livery.scheme) applySchemeShader(model, root, livery.scheme, clonedMeshes);
+  if (livery.materials) applyMaterialOverrides(model, livery.materials, loader, clonedMeshes);
   if (container) applyDecals(model, root, container, livery, loader);
   if (livery.airline && root?.userData) root.userData.airline = livery.airline;
 }

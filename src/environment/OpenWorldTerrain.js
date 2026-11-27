@@ -206,17 +206,11 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced', seaPalette 
     shader.fragmentShader = `varying float vTerrainWet;
 uniform vec3 terrainSeaColor;
 ` + shader.fragmentShader;
-    shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `
-      if (vTerrainWet > 0.5) {
-        gl_FragColor.rgb = mix(gl_FragColor.rgb, terrainSeaColor.rgb, 0.82);
-      }
-      #include <dithering_fragment>
-    `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
       #include <map_fragment>
-      if (vTerrainWet > 0.5) {
+      ${seaPalette ? `if (vTerrainWet > 0.5) {
         diffuseColor.rgb = mix(diffuseColor.rgb, terrainSeaColor.rgb, 0.82);
-      }
+      }` : ''}
       #ifdef USE_MAP
         #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
           if (terrainDetailBlend > 0.0) {
@@ -1595,8 +1589,16 @@ const frames = {
     insets: getInsetsForRegion('incheon'),
   },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
-  patagonia: { origin: PATAGONIA_ORIGIN, protectedAreas: [[-22000, -22000, 22000, 22000]] },
+  patagonia: { origin: PATAGONIA_ORIGIN },
 };
+
+function originWithinBounds(origin, bounds) {
+  if (!origin || !bounds) return false;
+  const lat = origin.latitude ?? origin.lat;
+  const lon = origin.longitude ?? origin.lon;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  return lat >= bounds.south && lat <= bounds.north && lon >= bounds.west && lon <= bounds.east;
+}
 
 function setCorridorStreamersVisible(surface, visible) {
   if (surface?.corridorStreamer?.group) surface.corridorStreamer.group.visible = visible;
@@ -1641,9 +1643,9 @@ export function updateOpenWorldTerrain(sim) {
         const half = surface.size / 2;
         protectedAreas = [[-half, -half, half, half]];
         localSurface = surface;
-      } else if (!customOrigin && surface.localSurface) {
+      } else if (!customOrigin && protectedAreas?.length && surface.localSurface) {
         localSurface = surface.localSurface;
-      } else if (!customOrigin && airportMesh?.geometry) {
+      } else if (!customOrigin && protectedAreas?.length && airportMesh?.geometry) {
         localSurface = {
           geometry: airportMesh.geometry,
           extent: surface.localImageryExtent
@@ -1652,20 +1654,23 @@ export function updateOpenWorldTerrain(sim) {
             : { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
         };
       }
+      const activeRegionPack = originWithinBounds(frame.origin, sim.pinnedAddonPack?.bounds)
+        ? sim.pinnedAddonPack
+        : null;
       surface.openWorld = new OpenWorldTerrain({
         ...frame,
         protectedAreas,
         localSurface,
         world: sim.world,
         quality: sim.renderQuality,
-        ...(sim.pinnedAddonPack?.cacheOptions && !isExampleTileUrl(sim.pinnedAddonPack.urlTemplate) ? { imageryCache: new TileCacheManager({
-          ...sim.pinnedAddonPack.cacheOptions,
+        ...(activeRegionPack?.cacheOptions && !isExampleTileUrl(activeRegionPack.urlTemplate) ? { imageryCache: new TileCacheManager({
+          ...activeRegionPack.cacheOptions,
           enableBrowserCache: false,
           maxMemoryTiles: 128,
           maxConcurrent: 6,
         }) } : {}),
-        ...(sim.pinnedAddonPack?.cacheOptions && !isExampleTileUrl(sim.pinnedAddonPack.urlTemplate) ? { fallbackImagery: true } : {}),
-        ...(sim.pinnedAddonPack?.palette?.sea ? { seaPalette: sim.pinnedAddonPack.palette.sea } : {}),
+        ...(activeRegionPack?.cacheOptions && !isExampleTileUrl(activeRegionPack.urlTemplate) ? { fallbackImagery: true } : {}),
+        ...(activeRegionPack?.palette?.sea ? { seaPalette: activeRegionPack.palette.sea } : {}),
       });
       surface.mesh.add(surface.openWorld.group);
     }

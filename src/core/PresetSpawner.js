@@ -1045,7 +1045,7 @@ class PresetSpawnerMethods {
         const airport = await loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`);
         const config = REGION_SURFACES.incheon;
         const { surface, flightSurface } = await createConfiguredRegionSurface(config, {
-          baseUrl: import.meta.env.BASE_URL,
+          flightSurface: airport.terrain,
         });
         this.incheonAirportFacade = createRegionAirportFacade({
           config, world: this.world, airportStreamer: this.airportStreamer, airport, flightSurface,
@@ -1347,6 +1347,7 @@ class PresetSpawnerMethods {
     // Sync cloud layer altitude with active airport elevation
     if (this.sky && typeof this.sky.setAirport === 'function') {
       this.sky.setAirport(id);
+      this.syncRegionVisuals?.();
     }
 
     // Reconfigure cockpit navigation displays for active airport

@@ -193,6 +193,15 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
     for (const polygon of tilePolygons(feature)) {
+      const outerTileRing = polygon[0]?.slice(0, -1) ?? [];
+      if (outerTileRing.length < 3) continue;
+      let tileCenterX = 0;
+      let tileCenterY = 0;
+      for (const [x, y] of outerTileRing) {
+        tileCenterX += x;
+        tileCenterY += y;
+      }
+      const tileCenter = { x: tileCenterX / outerTileRing.length, y: tileCenterY / outerTileRing.length };
       const rings = polygon.map(ring => ring.slice(0, -1).map(([x, y]) => {
         const { latitude, longitude } = tileToWgs84(tile.x + x / feature.extent, tile.y + y / feature.extent, zoom);
         const [localX, localZ] = project(latitude, longitude);
@@ -201,7 +210,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const [outer, ...holes] = rings;
       if (outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 3) continue;
       const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
-      const override = findBuildingOverride(overrides, feature, center, tile);
+      const override = findBuildingOverride(overrides, feature, tileCenter, tile);
       if (override?.collision === 'suppress') continue;
       if (exclude(center.x, center.y, outer) || terrain.isWater?.(center.x, center.y)
         || (Number.isFinite(terrain.size) && Math.max(Math.abs(center.x), Math.abs(center.y)) > terrain.size / 2)) continue;

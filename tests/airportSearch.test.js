@@ -278,10 +278,17 @@ test('place cruise altitude clears elevation and rejects invalid indexes', () =>
   assert.deepEqual(searchPlaceIndex({ places: 'not-an-array' }, 'paris'), []);
 });
 
-test('place results merge with airports without losing their source ranking', () => {
+test('place results merge with airports and exact name/population outrank weak prefix hits', () => {
   const merged = mergeScoredResults([], [
     ...searchAirportIndexScored([{ code: 'LGTS', iata: 'JTR', name: 'Santorini Airport', latitude: 36.4, longitude: 25.47, country: 'GR', type: 'large_airport', tileId: '12-20' }], 'santorini'),
     ...searchPlaceIndexScored(PLACE_INDEX, 'santorini'),
   ]);
-  assert.deepEqual(merged.map(result => result.id), ['LGTS', 'geonames:252919']);
+  assert.deepEqual(merged.map(result => result.id), ['geonames:252919', 'LGTS']);
+
+  const rankedByPop = searchPlaceIndex([
+    { id: 'geonames:100', label: 'Paris District', aliases: [], detail: 'city · FR', latitude: 48.85, longitude: 2.35, population: 50000, elevationM: 35 },
+    { id: 'geonames:200', label: 'Paris', aliases: ['파리'], detail: 'city · FR', latitude: 48.8566, longitude: 2.3522, population: 2100000, elevationM: 35 },
+    { id: 'geonames:300', label: 'Paris', aliases: [], detail: 'city · US', latitude: 33.66, longitude: -95.55, population: 25000, elevationM: 180 },
+  ], 'paris');
+  assert.deepEqual(rankedByPop.map(result => result.id), ['geonames:200', 'geonames:300', 'geonames:100']);
 });
