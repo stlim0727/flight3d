@@ -284,7 +284,8 @@ export function buildAddonPackFromProfile(resolved, {
   const requestedPin = requestedPackId ? resolved.pins.find(pin => pin.id === requestedPackId) : null;
   const regionPin = requestedPin?.manifest?.region
     ? requestedPin
-    : resolved.pins.find(pin => pin.manifest?.region);
+    : resolved.pins.find(pin => pin.manifest?.region && !String(pin.id).startsWith('demo/'))
+      ?? resolved.pins.find(pin => pin.manifest?.region);
   const aircraftPins = resolved.pins.filter(pin => pin.manifest?.aircraft);
   const aircrafts = Object.freeze(aircraftPins.map(pin =>
     aircraftPackFromProfile(resolved, pin.id, { coreVersion: effectiveCore })));

@@ -544,6 +544,28 @@ test('AddonPicker saves, restores, and removes the default-flight addons', async
   });
 });
 
+test('AddonPicker notifies the caller after apply and remove', async () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'med/region/island', version: '1.0.0', url: 'https://packs.example/island.json', sha256: 'a'.repeat(64) },
+  ] };
+  const storage = memoryStorage();
+  let applied = 0;
+  await withFakeDocument(async ({ parent }) => {
+    const picker = new AddonPicker({
+      fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      validateCatalog,
+      storage,
+      onApplied: () => { applied += 1; },
+    });
+    picker.mount(parent);
+    await picker.load('https://packs.example/catalog.json');
+    picker.selected.add('med/region/island');
+    assert.equal(picker.apply(), true);
+    assert.equal(picker.remove(), true);
+  });
+  assert.equal(applied, 2);
+});
+
 test('incompatible saved pins are not restored into the picker', async () => {
   const catalog = { schemaVersion: 1, addons: [
     { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64), compatible: false },

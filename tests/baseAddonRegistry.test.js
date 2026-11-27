@@ -14,6 +14,7 @@ import { addonAircraftIds } from '../src/config/aircraftConfigs.js';
 import { verifyAddonRuntime } from '../src/addons/verifyAddonRuntime.js';
 import {
   BASE_ADDON_CATALOG_URL,
+  buildAddonPackFromProfile,
   loadBaseAddonPrCatalog,
   loadDefaultBaseAddonCatalog,
   parseBaseAddonPrNumber,
@@ -354,6 +355,24 @@ test('loadBaseAddonPrCatalog gates on CI via static preview first and GitHub che
   assert.equal(apiVerified.ciPassed, true);
   assert.equal(apiVerified.source, 'github-api');
   assert.equal(apiVerified.catalog.addons[0].sha256, manifestSha);
+});
+
+test('default pack prefers a published region over a demo region', () => {
+  const demoRegion = buildAddonStarter({
+    publisher: 'demo', name: 'kitchen', kind: 'region', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const publishedRegion = buildAddonStarter({
+    publisher: 'med', name: 'island', kind: 'region', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  const pack = buildAddonPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [demoRegion, publishedRegion].map(manifest => ({
+      id: manifest.id, version: manifest.version, url: `https://packs.example/${manifest.id}.json`,
+      sha256: '0'.repeat(64), manifest,
+    })),
+  }, { coreVersion: '1.8.0' });
+  assert.equal(pack.id, publishedRegion.id);
 });
 
 test('loadDefaultBaseAddonCatalog fails open and ?addonPr resolves multi-aircraft + region packs safely', async () => {

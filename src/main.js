@@ -1966,6 +1966,23 @@ async function initFlightSimulator() {
     const { installAddonPicker } = await import('./ui/installAddonPicker.js').catch(() => ({}));
     installAddonPicker?.(document.getElementById('lobby-addon-picker'), {
       defaultCatalogUrl: BASE_ADDON_CATALOG_URL,
+      onApplied: async () => {
+        try {
+          const pack = await resolveAddonPinnedPack(window.location.search);
+          this.pinnedAddonPack = pack ?? null;
+          this.addonAircraftDescriptors = new Map();
+          for (const descriptor of pinnedAddonAircraftList(this.pinnedAddonPack)) {
+            if (descriptor?.id) this.addonAircraftDescriptors.set(descriptor.id, descriptor);
+          }
+          if (this.addonAircraftDescriptors.size > 0) {
+            registerAddonAircraft([...this.addonAircraftDescriptors.values()]);
+          }
+          if (this.water && this.sky) applyRegionPalette(this.pinnedAddonPack, { water: this.water, sky: this.sky });
+          this.lobbyScreen?.refresh();
+        } catch (error) {
+          console.warn('Addons could not be applied to the active session:', error);
+        }
+      },
     });
   }
   if (!window.simulator) {
