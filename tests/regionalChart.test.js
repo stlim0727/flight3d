@@ -17,6 +17,7 @@ import {
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld } from '../src/world/UnifiedWorld.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
+import { PATAGONIA_ORIGIN, patagoniaToWorld } from '../src/geospatial/patagonia.js';
 import { applyAirportOverrides } from '../src/config/airportOverrides.js';
 
 const near = (actual, expected, tolerance, label = '') =>
@@ -55,7 +56,7 @@ test('scene geodesy inverts the frame each real region is drawn in', () => {
 });
 
 test('chart is offered in real regions and never in fictional arenas', () => {
-  for (const anchor of ['incheon', 'jeju', 'lukla']) {
+  for (const anchor of ['incheon', 'jeju', 'lukla', 'patagonia']) {
     const world = new UnifiedWorld(anchor);
     assert.equal(chartSceneOrigin({ activeAirport: anchor, world }), AIRPORT_ORIGINS[anchor], anchor);
   }
@@ -221,4 +222,37 @@ test('scale bar and position read cleanly', () => {
   assert.equal(chartScaleBar(1, 120).km, 1);
   assert.equal(formatChartPosition({ latitude: 37.4563, longitude: 126.4407 }), '37.46°N 126.44°E');
   assert.equal(formatChartPosition({ latitude: -33.9, longitude: -70.79 }), '33.90°S 70.79°W');
+});
+
+test('Patagonia chart frame uses Fitz Roy origin, local geodesy, and valid water tiles', () => {
+  const world = new UnifiedWorld('patagonia');
+  assert.equal(realOffsetInIncheonFrame('patagonia'), null);
+  assert.deepEqual(chartSceneOrigin({ activeAirport: 'patagonia', world }), AIRPORT_ORIGINS.patagonia);
+  assert.deepEqual(AIRPORT_ORIGINS.patagonia, { latitude: -49.271278, longitude: -73.043222 });
+
+  const frame = makeFrame('patagonia');
+  assert.equal(frame.origin, AIRPORT_ORIGINS.patagonia);
+
+  const originWgs = frame.toWgs(0, 0);
+  near(originWgs.latitude, PATAGONIA_ORIGIN.lat, 1e-6, 'Fitz Roy latitude');
+  near(originWgs.longitude, PATAGONIA_ORIGIN.lon, 1e-6, 'Fitz Roy longitude');
+
+  // patagoniaToWorld is spherical azimuthal equidistant (R=6378137m) while toWgs
+  // inverts the WGS84 ellipsoid ENU plane; over 14.1 km they agree within < 50 m.
+  const offsetWgs = frame.toWgs(10000, -10000);
+  const roundTrip = patagoniaToWorld(offsetWgs.latitude, offsetWgs.longitude);
+  const discrepancyM = Math.hypot(roundTrip.x - 10000, roundTrip.z - (-10000));
+  assert.ok(discrepancyM < 50, `14.1 km projection discrepancy ${discrepancyM.toFixed(2)} m`);
+
+  const elCalafate = { latitude: -50.2803, longitude: -72.0531 };
+  assert.deepEqual(frame.placeAirport(elCalafate), elCalafate);
+
+  const m = chartMetersPerPixel(1100, 720);
+  const tiles = chartWaterTiles(chartProjection(frame.origin), 1100, 720, m);
+  assert.ok(tiles.length > 0 && tiles.length <= 64, `${tiles.length} tiles`);
+  for (const tile of tiles) {
+    assert.ok(Number.isInteger(tile.x) && Number.isInteger(tile.y) && Number.isInteger(tile.zoom));
+  }
+  const centerTile = wgs84ToTile(PATAGONIA_ORIGIN.lat, PATAGONIA_ORIGIN.lon, tiles[0].zoom);
+  assert.ok(tiles.some(t => t.x === centerTile.x && t.y === centerTile.y), 'tiles cover Fitz Roy');
 });

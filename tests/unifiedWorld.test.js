@@ -647,6 +647,31 @@ test('custom tangent-plane origin isolates distant global flights from built-in 
   assert.equal(incheon.group.visible, true, 'clearing custom origin restores Incheon group');
 });
 
+test('Patagonia uses its isolated Fitz Roy origin for WGS84, chart activeOrigin, and destination guidance', () => {
+  const world = new UnifiedWorld('patagonia');
+  assert.deepEqual(world.activeOrigin, AIRPORT_ORIGINS.patagonia);
+  assert.deepEqual(world.activeOrigin, { latitude: -49.271278, longitude: -73.043222 });
+
+  const originWgs = worldPositionToWgs84('patagonia', 0, 0);
+  assert.ok(originWgs, 'patagonia has a WGS84 frame');
+  assert.ok(Math.abs(originWgs.latitude - (-49.271278)) < 1e-6);
+  assert.ok(Math.abs(originWgs.longitude - (-73.043222)) < 1e-6);
+
+  const info = world.destinationInfo(0, 0, 'incheon');
+  assert.equal(info.synthetic, false);
+  assert.equal(info.target, 'threshold');
+  assert.ok(info.distanceM > 17_000_000, `expected > 17,000 km great-circle distance, got ${info.distanceM}`);
+  assert.ok(Math.abs(Math.hypot(info.dx, info.dz) - info.distanceM) < 1,
+    'destination vector magnitude matches great-circle distance');
+  const markerBearing = (Math.atan2(info.dx, -info.dz) * 180 / Math.PI + 360) % 360;
+  assert.ok(Math.abs(markerBearing - info.bearingDeg) < 1e-6,
+    'destination vector aligns with great-circle bearing rather than Incheon-plane offset');
+  const planarDx = BASE_OFFSETS.incheon[0] - BASE_OFFSETS.patagonia[0];
+  const planarDz = BASE_OFFSETS.incheon[1] - BASE_OFFSETS.patagonia[1];
+  assert.ok(Math.hypot(info.dx - planarDx, info.dz - planarDz) > 100_000,
+    'destination vector does not use planar BASE_OFFSETS subtraction');
+});
+
 test('setCustomOrigin invalidates remembered destination offsets from the previous tangent plane', () => {
   registerExternalDestinations(['KJFK']);
   const { world } = makeWorld();
