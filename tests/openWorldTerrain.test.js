@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, Texture, Vector3, Vector4 } from 'three';
+import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, ShaderLib, Texture, UniformsUtils, Vector3, Vector4 } from 'three';
 import { applyTerrainMaterialQuality, buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
 import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
@@ -251,14 +251,14 @@ test('upgrades z12 to z13 directly, then restores the base for a later fade-out'
   try {
     await world.loadImageryDetail(key, entry, 13);
     assert.equal(mesh.material.map, previous);
-    assert.equal(detail.blend.value, 0);
+    assert.equal(detail.blend.value, 1e-4);
     assert.equal(disposed, false);
     const camera = new PerspectiveCamera();
     const start = 1000;
     entry.detailUpdatedAt = start;
     world.nextImagerySelection = Infinity;
     world.updateImageryDetail(camera, 1080, start + 175);
-    assert.equal(detail.blend.value, 0.5);
+    assert.ok(Math.abs(detail.blend.value - 0.5001) < 1e-9);
     assert.equal(mesh.material.map, previous);
     world.updateImageryDetail(camera, 1080, start + 350);
     assert.equal(detail.blend.value, 1);
@@ -875,4 +875,88 @@ test('terrain material applies shader fast paths and disables shadow writes for 
 
   world.tiles.clear();
   world.dispose();
+});
+
+test('terrain material cache key updates across presets and patches performance textureGrad and ultraLow lighting', async () => {
+  const tileOrigin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const openWorld = new OpenWorldTerrain({
+    origin: tileOrigin,
+    quality: 'balanced',
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  const raster = flat(50);
+  openWorld.raster = () => Promise.resolve(raster);
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load({ x, y, key: `${x}/${y}` });
+
+  const entry = openWorld.tiles.get(`${x}/${y}`);
+  const material = entry.mesh.material;
+  assert.equal(material.customProgramCacheKey(), 'open-world-terrain-standard');
+
+  openWorld.setImageryQuality('performance');
+  assert.equal(material.customProgramCacheKey(), 'open-world-terrain-performance');
+
+  openWorld.setImageryQuality('ultraLow');
+  assert.equal(material.customProgramCacheKey(), 'open-world-terrain-ultralow');
+
+  openWorld.setImageryQuality('balanced');
+  assert.equal(material.customProgramCacheKey(), 'open-world-terrain-standard');
+
+  const shader = {
+    vertexShader: ShaderLib.lambert.vertexShader,
+    fragmentShader: ShaderLib.lambert.fragmentShader,
+    uniforms: UniformsUtils.clone(ShaderLib.lambert.uniforms),
+  };
+  material.onBeforeCompile(shader);
+
+  const perfMatch = shader.fragmentShader.match(/#elif defined\(QUALITY_PERFORMANCE\) && QUALITY_PERFORMANCE == 1([\s\S]*?)#else/);
+  assert.ok(perfMatch, 'fragment shader must include QUALITY_PERFORMANCE branch');
+  const perfBranch = perfMatch[1];
+  const dFdxIdx = perfBranch.indexOf('dFdx(vMapUv)');
+  const dFdyIdx = perfBranch.indexOf('dFdy(vMapUv)');
+  const edgeIfIdx = perfBranch.indexOf('if (edgeBlend > 0.0)');
+  assert.ok(dFdxIdx >= 0 && dFdyIdx >= 0 && edgeIfIdx > dFdxIdx && edgeIfIdx > dFdyIdx,
+    'dFdx/dFdy derivatives must be hoisted before if (edgeBlend > 0.0)');
+  assert.ok(perfBranch.includes('textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy)'));
+  assert.equal(perfBranch.includes('texture2D(terrainBaseMap'), false);
+
+  assert.equal(shader.fragmentShader.includes('diffuseColor.rgb * 0.95'), false,
+    'ultraLow must not replace scene lighting with constant 95% ambient');
+  assert.equal(shader.fragmentShader.includes('directDiffuse = vec3(0.0)'), false,
+    'ultraLow must preserve direct diffuse scene lighting');
+  assert.match(shader.fragmentShader, /reflectedLight\.indirectDiffuse \*= 0\.68;/);
+  assert.match(shader.fragmentShader, /reflectedLight\.directDiffuse \*= 0\.88;/);
+
+  openWorld.dispose();
+});
+
+test('loadImageryDetail starts blend at 0 when no previous detailMap exists', async () => {
+  const key = `${x}/${y}`;
+  const world = new OpenWorldTerrain({
+    origin,
+    imageryCache: {
+      getTileImage: async () => ({ width: 256, height: 256 }),
+      dispose() {},
+    },
+  });
+  const baseMap = { dispose() {} };
+  const mesh = new Mesh(new BoxGeometry(4000, 100, 4000));
+  mesh.material.map = baseMap;
+  const detail = { map: { value: baseMap }, blend: { value: 0.5 } };
+  const entry = { mesh, baseMap, detailMap: null, detailLevel: 11, detail };
+  world.tiles.set(key, entry);
+  world.detailWanted.set(key, 12);
+  globalThis.document = { createElement: () => ({ getContext: () => ({ drawImage() {} }) }) };
+  try {
+    await world.loadImageryDetail(key, entry, 12);
+    assert.equal(entry.previousDetailMap, undefined);
+    assert.equal(detail.blend.value, 0);
+  } finally {
+    delete globalThis.document;
+    world.dispose();
+  }
 });

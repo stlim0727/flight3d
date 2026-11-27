@@ -153,8 +153,8 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     QUALITY_PERFORMANCE: isPerformance ? 1 : 0,
   };
   material.customProgramCacheKey = () => (
-    isUltraLow ? 'open-world-terrain-ultralow'
-      : isPerformance ? 'open-world-terrain-performance'
+    material.defines?.QUALITY_ULTRALOW === 1 ? 'open-world-terrain-ultralow'
+      : material.defines?.QUALITY_PERFORMANCE === 1 ? 'open-world-terrain-performance'
         : 'open-world-terrain-standard'
   );
   material.onBeforeCompile = shader => {
@@ -209,8 +209,10 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
             vec4 edgeWeights = proximity * vec4(centerY, centerX, centerY, centerX);
             vec4 cornerWeights = proximity * proximity.yzwx;
             float edgeBlend = dot(terrainDetailEdges, edgeWeights) + dot(terrainDetailCorners, cornerWeights);
+            vec2 uvDx = dFdx(vMapUv);
+            vec2 uvDy = dFdy(vMapUv);
             if (edgeBlend > 0.0) {
-              diffuseColor = mix(diffuseColor, texture2D(terrainBaseMap, vMapUv), edgeBlend);
+              diffuseColor = mix(diffuseColor, textureGrad(terrainBaseMap, vMapUv, uvDx, uvDy), edgeBlend);
             }
           }
           // Fast contrast boost with 2 MADs instead of transcendental pow(x, 1.08)
@@ -241,17 +243,10 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     shader.fragmentShader = shader.fragmentShader.replace('#include <lights_fragment_end>', `
       #include <lights_fragment_end>
       #ifdef USE_MAP
-        #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
-          // Unlit-style fast path: satellite imagery already contains baked solar illumination.
-          // Minimizes per-fragment ALU load and prevents double lighting.
-          reflectedLight.indirectDiffuse = diffuseColor.rgb * 0.95;
-          reflectedLight.directDiffuse = vec3(0.0);
-        #else
-          // Satellite tiles already carry baked overhead illumination. Trim excess
-          // ambient washout and direct over-exposure while keeping sunset/night/cloud shading.
-          reflectedLight.indirectDiffuse *= 0.68;
-          reflectedLight.directDiffuse *= 0.88;
-        #endif
+        // Satellite tiles already carry baked overhead illumination. Trim excess
+        // ambient washout and direct over-exposure while keeping sunset/night/cloud shading.
+        reflectedLight.indirectDiffuse *= 0.68;
+        reflectedLight.directDiffuse *= 0.88;
       #endif
     `);
     shader.fragmentShader = `
@@ -1345,14 +1340,15 @@ export class OpenWorldTerrain {
     for (const [i, image] of images.entries()) {
       context.drawImage(image, (i % count) * samples, Math.floor(i / count) * samples);
     }
-    if (entry.detailMap) {
+    const replacing = Boolean(entry.detailMap);
+    if (replacing) {
       entry.previousDetailMap = entry.detailMap;
       this.applyImagery(entry, entry.previousDetailMap);
     }
     entry.detailMap = imageryTexture(canvas, this.imageryBudget.anisotropy);
     entry.detailLevel = level;
     entry.detail.map.value = entry.detailMap;
-    entry.detail.blend.value = 0;
+    entry.detail.blend.value = replacing ? 1e-4 : 0;
     entry.detailUpdatedAt = performance.now();
   }
 

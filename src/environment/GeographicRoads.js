@@ -299,8 +299,8 @@ function roadMaterial(quality = 'balanced') {
     #endif
   `);
   material.customProgramCacheKey = () => (
-    isUltraLow ? 'geographic-road-surface-ultralow'
-      : isPerformance ? 'geographic-road-surface-performance'
+    material.defines?.QUALITY_ULTRALOW === 1 ? 'geographic-road-surface-ultralow'
+      : material.defines?.QUALITY_PERFORMANCE === 1 ? 'geographic-road-surface-performance'
         : 'geographic-road-surface-standard'
   );
   return applyLogDepthOffset(material, 4);
