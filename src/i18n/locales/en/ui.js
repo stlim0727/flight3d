@@ -23,6 +23,7 @@ export default {
   "startup.failed": "Startup could not finish. Please try again.",
   "startup.retry": "Try again",
   "startup.details": "Progress history",
+  "notice.addon.loadFailed": "Saved addons were not loaded: {error}",
   "startup.step": "Step {current} of {total}",
   "startup.elapsed": "Elapsed {total}s · Current task {current}s",
   "startup.active": "In progress · {seconds}s",

@@ -140,6 +140,8 @@ async function resolveAddonPinnedPack(search) {
     return await resolveSharedAddonPack(resolveAddonSearch(search));
   } catch (error) {
     if (!savedAddonSearchParams()) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    window.addonStartupError = message;
     console.warn('Saved addons could not be loaded:', error);
     return resolveSharedAddonPack(search);
   }
@@ -1281,6 +1283,9 @@ class FlightSimulator {
     document.getElementById('startup-overlay').hidden = true;
     document.getElementById('canvas-container').inert = false;
     document.getElementById('hud-overlay').inert = false;
+    if (window.addonStartupError) {
+      this.showToast(() => t('notice.addon.loadFailed', { error: window.addonStartupError }));
+    }
     // Loading time must not turn into accumulated simulation time.
     this.clock.getDelta();
     inputLatency?.mark('startup-complete');
