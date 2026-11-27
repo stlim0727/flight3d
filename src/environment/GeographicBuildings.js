@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { nightLightLevel } from './AirportNightLighting.js';
-import { cityFacadeUvShader, createCityFacadeAtlas } from './CityBuildingAssets.js';
+import { cityFacadeUvShader, cityRoofAtlasRgb, createCityFacadeAtlas } from './CityBuildingAssets.js';
 import { VectorTile } from '@mapbox/vector-tile';
 import { PbfReader } from 'pbf';
 import { PMTiles } from 'pmtiles';
@@ -10,6 +10,9 @@ import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
 import { extractBuildingLandmarks } from '../geospatial/overtureLandmarks.js';
+import { buildingArchiveUrl } from '../geospatial/buildingArchive.js';
+import { resolveBuildingStyle } from '../geospatial/regionalBuildingStyle.js';
+import overviewProperties from '../config/regionalOverviewProperties.json' with { type: 'json' };
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
 
@@ -17,9 +20,17 @@ const neighbors = [[0, 0], [0, -1], [-1, 0], [1, 0], [0, 1], [-1, -1], [1, -1], 
 const zoom = 14;
 const overviewZoom = 12;
 const collisionCellSize = 128;
-const source = new PMTiles(
-  'https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/2026-11-18.0/buildings.pmtiles',
-);
+const source = new PMTiles(buildingArchiveUrl);
+const roofAtlasColor = new THREE.Color().setRGB(...cityRoofAtlasRgb.map(value => value / 255), THREE.SRGBColorSpace);
+const silhouetteColor = new THREE.Color(0xa99f94);
+const white = new THREE.Color(0xffffff);
+
+// Material and map albedo multiply vertex colors in linear space. Preserve
+// atlas detail while giving the plain roof membrane the selected map color.
+function roofTint(roofColor, albedo) {
+  const color = new THREE.Color(roofColor);
+  return color.setRGB(color.r / albedo.r, color.g / albedo.g, color.b / albedo.b);
+}
 
 function lightTexture(size, sample, alphaOnly = false) {
   const bytes = new Uint8Array(size * size * 4);
@@ -98,7 +109,10 @@ function buildOverviewTile(data, tile, project, terrain, exclude) {
     const base = Math.min(height, ...corners.map(point => terrain.getHeight(point.x, point.y)));
     if (!Number.isFinite(base)) continue;
     footprintOffsets[footprintOffsets.length - 1] = boxes.length;
-    boxes.push({ x: localX, z: localZ, base, width, depth, top: height + geographicBuildingHeight(feature.properties) });
+    const properties = overviewProperties[feature.id];
+    const style = resolveBuildingStyle({ latitude, longitude, id: feature.id,
+      properties: properties ? { ...properties, ...feature.properties } : feature.properties });
+    boxes.push({ x: localX, z: localZ, base, width, depth, top: height + style.heightM, roofColor: style.roofColor });
   }
   if (!positions.length) return null;
   const lights = new THREE.BufferGeometry();
@@ -116,12 +130,15 @@ function buildSilhouettes(boxes) {
   const positions = [];
   const normals = [];
   const indices = [];
+  const colors = new Float32Array(boxes.length * boxVertexCount * 4).fill(1);
   const { position, normal } = boxGeometry.attributes;
-  for (const [i, { x, z, base, width, depth, top }] of boxes.entries()) {
+  for (const [i, { x, z, base, width, depth, top, roofColor }] of boxes.entries()) {
     const mid = (base + top) / 2;
+    const tint = roofColor && roofTint(roofColor, silhouetteColor);
     for (let v = 0; v < boxVertexCount; v++) {
       positions.push(x + width * position.getX(v), mid + (top - base) * position.getY(v), z + depth * position.getZ(v));
       normals.push(normal.getX(v), normal.getY(v), normal.getZ(v));
+      if (tint && normal.getY(v) === 1) tint.toArray(colors, (i * boxVertexCount + v) * 4);
     }
     for (const index of boxGeometry.index.array) indices.push(i * boxVertexCount + index);
   }
@@ -129,15 +146,13 @@ function buildSilhouettes(boxes) {
   geometry.setIndex(indices);
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
-  geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(boxes.length * boxVertexCount * 4).fill(1), 4));
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4));
   geometry.attributes.color.setUsage(THREE.DynamicDrawUsage);
   return geometry;
 }
 
-export function geographicBuildingHeight({ height, num_floors: floors }) {
-  if (Number.isFinite(height) && height > 0 && height <= 1500) return height;
-  if (Number.isFinite(floors) && floors > 0 && floors <= 300) return floors * 3.2;
-  return 9;
+export function geographicBuildingHeight(properties) {
+  return resolveBuildingStyle({ properties }).heightM;
 }
 
 function matchesBuildingOverride(override, feature, latitude, longitude) {
@@ -192,6 +207,11 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
+    // Use the whole source feature before our tile clipping or multipolygon split.
+    const [west, north, east, south] = feature.bbox();
+    const location = tileToWgs84(tile.x + (west + east) / (2 * feature.extent),
+      tile.y + (north + south) / (2 * feature.extent), zoom);
+    const style = resolveBuildingStyle({ ...location, id: feature.id, properties: feature.properties });
     for (const polygon of tilePolygons(feature)) {
       const outerTileRing = polygon[0]?.slice(0, -1) ?? [];
       if (outerTileRing.length < 3) continue;
@@ -218,12 +238,14 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const low = Math.min(...samples);
       const high = Math.max(...samples);
       if (!Number.isFinite(low) || !Number.isFinite(high) || high <= 0) continue;
-      const roof = high + geographicBuildingHeight(feature.properties);
+      const roof = high + style.heightM;
       const roofTriangles = THREE.ShapeUtils.triangulateShape(outer, holes);
       if (!roofTriangles.length) continue;
       if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
       const points = rings.flat();
-      const color = override?.material?.baseColor ? new THREE.Color(override.material.baseColor) : null;
+      const overrideColor = override?.material?.baseColor ? new THREE.Color(override.material.baseColor) : null;
+      const wallColor = overrideColor ?? white;
+      const roofColor = overrideColor ?? (style.roofColor ? roofTint(style.roofColor, roofAtlasColor) : white);
       const facadeTile = Math.floor(Math.abs(center.x) / 83 + Math.abs(center.y) / 47) % 3;
       const facadeUv = [(facadeTile % 2 + 0.5) / 2, (Math.floor(facadeTile / 2) + 0.5) / 2];
       for (const triangle of roofTriangles) {
@@ -231,7 +253,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
           const point = points[index];
           positions.push(point.x, roof, point.y);
           facadeUvs.push(...roofAtlasUv(point.x, point.y));
-          tint.push(color ? color.r : 1, color ? color.g : 1, color ? color.b : 1);
+          tint.push(roofColor.r, roofColor.g, roofColor.b);
         }
       }
       for (const ring of rings) {
@@ -242,7 +264,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
             b.x, low, b.y, b.x, roof, b.y, a.x, roof, a.y);
           facadeUvs.push(...facadeUv, ...facadeUv, ...facadeUv,
             ...facadeUv, ...facadeUv, ...facadeUv);
-          for (let v = 0; v < 6; v++) tint.push(color ? color.r : 1, color ? color.g : 1, color ? color.b : 1);
+          for (let v = 0; v < 6; v++) tint.push(wallColor.r, wallColor.g, wallColor.b);
         }
       }
     }
@@ -324,7 +346,7 @@ export class GeographicBuildings {
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
     });
     this.silhouetteMaterial = new THREE.MeshLambertMaterial({
-      color: 0xa99f94, vertexColors: true, alphaHash: true, opacity: 0,
+      color: silhouetteColor, vertexColors: true, alphaHash: true, opacity: 0,
     });
     this.overviewTiles = new Map();
     this.pendingOverview = null;

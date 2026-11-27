@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 // the browser receives no separately licensed texture or model download.
 const TILE = 128;
 const SIZE = TILE * 2;
+export const cityRoofAtlasRgb = [86, 91, 96];
 
 // Streamed buildings are seen up close after overview lights fade, so they use a
 // brighter lit-window mask than the hand-placed city's subtle night glow.
@@ -16,7 +17,7 @@ export function createCityFacadeAtlas(windowLight = [80, 68, 44]) {
     [60, 82, 105], // glazed office
     [173, 166, 149], // residential stone
     [110, 122, 131], // commercial cladding
-    [86, 91, 96] // rooftop membrane
+    cityRoofAtlasRgb // rooftop membrane
   ];
   for (let tile = 0; tile < 4; tile++) {
     for (let y = 0; y < TILE; y++) {
