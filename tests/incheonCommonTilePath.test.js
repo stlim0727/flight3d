@@ -1,12 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { getInsetsForRegion } from '../src/config/terrainInsets.js';
-import { OpenWorldRegionSurface } from '../src/environment/OpenWorldRegionSurface.js';
 import { buildOpenTerrainTile } from '../src/environment/OpenWorldTerrain.js';
 import { REGION_SURFACES } from '../src/config/regionSurfaces.js';
 import { INCHEON_PATCH } from '../src/geospatial/incheon.js';
-import { IncheonFlightSurface } from '../src/geospatial/IncheonFlightSurface.js';
-import { terrainGeometry } from '../src/previews/incheonGeometry.js';
+import { createConfiguredRegionSurface } from '../src/environment/RegionSurfaceFactory.js';
 import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
 
 test('Incheon uses the common anchor surface registry', () => {
@@ -29,7 +27,7 @@ test('RKSI inset is declared in the common tile inset registry', () => {
   assert.ok(Number.isInteger(tile.x) && Number.isInteger(tile.y));
 });
 
-test('Incheon common surface supplies a DSM mesh inside the protected area', () => {
+test('Incheon common surface supplies a DSM mesh through the shared factory', async () => {
   const config = REGION_SURFACES.incheon;
   const source = {
     getHeight: (x, z) => 7 + Math.hypot(x, z) / 100,
@@ -37,15 +35,30 @@ test('Incheon common surface supplies a DSM mesh inside the protected area', () 
     isLand: () => true,
     coastline: { land: { type: 'Polygon', coordinates: [[[-6000, -6000], [6000, -6000], [6000, 6000], [-6000, 6000], [-6000, -6000]]] } },
   };
-  const flightSurface = new IncheonFlightSurface(source);
-  const localSurface = {
-    size: 12000,
-    segments: 240,
-    geometry: terrainGeometry(12000, 240, (x, z) => source.getNaturalHeight(x, z)),
-    getNaturalHeight: (x, z) => source.getNaturalHeight(x, z),
-    getHeight: (x, z) => flightSurface.getHeight(x, z),
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    if (url.endsWith('terrain-metadata.json')) {
+      return { ok: true, json: async () => ({ schemaVersion: 1, grids: {} }) };
+    }
+    if (url.endsWith('coastline.json')) {
+      return { ok: true, json: async () => source.coastline };
+    }
+    throw new Error(`Unexpected URL: ${url}`);
   };
-  const surface = new OpenWorldRegionSurface({ ...config, fallback: {}, localSurface });
+  const configured = {
+    ...config,
+    localTerrain: {
+      ...config.localTerrain,
+      Terrain: class {
+        constructor() {
+          Object.assign(this, source);
+        }
+      },
+    },
+  };
+  const { surface } = await createConfiguredRegionSurface(configured, { baseUrl: '/' });
+  globalThis.fetch = originalFetch;
+  const localSurface = surface.localSurface;
   assert.equal(surface.localSurface, localSurface);
 
   const raster = new Float32Array(256 * 256).fill(0);
