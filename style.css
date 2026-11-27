@@ -117,6 +117,10 @@ dialog.lobby-addon-dialog::backdrop {
 .addon-picker-filters .addon-search { flex: 1 1 12rem; }
 .addon-kind-buttons { display: flex; gap: .25rem; flex-wrap: wrap; }
 .addon-kind[aria-pressed="true"] { outline: 2px solid #7ed7e8; }
+.addon-saved { margin: .6rem 0; }
+.addon-saved h4 { margin: 0 0 .3rem; font-size: .85rem; color: #cbd5e1; }
+.addon-saved-list { display: grid; gap: .4rem; }
+.addon-saved-item { display: flex; gap: .6rem; align-items: center; justify-content: space-between; padding: .5rem; border: 1px solid #7ed7e855; border-radius: .5rem; background: #10212a80; font-size: .85rem; }
 .addon-list { display: grid; gap: .4rem; max-height: 16rem; overflow-y: auto; }
 .addon-item { display: flex; gap: .6rem; align-items: center; padding: .5rem; border: 1px solid #bad9e133; border-radius: .5rem; background: #10212a80; }
 .addon-item:has(input:checked) { border-color: #7ed7e8; }
