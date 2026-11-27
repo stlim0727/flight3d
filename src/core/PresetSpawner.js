@@ -16,6 +16,8 @@ import { alignSpawnToWind } from './windSpawn.js';
 import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js';
 import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
+import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
+import { IncheonFlightSurface } from '../geospatial/IncheonFlightSurface.js';
 import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { castFarSunShadow } from '../environment/FarSunShadow.js';
@@ -80,11 +82,6 @@ class PresetSpawnerMethods {
     // An arena field must not leak into a different mission or ordinary flight.
     if (this.windField) setSimulationWind(this);
     this.bridgeFlight?.stop();
-    if (this.activeAirport === 'incheon' && this.incheonAirport) {
-      this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
-      this.currentTerrain = this.incheonAirport.terrain;
-      this.currentAirport = this.incheonAirport;
-    }
     if (type === 'shadow' && !this.devRunner?.changingState) {
       return this.devRunner?.start('shadow') ?? false;
     }
@@ -711,10 +708,10 @@ class PresetSpawnerMethods {
     const previousBuildings = previousTerrain?.geographicBuildingLayer;
     world.setAnchor(id);
     if (this.incheonAirport) world.register('incheon', {
-      terrain: this.incheonAirport.terrain,
-      airport: this.incheonAirport,
+      terrain: this.incheonSurface ?? this.incheonAirport.terrain,
+      airport: this.incheonAirportFacade ?? this.incheonAirport,
       group: this.incheonAirport.group,
-      mesh: this.incheonAirport.terrain.mesh,
+      mesh: (this.incheonSurface ?? this.incheonAirport.terrain).mesh,
       extent: REGION_EXTENTS.incheon,
     });
     if (this.jejuSurface) world.register('jeju', {
@@ -837,7 +834,7 @@ class PresetSpawnerMethods {
   }
 
   spawnAirportFor(id) {
-    return id === 'incheon' ? this.incheonAirport
+    return id === 'incheon' ? (this.incheonAirportFacade ?? this.incheonAirport)
       : id === 'jeju' ? this.jejuAirportFacade
       : id === 'lukla' ? (this.airportStreamer?.regionFor?.('VNLK')?.airport ?? null)
       : id === 'neon' ? this.neonCity?.airport
@@ -1055,13 +1052,36 @@ class PresetSpawnerMethods {
 
   async ensureIncheonRegion() {
     if (this.incheonAirport) return this.incheonAirport;
-    this.incheonLoad ??= import('../environment/IncheonAirport.js')
-      .then(({ loadIncheonAirport }) => loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`))
-      .then(airport => {
-        this.incheonAirport = airport;
-        airport.group.visible = airport.terrain.mesh.visible = false;
-        this.scene?.add(airport.group, airport.terrain.mesh);
-        return airport;
+    this.incheonLoad ??= Promise.all([
+      import('../environment/IncheonAirport.js'),
+      loadIncheonTerrain(`${import.meta.env.BASE_URL}scenery/incheon/`),
+    ]).then(async ([{ loadIncheonAirport }, source]) => {
+      const airport = await loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`);
+      const config = REGION_SURFACES.incheon;
+      const flightSurface = new IncheonFlightSurface(source);
+      const fallback = new CorridorFlightSurface({ activeOrigin: config.origin, incheonSurface: flightSurface });
+      const surface = new OpenWorldRegionSurface({
+        ...config, fallback,
+        localImageryExtent: [-6000, -6000, 6000, 6000],
+      });
+      const streamedAirport = () => this.airportStreamer?.regionFor?.('RKSI')?.airport ?? null;
+      this.incheonAirportFacade = {
+        isOnRunway: (x, z) => Boolean(streamedAirport()?.isOnRunway?.(...this.world.local('RKSI', x, z)))
+          || flightSurface.isOnRunway(x, z),
+        isRunwaySafetyArea: (x, z) => Boolean(streamedAirport()?.isRunwaySafetyArea?.(...this.world.local('RKSI', x, z)))
+          || flightSurface.isRunwaySafetyArea(x, z),
+        hasModeledBuilding: (x, z) => airport.hasModeledBuilding(x, z),
+        checkBuildingCollision: probes => airport.checkBuildingCollision(probes),
+        getGazeTargets: () => airport.getGazeTargets(),
+        nightLighting: airport.nightLighting,
+        resetTraffic: () => airport.resetTraffic(),
+        update: (dt, position, time, options) => airport.update(dt, position, time, options),
+      };
+      this.incheonSurface = surface;
+      this.incheonAirport = airport;
+      airport.group.visible = false;
+      this.scene?.add(airport.group, surface.mesh);
+      return airport;
       })
       .catch(error => {
         this.incheonLoad = null;
@@ -1107,7 +1127,7 @@ class PresetSpawnerMethods {
   _isRegionLoaded(id) {
     if (id === 'coastal') return Boolean(this.terrain && this.airport);
     if (id === 'lukla') return Boolean(this.luklaTerrain);
-    if (id === 'incheon') return Boolean(this.incheonAirport);
+    if (id === 'incheon') return Boolean(this.incheonSurface);
     if (id === 'jeju') return Boolean(this.jejuSurface);
     if (id === 'patagonia') return Boolean(this.patagoniaTerrain?.isLoaded) && !this.patagoniaTerrain.loadError;
     if (id === 'neon') return Boolean(this.neonCity);
@@ -1118,7 +1138,7 @@ class PresetSpawnerMethods {
   _isRegionLoadingOrLoaded(id) {
     if (id === 'coastal') return Boolean((this.terrain && this.airport) || this._coastalLoad);
     if (id === 'lukla') return Boolean(this.luklaTerrain || this._luklaLoad);
-    if (id === 'incheon') return Boolean(this.incheonAirport || this.incheonLoad);
+    if (id === 'incheon') return Boolean(this.incheonSurface || this.incheonLoad);
     if (id === 'jeju') return Boolean(this.jejuSurface);
     if (id === 'patagonia') return Boolean(this.patagoniaTerrain || this._patagoniaLoad);
     if (id === 'neon') return Boolean(this.neonCity || this._neonLoad);
@@ -1194,9 +1214,9 @@ class PresetSpawnerMethods {
     if (this.activeAirport === id) {
       if (this.syncUnifiedWorld(id)) return;
       if (id === 'incheon' && this.incheonAirport) {
-        this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = true;
-        this.currentTerrain = this.incheonAirport.terrain;
-        this.currentAirport = this.incheonAirport;
+        this.incheonAirport.group.visible = true;
+        this.currentTerrain = this.incheonSurface;
+        this.currentAirport = this.incheonAirportFacade ?? this.incheonAirport;
       } else if (id === 'jeju' && this.jejuAirport) {
         this.jejuAirport.group.visible = this.jejuAirport.terrain.mesh.visible = true;
         this.currentTerrain = this.jejuAirport.terrain;
@@ -1282,17 +1302,17 @@ class PresetSpawnerMethods {
     if (this.luklaTerrain?.mesh) this.luklaTerrain.mesh.visible = isLukla;
     if (this.patagoniaTerrain?.mesh) this.patagoniaTerrain.mesh.visible = isPatagonia;
 
-    if (this.incheonAirport) this.incheonAirport.group.visible = this.incheonAirport.terrain.mesh.visible = isIncheon;
+    if (this.incheonAirport) this.incheonAirport.group.visible = isIncheon;
     if (this.neonCity?.group) this.neonCity.group.visible = isNeon;
     if (this.persistentValley?.group) this.persistentValley.group.visible = isValley;
     this.currentTerrain = isNeon ? this.neonCity.terrain
-      : isIncheon ? this.incheonAirport.terrain
+      : isIncheon ? this.incheonSurface
       : isLukla ? this.luklaTerrain
       : isValley ? this.persistentValley
       : isPatagonia ? this.patagoniaTerrain
       : this.terrain;
     this.currentAirport = isNeon ? this.neonCity.airport
-      : isIncheon ? this.incheonAirport
+      : isIncheon ? (this.incheonAirportFacade ?? this.incheonAirport)
       : isLukla ? this.spawnAirportFor('lukla')
       : isValley ? null
       : this.airport;
@@ -1325,8 +1345,8 @@ class PresetSpawnerMethods {
         const t = this.neonCity.airport.controlTowerData;
         this.cameraSystem.towerPos.set(t.x, t.y + t.height - 1.5, t.z);
       } else if (isIncheon) {
-        const cab = this.incheonAirport.towerCab;
-        this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
+        const cab = this.incheonAirport?.towerCab;
+        if (cab) this.cameraSystem.towerPos.set(cab.x, cab.y, cab.z);
       } else if (isJeju) {
         const tower = getAirportOverride('RKPC')?.facilities?.find(f => f.kind === 'tower');
         if (tower) {

@@ -15,6 +15,7 @@ export class OpenWorldRegionSurface {
     precinctExtent = [-3200, -1500, 3200, 1500],
     fallback,
     strips = [],
+    localImageryExtent = null,
   } = {}) {
     this.fallback = fallback;
     this.openWorld = null;
@@ -28,6 +29,7 @@ export class OpenWorldRegionSurface {
     this.geometry.translate((minX + maxX) / 2, elevationM, (minZ + maxZ) / 2);
     this.airportMesh = new THREE.Mesh(this.geometry, new THREE.MeshBasicMaterial({ visible: false }));
     this.mesh.add(this.airportMesh);
+    this.localImageryExtent = localImageryExtent;
 
     const stripMaterial = new THREE.MeshStandardMaterial({ color: 0x2b3033, roughness: 0.9 });
     this.stripMeshes = strips.map(strip => {
