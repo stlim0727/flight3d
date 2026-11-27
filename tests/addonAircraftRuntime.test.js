@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { validateAddonManifest } from '../src/addons/addonContract.js';
 import { aircraftPackFromProfile } from '../src/addons/aircraftPackBinding.js';
+import { buildAddonProfileUrl, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
 import { registerAddonAircraft, resolveAircraftConfig, addonAircraftIds } from '../src/config/aircraftConfigs.js';
 import { AddonAircraft } from '../src/aircraft/AddonAircraft.js';
 import { buildAddonStarter } from '../src/addons/addonStarter.js';
@@ -452,10 +455,16 @@ test('partial physics.id addon fills missing runtime defaults for headless stepp
 
   const sim = createHeadlessSimulation({ aircraftId: descriptor.id, airportId: 'coastal' });
   sim.setPreset('cruise');
+  assert.ok(sim.engines.fuelKg > 0, `expected positive fuel for ${descriptor.id}, got ${sim.engines.fuelKg}`);
+  const startFuelKg = sim.engines.fuelKg;
+  sim.controls.throttle = 1;
+  sim.engines.setThrottle(1);
   const startX = sim.position.x;
   for (let tick = 0; tick < 120; tick++) stepPhysics(sim);
   assert.equal(sim.isCrashed, false);
   assert.ok(Math.abs(sim.position.x - startX) > 10);
+  assert.ok(sim.engines.thrust[0] > 0, `expected positive thrust, got ${sim.engines.thrust[0]}`);
+  assert.ok(sim.engines.fuelKg < startFuelKg, `expected fuel burn from ${startFuelKg}, got ${sim.engines.fuelKg}`);
 });
 
 test('spawn planners give GA addon aircraft non-zero GA speeds and configured ground clearance', () => {
@@ -503,4 +512,162 @@ test('spawn planners give GA addon aircraft non-zero GA speeds and configured gr
     latitude: 37.5, longitude: 127.1, headingDeg: 90, altitudeM: 1000, aircraftId: descriptor.id,
   });
   assert.ok(Math.abs(Math.hypot(mapCruise.vx, mapCruise.vz) - 48) < 1e-6);
+});
+
+test('example aircraft addon omitting fuelCapacityKg binds default fuel and burns fuel under headless thrust', () => {
+  const exampleManifest = JSON.parse(
+    readFileSync(new URL('../examples/packs/aircraft/addon.json', import.meta.url), 'utf8'),
+  );
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: exampleManifest.id, version: exampleManifest.version, sha256: 'a'.repeat(64), manifest: exampleManifest }],
+  }, exampleManifest.id, { coreVersion: '1.8.0' });
+
+  assert.equal(descriptor.config.propulsion.fuelCapacityKg, 185);
+  assert.equal(descriptor.config.massProperties.emptyWeightKg, 1665);
+  assert.ok(Array.isArray(descriptor.config.massDistribution.tanks) && descriptor.config.massDistribution.tanks.length > 0);
+  assert.equal(descriptor.config.massDistribution.tanks[0].capacityKg, 185);
+  assert.equal(descriptor.config.massDistribution.initialFuelKg, 185);
+
+  registerAddonAircraft([descriptor]);
+  const sim = createHeadlessSimulation({ aircraftId: descriptor.id, airportId: 'coastal' });
+  assert.ok(sim.engines.fuelKg > 0);
+
+  sim.setPreset('cruise');
+  assert.ok(sim.engines.fuelKg > 0);
+  const startFuelKg = sim.engines.fuelKg;
+  sim.controls.throttle = 1;
+  sim.engines.setThrottle(1);
+  for (let tick = 0; tick < 120; tick++) stepPhysics(sim);
+
+  assert.equal(sim.isCrashed, false);
+  assert.ok(sim.engines.thrust[0] > 0, `expected positive thrust, got ${sim.engines.thrust[0]}`);
+  assert.ok(sim.engines.fuelKg < startFuelKg, `expected fuel burn from ${startFuelKg}, got ${sim.engines.fuelKg}`);
+});
+
+test('derived addon preserves author-supplied physics.massProperties and partial propulsion defaults', () => {
+  const custom = buildAddonStarter({
+    publisher: 'demo', name: 'custom-inertia', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  delete custom.aircraft.physics.fuelCapacityKg;
+  custom.aircraft.physics.massKg = 1850;
+  custom.aircraft.physics.massProperties = {
+    currentMassKg: 1800,
+    Ixx: 2400,
+    Iyy: 3100,
+    Izz: 4200,
+  };
+  custom.aircraft.physics.propulsion = {
+    numEngines: 2,
+    engineName: 'Twin Prop',
+  };
+
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: custom.id, version: custom.version, sha256: 'a'.repeat(64), manifest: custom }],
+  }, custom.id, { coreVersion: '1.8.0' });
+
+  assert.equal(descriptor.config.massProperties.Ixx, 2400);
+  assert.equal(descriptor.config.massProperties.Iyy, 3100);
+  assert.equal(descriptor.config.massProperties.Izz, 4200);
+  assert.equal(descriptor.config.massProperties.currentMassKg, 1800);
+  assert.equal(descriptor.config.massProperties.emptyWeightKg, 1665);
+  assert.equal(descriptor.config.massDistribution.initialFuelKg, 135);
+  assert.equal(descriptor.config.massDistribution.initialPayloadKg, 0);
+  assert.equal(descriptor.config.propulsion.numEngines, 2);
+  assert.equal(descriptor.config.propulsion.engineName, 'Twin Prop');
+  assert.equal(descriptor.config.propulsion.fuelCapacityKg, 185);
+  assert.ok(descriptor.config.propulsion.maxStaticThrustPerEngineN > 0);
+});
+
+test('derived addon respects explicit zero fuelCapacityKg and infers fuelCapacityKg from tanks when omitted', () => {
+  const glider = buildAddonStarter({
+    publisher: 'demo', name: 'glider', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  glider.aircraft.physics.fuelCapacityKg = 0;
+
+  const gliderDescriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: glider.id, version: glider.version, sha256: 'a'.repeat(64), manifest: glider }],
+  }, glider.id, { coreVersion: '1.8.0' });
+
+  assert.equal(gliderDescriptor.config.propulsion.fuelCapacityKg, 0);
+  assert.equal(gliderDescriptor.config.massProperties.emptyWeightKg, glider.aircraft.physics.massKg);
+  assert.deepEqual(gliderDescriptor.config.massDistribution.tanks, []);
+  assert.equal(gliderDescriptor.config.massDistribution.initialFuelKg, 0);
+
+  const tanked = buildAddonStarter({
+    publisher: 'demo', name: 'twin-tank', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0',
+  }).files['addon.json'];
+  delete tanked.aircraft.physics.fuelCapacityKg;
+  tanked.aircraft.physics.massDistribution = {
+    referenceMassKg: 1200,
+    initialFuelKg: 100,
+    tanks: [
+      { id: 'left', capacityKg: 75, position: { x: -1, y: 0, z: 0 }, priority: 0 },
+      { id: 'right', capacityKg: 75, position: { x: 1, y: 0, z: 0 }, priority: 0 },
+    ],
+    stations: [{ id: 'payload', capacityKg: 1200, position: { x: 0, y: 0, z: 0 } }],
+  };
+
+  const tankedDescriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: tanked.id, version: tanked.version, sha256: 'a'.repeat(64), manifest: tanked }],
+  }, tanked.id, { coreVersion: '1.8.0' });
+
+  assert.equal(tankedDescriptor.config.propulsion.fuelCapacityKg, 150);
+  assert.equal(tankedDescriptor.config.massProperties.emptyWeightKg, 1050);
+});
+
+test('shared profile pinning two aircraft packs registers and resolves both aircraft IDs', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
+  const packOne = buildAddonStarter({
+    publisher: 'demo', name: 'multi-one', kind: 'aircraft', version: '1.0.0', coreVersion: '1.8.0', title: 'Multi One',
+  }).files['addon.json'];
+  const packTwo = buildAddonStarter({
+    publisher: 'demo', name: 'multi-two', kind: 'aircraft', version: '1.2.0', coreVersion: '1.8.0', title: 'Multi Two',
+  }).files['addon.json'];
+  const bytesOne = Buffer.from(JSON.stringify(packOne), 'utf8');
+  const bytesTwo = Buffer.from(JSON.stringify(packTwo), 'utf8');
+  const shaOne = createHash('sha256').update(bytesOne).digest('hex');
+  const shaTwo = createHash('sha256').update(bytesTwo).digest('hex');
+  const catalog = {
+    schemaVersion: 1,
+    addons: [
+      { id: packOne.id, version: packOne.version, url: 'https://packs.example/multi-one.json', sha256: shaOne },
+      { id: packTwo.id, version: packTwo.version, url: 'https://packs.example/multi-two.json', sha256: shaTwo },
+    ],
+  };
+  const profileUrl = buildAddonProfileUrl(catalog, [packOne.id, packTwo.id], {
+    baseUrl: 'https://flight.example/?',
+    coreVersion: '1.8.0',
+  });
+  const fetchImpl = async url => {
+    if (url === 'https://packs.example/multi-one.json') return { ok: true, arrayBuffer: async () => bytesOne };
+    if (url === 'https://packs.example/multi-two.json') return { ok: true, arrayBuffer: async () => bytesTwo };
+    return { ok: false, status: 404 };
+  };
+
+  const resolved = await resolveSharedAddonPack(new URL(profileUrl).search, { fetchImpl });
+  assert.equal(resolved.aircrafts.length, 2);
+  assert.deepEqual(resolved.aircrafts.map(item => item.id), ['multi-one', 'multi-two']);
+
+  const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+  const helperMatch = mainSource.match(/function pinnedAddonAircraftList\(pack\) \{[\s\S]*?\n\}/);
+  assert.ok(helperMatch, 'pinnedAddonAircraftList helper should exist in src/main.js');
+  const pinnedAddonAircraftList = new Function(`return (${helperMatch[0]});`)();
+  const list = pinnedAddonAircraftList(resolved);
+  assert.equal(list.length, 2);
+  assert.deepEqual(pinnedAddonAircraftList({ aircraft: resolved.aircrafts[1] }), [resolved.aircrafts[1]]);
+
+  registerAddonAircraft(list);
+  assert.equal(resolveAircraftConfig('multi-one'), resolved.aircrafts[0].config);
+  assert.equal(resolveAircraftConfig('multi-two'), resolved.aircrafts[1].config);
+  assert.ok(addonAircraftIds().includes('multi-one'));
+  assert.ok(addonAircraftIds().includes('multi-two'));
 });

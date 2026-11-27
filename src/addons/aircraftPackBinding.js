@@ -70,13 +70,71 @@ function normalizeLandingGear(gear, { lengthM, wingspanM }) {
   };
 }
 
+function defaultFuelCapacityKg(massKg) {
+  const positiveMass = Number.isFinite(massKg) && massKg > 0 ? massKg : 1050;
+  const candidate = Math.round(positiveMass * 0.1);
+  if (candidate > 0 && candidate < positiveMass) return candidate;
+  return positiveMass * 0.1;
+}
+
+function mergePropulsion(propulsion, massKg, fuelCapacityKg) {
+  const defaults = buildDefaultPropulsion(massKg, fuelCapacityKg);
+  if (!propulsion) return defaults;
+  return {
+    ...defaults,
+    ...propulsion,
+    fuelCapacityKg: propulsion.fuelCapacityKg ?? fuelCapacityKg,
+  };
+}
+
+function sumValidatedTankCapacity(tanks, packId) {
+  if (!Array.isArray(tanks) || tanks.length === 0) {
+    throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+  }
+  return tanks.reduce((total, tank) => {
+    if (!Number.isFinite(tank?.capacityKg) || tank.capacityKg <= 0) {
+      throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+    }
+    return total + tank.capacityKg;
+  }, 0);
+}
+
+function buildDefaultMassDistribution(massProperties, fuelCapacityKg) {
+  const initialFuelKg = Math.min(
+    fuelCapacityKg,
+    Math.max(0, massProperties.currentMassKg - massProperties.emptyWeightKg),
+  );
+  const initialPayloadKg = Math.max(
+    0,
+    massProperties.currentMassKg - massProperties.emptyWeightKg - initialFuelKg,
+  );
+  return {
+    referenceMassKg: massProperties.currentMassKg,
+    initialFuelKg,
+    initialPayloadKg,
+    tanks: fuelCapacityKg > 0
+      ? [{ id: 'main', capacityKg: fuelCapacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0 }]
+      : [],
+    stations: [{ id: 'payload', capacityKg: massProperties.maxTakeoffWeightKg, position: { x: 0, y: 0, z: 0 } }],
+  };
+}
+
 function normalizeFullPhysicsConfig(aircraft, manifest) {
   const physics = aircraft.physics;
   const wingspanM = physics.aerodynamics?.wingspanM ?? physics.wingspanM ?? 11;
   const wingAreaM2 = physics.aerodynamics?.wingAreaM2 ?? physics.wingAreaM2 ?? 16;
   const lengthM = physics.lengthM ?? 8;
   const massKg = physics.massProperties?.currentMassKg ?? physics.massKg ?? 1050;
-  const fuelCapacityKg = physics.propulsion?.fuelCapacityKg ?? physics.fuelCapacityKg ?? 0;
+  const explicitFuelCapacity = physics.propulsion?.fuelCapacityKg ?? physics.fuelCapacityKg;
+  const tankSum = Array.isArray(physics.massDistribution?.tanks)
+    ? physics.massDistribution.tanks.reduce(
+      (sum, tank) => sum + (Number.isFinite(tank?.capacityKg) && tank.capacityKg > 0 ? tank.capacityKg : 0),
+      0,
+    )
+    : 0;
+  const fuelCapacityKg = explicitFuelCapacity !== undefined
+    ? explicitFuelCapacity
+    : (tankSum > 0 ? tankSum : defaultFuelCapacityKg(massKg));
   const emptyWeightKg = physics.massProperties?.emptyWeightKg ?? Math.max(1, massKg - fuelCapacityKg);
   const maxTakeoffWeightKg = physics.massProperties?.maxTakeoffWeightKg ?? massKg;
   const massProperties = {
@@ -88,17 +146,7 @@ function normalizeFullPhysicsConfig(aircraft, manifest) {
     Izz: massKg * wingspanM ** 2 / 12,
     ...physics.massProperties,
   };
-  const initialFuelKg = Math.min(fuelCapacityKg, Math.max(0, massProperties.currentMassKg - massProperties.emptyWeightKg));
-  const initialPayloadKg = Math.max(0, massProperties.currentMassKg - massProperties.emptyWeightKg - initialFuelKg);
-  const massDistribution = physics.massDistribution ?? {
-    referenceMassKg: massProperties.currentMassKg,
-    initialFuelKg,
-    initialPayloadKg,
-    tanks: fuelCapacityKg > 0
-      ? [{ id: 'main', capacityKg: fuelCapacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0 }]
-      : [],
-    stations: [{ id: 'payload', capacityKg: massProperties.maxTakeoffWeightKg, position: { x: 0, y: 0, z: 0 } }],
-  };
+  const massDistribution = physics.massDistribution ?? buildDefaultMassDistribution(massProperties, fuelCapacityKg);
   const flapAngles = Array.isArray(physics.aerodynamics?.flapAngles) && physics.aerodynamics.flapAngles.length > 0
     ? physics.aerodynamics.flapAngles
     : [0];
@@ -115,7 +163,7 @@ function normalizeFullPhysicsConfig(aircraft, manifest) {
       flapAngles,
     },
     stallWarning: physics.stallWarning ?? { type: 'lowSpeed', marginDeg: 2 },
-    propulsion: physics.propulsion ?? buildDefaultPropulsion(massKg, fuelCapacityKg),
+    propulsion: mergePropulsion(physics.propulsion, massKg, fuelCapacityKg),
     landingGear: normalizeLandingGear(physics.landingGear, { lengthM, wingspanM }),
     cockpit: physics.cockpit ?? {
       hasPhotoCockpit: false,
@@ -126,6 +174,48 @@ function normalizeFullPhysicsConfig(aircraft, manifest) {
       chaseHeight: 3,
     },
     specs: physics.specs ?? buildDefaultSpecs(physics.id, physics.name ?? manifest.attribution),
+  };
+}
+
+function buildDerivedPhysicsConfig(aircraft, manifest, derivedFuelCapacityKg) {
+  const physics = aircraft.physics;
+  const derivedMassProperties = {
+    currentMassKg: physics.massKg,
+    emptyWeightKg: physics.massKg - derivedFuelCapacityKg,
+    maxTakeoffWeightKg: physics.massKg,
+    Ixx: physics.massKg * physics.lengthM ** 2 / 12,
+    Iyy: physics.massKg * physics.lengthM ** 2 / 12,
+    Izz: physics.massKg * physics.wingspanM ** 2 / 12,
+    ...physics.massProperties,
+  };
+  return {
+    ...physics,
+    id: aircraft.id.toUpperCase(),
+    name: manifest.attribution,
+    configurationLimits: { flap: [0], gearOperating: Infinity, gearExtended: Infinity },
+    massProperties: derivedMassProperties,
+    massDistribution: physics.massDistribution ?? buildDefaultMassDistribution(derivedMassProperties, derivedFuelCapacityKg),
+    aerodynamics: {
+      ...physics.aerodynamics,
+      wingspanM: physics.wingspanM,
+      wingAreaM2: physics.wingAreaM2,
+      flapAngles: physics.aerodynamics?.flapAngles ?? [0],
+    },
+    stallWarning: physics.stallWarning ?? { type: 'lowSpeed', marginDeg: 2 },
+    propulsion: mergePropulsion(physics.propulsion, physics.massKg, derivedFuelCapacityKg),
+    landingGear: normalizeLandingGear(physics.landingGear, {
+      lengthM: physics.lengthM,
+      wingspanM: physics.wingspanM,
+    }),
+    cockpit: physics.cockpit ?? {
+      hasPhotoCockpit: false,
+      captainEyePos: { x: 0, y: 0.7, z: -physics.lengthM * 0.15 },
+      defaultFov: 68,
+      exteriorFov: 55,
+      chaseDistance: 14,
+      chaseHeight: 3,
+    },
+    specs: physics.specs ?? buildDefaultSpecs(aircraft.id.toUpperCase(), manifest.attribution),
   };
 }
 
@@ -142,6 +232,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   if (!aircraft) throw new Error(`${packId} is not an aircraft addon`);
   const physics = aircraft.physics ?? {};
   const derived = !physics.id;
+  let derivedFuelCapacityKg = 0;
   if (derived) {
     for (const [field, value] of Object.entries({
       massKg: physics.massKg,
@@ -151,37 +242,40 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     })) {
       if (!Number.isFinite(value) || value <= 0) throw new Error(`${packId} physics.${field} must be a positive number`);
     }
-    const fuelCapacityKg = physics.fuelCapacityKg ?? 0;
-    if (!Number.isFinite(fuelCapacityKg) || fuelCapacityKg < 0) {
-      throw new Error(`${packId} physics.fuelCapacityKg must be a non-negative number`);
-    }
-    if (fuelCapacityKg >= physics.massKg) {
-      throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
+    const explicitFuelCapacity = physics.propulsion?.fuelCapacityKg ?? physics.fuelCapacityKg;
+    let validatedTankCapacityKg = null;
+    if (explicitFuelCapacity !== undefined) {
+      if (!Number.isFinite(explicitFuelCapacity) || explicitFuelCapacity < 0) {
+        throw new Error(`${packId} physics.fuelCapacityKg must be a non-negative number`);
+      }
+      if (explicitFuelCapacity >= physics.massKg) {
+        throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
+      }
+      derivedFuelCapacityKg = explicitFuelCapacity;
+    } else if (physics.massDistribution) {
+      validatedTankCapacityKg = sumValidatedTankCapacity(physics.massDistribution.tanks, packId);
+      if (validatedTankCapacityKg >= physics.massKg) {
+        throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
+      }
+      derivedFuelCapacityKg = validatedTankCapacityKg;
+    } else {
+      derivedFuelCapacityKg = defaultFuelCapacityKg(physics.massKg);
     }
     if (physics.massDistribution) {
       const distribution = physics.massDistribution;
-      const tanks = distribution.tanks ?? [];
-      if (tanks.length === 0) {
-        throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
-      }
-      const tankCapacityKg = tanks.reduce((total, tank) => {
-        if (!Number.isFinite(tank?.capacityKg) || tank.capacityKg <= 0) {
-          throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
-        }
-        return total + tank.capacityKg;
-      }, 0);
-      if (tankCapacityKg !== fuelCapacityKg) {
+      const tankCapacityKg = validatedTankCapacityKg ?? sumValidatedTankCapacity(distribution.tanks, packId);
+      if (tankCapacityKg !== derivedFuelCapacityKg) {
         throw new Error(`${packId} physics.massDistribution tank capacity must match declared fuel capacity`);
       }
       const referenceMassKg = distribution.referenceMassKg ?? physics.massKg;
-      if (referenceMassKg - (physics.massKg - fuelCapacityKg) - tankCapacityKg < 0) {
+      if (referenceMassKg - (physics.massKg - derivedFuelCapacityKg) - tankCapacityKg < 0) {
         throw new Error(`${packId} physics.massDistribution tank capacity exceeds the reference payload`);
       }
       if (Number.isFinite(distribution.initialFuelKg) && distribution.initialFuelKg > tankCapacityKg) {
         throw new Error(`${packId} physics.massDistribution initial fuel exceeds tank capacity`);
       }
     }
-    if (physics.massProperties && physics.massProperties.currentMassKg < physics.massKg - fuelCapacityKg) {
+    if (physics.massProperties && physics.massProperties.currentMassKg < physics.massKg - derivedFuelCapacityKg) {
       throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);
     }
   }
@@ -199,50 +293,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   }
   const config = aircraft.physics?.id
     ? normalizeFullPhysicsConfig(aircraft, manifest)
-    : {
-      ...aircraft.physics,
-      id: aircraft.id.toUpperCase(),
-      name: manifest.attribution,
-      configurationLimits: { flap: [0], gearOperating: Infinity, gearExtended: Infinity },
-      massProperties: {
-        currentMassKg: aircraft.physics.massKg,
-        emptyWeightKg: aircraft.physics.massKg - (physics.fuelCapacityKg ?? 0),
-        maxTakeoffWeightKg: aircraft.physics.massKg,
-        Ixx: aircraft.physics.massKg * aircraft.physics.lengthM ** 2 / 12,
-        Iyy: aircraft.physics.massKg * aircraft.physics.lengthM ** 2 / 12,
-        Izz: aircraft.physics.massKg * aircraft.physics.wingspanM ** 2 / 12,
-      },
-      massDistribution: aircraft.physics.massDistribution ?? {
-        referenceMassKg: aircraft.physics.massKg,
-        initialFuelKg: physics.fuelCapacityKg ?? 0,
-        initialPayloadKg: 0,
-        tanks: physics.fuelCapacityKg
-          ? [{ id: 'main', capacityKg: physics.fuelCapacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0 }]
-          : [],
-        stations: [{ id: 'payload', capacityKg: aircraft.physics.massKg, position: { x: 0, y: 0, z: 0 } }],
-      },
-      aerodynamics: {
-        ...aircraft.physics.aerodynamics,
-        wingspanM: aircraft.physics.wingspanM,
-        wingAreaM2: aircraft.physics.wingAreaM2,
-        flapAngles: aircraft.physics.aerodynamics?.flapAngles ?? [0],
-      },
-      stallWarning: aircraft.physics.stallWarning ?? { type: 'lowSpeed', marginDeg: 2 },
-      propulsion: aircraft.physics.propulsion ?? buildDefaultPropulsion(aircraft.physics.massKg, physics.fuelCapacityKg ?? 0),
-      landingGear: normalizeLandingGear(aircraft.physics.landingGear, {
-        lengthM: aircraft.physics.lengthM,
-        wingspanM: aircraft.physics.wingspanM,
-      }),
-      cockpit: aircraft.physics.cockpit ?? {
-        hasPhotoCockpit: false,
-        captainEyePos: { x: 0, y: 0.7, z: -aircraft.physics.lengthM * 0.15 },
-        defaultFov: 68,
-        exteriorFov: 55,
-        chaseDistance: 14,
-        chaseHeight: 3,
-      },
-      specs: aircraft.physics.specs ?? buildDefaultSpecs(aircraft.id.toUpperCase(), manifest.attribution),
-    };
+    : buildDerivedPhysicsConfig(aircraft, manifest, derivedFuelCapacityKg);
   return Object.freeze({
     id: aircraft.id,
     packId,
