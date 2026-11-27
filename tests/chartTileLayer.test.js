@@ -92,3 +92,38 @@ test('recently visible tiles survive bounded eviction across sheets', async () =
   assert.equal(layer.cache.has('7/1/11'), false);
   assert.equal(layer.visible[0].state, 'ready');
 });
+
+test('select protects all currently visible tiles when selection exceeds CHART_TILE_LIMIT and aborts evicted loading entries', async () => {
+  const { layer, calls, select } = fixture();
+  // Seed older non-visible cached entries first.
+  select(tile(100), tile(101));
+  calls[0].resolve({ data: ['stale-a'] });
+  calls[1].resolve({ data: ['stale-b'] });
+  await settle();
+
+  // Also ensure an orphaned loading entry evicted via LRU has its controller aborted.
+  const orphan = { ...tile(102), key: '7/102/11', state: 'new' };
+  layer.cache.set(orphan.key, orphan);
+  layer.load(orphan);
+  const orphanRequest = calls[2];
+  assert.equal(orphan.state, 'loading');
+  assert.equal(orphanRequest.signal.aborted, false);
+
+  const wideTiles = Array.from({ length: CHART_TILE_LIMIT + 3 }, (_, i) => tile(i));
+  select(...wideTiles);
+  assert.equal(layer.cache.size, wideTiles.length);
+  assert.equal(layer.cache.has('7/100/11'), false);
+  assert.equal(layer.cache.has('7/101/11'), false);
+  assert.equal(layer.cache.has('7/102/11'), false);
+  assert.equal(orphanRequest.signal.aborted, true);
+  assert.ok(layer.visible.every(entry => layer.cache.has(entry.key)));
+
+  // Settle the wide selection so subsequent shrinking exercises LRU eviction rather than loading cancellation.
+  for (const request of calls.slice(3)) request.resolve({ data: ['wide'] });
+  await settle();
+  assert.ok(layer.visible.every(entry => entry.state === 'ready'));
+
+  // Shrinking selection back below CHART_TILE_LIMIT restores the bounded cache cap.
+  select(tile(0));
+  assert.equal(layer.cache.size, CHART_TILE_LIMIT);
+});

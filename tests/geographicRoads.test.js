@@ -356,3 +356,36 @@ test('GeographicRoads updates quality defines and toggles lamp visibility', () =
 
   roads.dispose();
 });
+
+test('GeographicRoads cache key tracks quality changes and groundNoise only short-circuits in ultraLow', () => {
+  const origin = { latitude: 37.46, longitude: 126.44 };
+  const surface = { ...terrain, isLoaded: true, openWorld: { readyForTile: () => true } };
+  const roads = new GeographicRoads({ origin, project, terrain: surface, quality: 'balanced' });
+  assert.equal(roads.material.customProgramCacheKey(), 'geographic-road-surface-standard:log-depth-offset:0.1');
+
+  roads.setQuality('performance');
+  assert.equal(roads.material.customProgramCacheKey(), 'geographic-road-surface-performance:log-depth-offset:0.1');
+
+  roads.setQuality('ultraLow');
+  assert.equal(roads.material.customProgramCacheKey(), 'geographic-road-surface-ultralow:log-depth-offset:0.1');
+
+  roads.setQuality('balanced');
+  assert.equal(roads.material.customProgramCacheKey(), 'geographic-road-surface-standard:log-depth-offset:0.1');
+
+  const shader = {
+    vertexShader: THREE.ShaderLib.lambert.vertexShader,
+    fragmentShader: THREE.ShaderLib.lambert.fragmentShader,
+    uniforms: THREE.UniformsUtils.clone(THREE.ShaderLib.lambert.uniforms),
+  };
+  roads.material.onBeforeCompile(shader);
+
+  const noiseMatch = shader.fragmentShader.match(/float groundNoise\(vec2 p\)\s*\{([\s\S]*?)\n\s*\}/);
+  assert.ok(noiseMatch, 'patched fragment shader must define groundNoise');
+  const noiseBody = noiseMatch[1];
+  assert.match(noiseBody, /#if\s+defined\(QUALITY_ULTRALOW\)\s*&&\s*QUALITY_ULTRALOW\s*==\s*1\s+return 0\.0;/);
+  assert.equal(noiseBody.includes('QUALITY_PERFORMANCE'), false, 'groundNoise must evaluate under QUALITY_PERFORMANCE');
+  assert.equal(noiseBody.includes('QUALITY_FAST'), false, 'groundNoise must not short-circuit on QUALITY_FAST');
+  assert.match(shader.fragmentShader, /#elif defined\(QUALITY_PERFORMANCE\) && QUALITY_PERFORMANCE == 1[\s\S]*?groundNoise\(vGroundXZ \/ 14\.0\)/);
+
+  roads.dispose();
+});

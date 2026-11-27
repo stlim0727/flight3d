@@ -31,7 +31,12 @@ export class ChartTileLayer {
       this.cache.set(key, entry);
       return entry;
     });
-    while (this.cache.size > CHART_TILE_LIMIT) this.cache.delete(this.cache.keys().next().value);
+    const limit = Math.max(CHART_TILE_LIMIT, this.visible.length);
+    while (this.cache.size > limit) {
+      const [evictKey, evicted] = this.cache.entries().next().value;
+      if (evicted.state === 'loading') evicted.controller?.abort();
+      this.cache.delete(evictKey);
+    }
     this.revision++;
   }
 
