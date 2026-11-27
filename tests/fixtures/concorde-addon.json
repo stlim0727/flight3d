@@ -1,0 +1,389 @@
+{
+  "schemaVersion": 1,
+  "id": "stlim0727/aircraft/concorde",
+  "publisher": "stlim0727",
+  "version": "1.0.0",
+  "title": "Concorde",
+  "coreRange": {
+    "min": "1.8.0",
+    "maxExclusive": "2.0.0"
+  },
+  "dependencies": [],
+  "license": "CC-BY-4.0",
+  "attribution": "Concorde supersonic airliner addon by stlim0727",
+  "aircraft": {
+    "id": "concorde",
+    "physics": {
+      "profile": "rigid-body-v1",
+      "id": "CONCORDE",
+      "name": "Concorde",
+      "massKg": 180000,
+      "wingAreaM2": 358.25,
+      "wingspanM": 25.6,
+      "lengthM": 61.66,
+      "fuelCapacityKg": 95680,
+      "massProperties": {
+        "currentMassKg": 180000,
+        "emptyWeightKg": 78700,
+        "maxTakeoffWeightKg": 185070,
+        "Ixx": 1900000,
+        "Iyy": 16500000,
+        "Izz": 17800000
+      },
+      "aerodynamics": {
+        "wingspanM": 25.6,
+        "wingAreaM2": 358.25,
+        "clAlpha": 3.1,
+        "cd0": 0.015,
+        "oswaldEfficiency": 0.62,
+        "flapAngles": [
+          0,
+          5,
+          12.5
+        ],
+        "transonicMachBuffet": 1.15,
+        "waveDragTable": [
+          [
+            0,
+            0
+          ],
+          [
+            0.8,
+            0
+          ],
+          [
+            0.95,
+            0.002
+          ],
+          [
+            1.05,
+            0.004
+          ],
+          [
+            1.2,
+            0.005
+          ],
+          [
+            1.7,
+            0.004
+          ],
+          [
+            2.2,
+            0.004
+          ],
+          [
+            3,
+            0.004
+          ]
+        ]
+      },
+      "propulsion": {
+        "numEngines": 4,
+        "engineName": "Rolls-Royce/Snecma Olympus 593",
+        "maxStaticThrustPerEngineN": 169300,
+        "idleN1Percent": 26,
+        "togaN1Percent": 105,
+        "spoolUpTimeSec": 2.2,
+        "spoolDownTimeSec": 2,
+        "reverseThrustEfficiency": 0.35,
+        "baseFuelFlowKgPerHour": 4800,
+        "maxFuelFlowKgPerHour": 25600,
+        "fuelCapacityKg": 95680,
+        "momentArmMeters": 1.1,
+        "cruiseTsfcKgPerDanHour": 1.2,
+        "reheat": {
+          "available": true,
+          "autoFromMach": 0.93,
+          "autoToMach": 1.7,
+          "fuelFlowMultiplier": 1.9
+        },
+        "dryThrustTable": [
+          [
+            0,
+            120000
+          ],
+          [
+            0.8,
+            95000
+          ],
+          [
+            0.93,
+            90000
+          ],
+          [
+            1.2,
+            80000
+          ],
+          [
+            1.7,
+            65000
+          ],
+          [
+            2,
+            45000
+          ],
+          [
+            2.2,
+            40000
+          ]
+        ],
+        "reheatThrustTable": [
+          [
+            0,
+            169300
+          ],
+          [
+            0.8,
+            150000
+          ],
+          [
+            0.93,
+            140000
+          ],
+          [
+            1.2,
+            130000
+          ],
+          [
+            1.7,
+            125000
+          ],
+          [
+            2,
+            120000
+          ],
+          [
+            2.2,
+            110000
+          ]
+        ],
+        "thrustTableReferenceAltitudeM": 18300,
+        "machThrustLapse": [
+          [
+            0,
+            1
+          ],
+          [
+            0.8,
+            1
+          ],
+          [
+            1.5,
+            1
+          ],
+          [
+            2.2,
+            1
+          ],
+          [
+            3,
+            1
+          ]
+        ]
+      },
+      "landingGear": {
+        "isFixed": false,
+        "cgGroundHeightM": 4.5,
+        "gearTransitTimeSec": 8,
+        "bodySupportPoints": [
+          {
+            "id": "nose",
+            "position": [
+              0,
+              -1.4,
+              -26
+            ],
+            "weight": 1
+          },
+          {
+            "id": "belly",
+            "position": [
+              0,
+              -1.6,
+              0
+            ],
+            "weight": 1
+          },
+          {
+            "id": "tail",
+            "position": [
+              0,
+              -1.2,
+              26.5
+            ],
+            "weight": 1
+          },
+          {
+            "id": "wingL",
+            "position": [
+              -12.5,
+              -0.7,
+              13
+            ],
+            "weight": 1
+          },
+          {
+            "id": "wingR",
+            "position": [
+              12.5,
+              -0.7,
+              13
+            ],
+            "weight": 1
+          },
+          {
+            "id": "engineL",
+            "position": [
+              -4.6,
+              -2.1,
+              11.2
+            ],
+            "weight": 1
+          },
+          {
+            "id": "engineR",
+            "position": [
+              4.6,
+              -2.1,
+              11.2
+            ],
+            "weight": 1
+          }
+        ],
+        "contacts": [
+          {
+            "id": "nose",
+            "name": "Nose Gear",
+            "localPos": {
+              "x": 0,
+              "y": -3.2,
+              "z": -16.5
+            },
+            "wheelRadius": 0.48,
+            "restLength": 1,
+            "kSpring": 950000,
+            "cDamper": 110000,
+            "isSteerable": true,
+            "maxSteeringDeg": 55
+          },
+          {
+            "id": "mainLeft",
+            "name": "Left Main Gear",
+            "localPos": {
+              "x": -3.85,
+              "y": -3.3,
+              "z": 6.5
+            },
+            "wheelRadius": 0.62,
+            "restLength": 1,
+            "kSpring": 2600000,
+            "cDamper": 280000,
+            "isSteerable": false
+          },
+          {
+            "id": "mainRight",
+            "name": "Right Main Gear",
+            "localPos": {
+              "x": 3.85,
+              "y": -3.3,
+              "z": 6.5
+            },
+            "wheelRadius": 0.62,
+            "restLength": 1,
+            "kSpring": 2600000,
+            "cDamper": 280000,
+            "isSteerable": false
+          }
+        ],
+        "rollingFriction": 0.02,
+        "maxBrakingFriction": 0.55,
+        "tireLateralFriction": 0.8
+      },
+      "specs": {
+        "id": "CONCORDE",
+        "name": "Concorde",
+        "type": "airliner",
+        "limitLoad": {
+          "min": -1,
+          "max": 2.5
+        },
+        "ultimateLoad": {
+          "min": -1.5,
+          "max": 3.75
+        },
+        "oleoStrokeM": 0.45,
+        "hardLandingGThreshold": 1.8,
+        "crashGThreshold": 2.8,
+        "landingRatings": []
+      }
+    },
+    "model": {
+      "url": "https://stlim0727.github.io/flight3d-addons/addons/stlim0727/aircraft/concorde/concorde.glb",
+      "sha256": "28688a542de24483b121980e6280b29d2474ac273b8e76f92279f396027c8044"
+    },
+    "controlBindings": {
+      "azimuth": "azimuth_node",
+      "elevator": "elevator_node",
+      "rudder": "rudder_node",
+      "flaps": "flaps_node",
+      "gear": "gear_node"
+    },
+    "animation": {
+      "schema": "transform-v1",
+      "controls": {
+        "azimuth": {
+          "node": "azimuth_node",
+          "axis": "z",
+          "input": "rpm",
+          "continuous": true,
+          "rpmRange": [
+            26,
+            105
+          ]
+        },
+        "elevator": {
+          "node": "elevator_node",
+          "axis": "x",
+          "input": "elevator",
+          "rangeDeg": [
+            -22,
+            22
+          ]
+        },
+        "rudder": {
+          "node": "rudder_node",
+          "axis": "y",
+          "input": "rudder",
+          "rangeDeg": [
+            -25,
+            25
+          ]
+        },
+        "flaps": {
+          "node": "flaps_node",
+          "axis": "x",
+          "input": "flapsIndex",
+          "rangeDeg": [
+            0,
+            12.5
+          ]
+        },
+        "gear": {
+          "node": "gear_node",
+          "axis": "x",
+          "input": "gearState",
+          "rangeDeg": [
+            0,
+            90
+          ]
+        }
+      }
+    }
+  },
+  "assets": [
+    {
+      "url": "https://stlim0727.github.io/flight3d-addons/addons/stlim0727/aircraft/concorde/concorde.glb",
+      "sha256": "28688a542de24483b121980e6280b29d2474ac273b8e76f92279f396027c8044"
+    }
+  ]
+}

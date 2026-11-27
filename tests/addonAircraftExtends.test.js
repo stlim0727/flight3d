@@ -95,6 +95,21 @@ test('aircraft addon extending built-in C172 deep-merges partial overrides witho
   assert.equal(AIRCRAFT_REGISTRY.C172.name, 'Cessna 172 Skyhawk');
 });
 
+test('extended addon aerodynamics aliases override built-in canonical keys', () => {
+  const baseCla = AIRCRAFT_REGISTRY.C172.aerodynamics.claPerRad;
+  const manifest = c172TurboManifest({
+    physics: {
+      aerodynamics: { clAlpha: 3.1, cd0: 0.015 },
+    },
+  });
+  assert.equal(validateAddonManifest(manifest, { coreVersion: '1.8.0' }).ok, true);
+  const descriptor = aircraftPackFromProfile(makeProfile([manifest]), manifest.id, { coreVersion: '1.8.0' });
+  assert.equal(descriptor.config.aerodynamics.claPerRad, 3.1);
+  assert.equal(descriptor.config.aerodynamics.cd0Clean, 0.015);
+  assert.equal(AIRCRAFT_REGISTRY.C172.aerodynamics.claPerRad, baseCla);
+  assert.notEqual(baseCla, 3.1);
+});
+
 test('extended aircraft supports shorthand massKg/wingspanM/wingAreaM2/fuelCapacityKg and custom GLB override', () => {
   const manifest = c172TurboManifest({
     id: 'bush-cub',

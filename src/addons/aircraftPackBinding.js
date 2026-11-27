@@ -189,6 +189,13 @@ function normalizeFullPhysicsConfig(aircraft, manifest) {
   const flapAngles = Array.isArray(physics.aerodynamics?.flapAngles) && physics.aerodynamics.flapAngles.length > 0
     ? physics.aerodynamics.flapAngles
     : [0];
+  const aerodynamics = { ...physics.aerodynamics };
+  if (aerodynamics.claPerRad === undefined && aerodynamics.clAlpha !== undefined) {
+    aerodynamics.claPerRad = aerodynamics.clAlpha;
+  }
+  if (aerodynamics.cd0Clean === undefined && aerodynamics.cd0 !== undefined) {
+    aerodynamics.cd0Clean = aerodynamics.cd0;
+  }
   return {
     ...physics,
     name: physics.name ?? manifest.attribution,
@@ -196,7 +203,7 @@ function normalizeFullPhysicsConfig(aircraft, manifest) {
     massProperties,
     massDistribution,
     aerodynamics: {
-      ...physics.aerodynamics,
+      ...aerodynamics,
       wingspanM,
       wingAreaM2,
       flapAngles,
@@ -261,6 +268,15 @@ function buildDerivedPhysicsConfig(aircraft, manifest, derivedFuelCapacityKg) {
 function buildExtendedPhysicsConfig(baseConfig, baseSpec, aircraft, manifest, packId) {
   const physics = aircraft.physics ?? {};
   const merged = deepMerge(baseConfig, physics);
+  const mergedAero = { ...merged.aerodynamics };
+  const overrideAero = physics.aerodynamics ?? {};
+  if (overrideAero.claPerRad === undefined && overrideAero.clAlpha !== undefined) {
+    mergedAero.claPerRad = overrideAero.clAlpha;
+  }
+  if (overrideAero.cd0Clean === undefined && overrideAero.cd0 !== undefined) {
+    mergedAero.cd0Clean = overrideAero.cd0;
+  }
+  merged.aerodynamics = mergedAero;
   if (physics.massKg !== undefined && physics.massProperties?.currentMassKg === undefined) {
     merged.massProperties = { ...(merged.massProperties ?? {}), currentMassKg: physics.massKg };
     if (physics.massProperties?.maxTakeoffWeightKg === undefined

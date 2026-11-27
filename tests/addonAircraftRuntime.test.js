@@ -71,6 +71,22 @@ test('aircraft descriptor resolves config, spec and animation controls', () => {
   assert.ok(addonAircraftIds().includes('testplane'));
 });
 
+test('aircraft descriptors normalize manifest aerodynamics aliases', () => {
+  const aliased = structuredClone(manifest);
+  aliased.aircraft.physics.id = 'ALIASED';
+  aliased.aircraft.physics.aerodynamics = { clAlpha: 3.1, cd0: 0.015 };
+  const descriptor = aircraftPackFromProfile({
+    schemaVersion: 1,
+    coreVersion: '1.8.0',
+    pins: [{ id: aliased.id, version: aliased.version, sha256: 'a'.repeat(64), manifest: aliased }],
+  }, aliased.id, { coreVersion: '1.8.0' });
+  assert.equal(descriptor.config.aerodynamics.claPerRad, 3.1);
+  assert.equal(descriptor.config.aerodynamics.cd0Clean, 0.015);
+  const aero = new Aerodynamics(descriptor.config);
+  assert.equal(aero.CLa, 3.1);
+  assert.equal(aero.CD0, 0.015);
+});
+
 test('procedural fallback moves control surfaces from telemetry', async () => {
   const descriptor = aircraftPackFromProfile({
     schemaVersion: 1,
