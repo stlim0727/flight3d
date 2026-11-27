@@ -18,6 +18,7 @@ import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js
 import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
 import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { IncheonFlightSurface } from '../geospatial/IncheonFlightSurface.js';
+import { terrainGeometry } from '../previews/incheonGeometry.js';
 import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { castFarSunShadow } from '../environment/FarSunShadow.js';
@@ -1049,9 +1050,18 @@ class PresetSpawnerMethods {
       const config = REGION_SURFACES.incheon;
       const flightSurface = new IncheonFlightSurface(source);
       const fallback = new CorridorFlightSurface({ activeOrigin: config.origin, incheonSurface: flightSurface });
+      const localGeometry = terrainGeometry(12000, 240, (x, z) => source.getNaturalHeight(x, z));
+      const localSurface = {
+        size: 12000,
+        segments: 240,
+        geometry: localGeometry,
+        getNaturalHeight: (x, z) => source.getNaturalHeight(x, z),
+        getHeight: (x, z) => flightSurface.getHeight(x, z),
+      };
       const surface = new OpenWorldRegionSurface({
         ...config, fallback,
         localImageryExtent: [-6000, -6000, 6000, 6000],
+        localSurface,
       });
       const streamedAirport = () => this.airportStreamer?.regionFor?.('RKSI')?.airport ?? null;
       this.incheonAirportFacade = {
