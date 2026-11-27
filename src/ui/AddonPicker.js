@@ -1,9 +1,8 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
 import {
-  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
-  saveAddonCatalogUrl, saveSelectedAddons,
+  clearSavedAddonProfile, loadSavedAddonProfile, mergeSelectedAddons,
+  removeSavedAddonPin, saveAddonCatalogUrl,
 } from '../addons/savedAddonProfile.js';
-import { serializeProfile } from '../addons/addonContract.js';
 
 const LABELS = {
   title: '애드온',
@@ -49,6 +48,7 @@ export class AddonPicker {
     this.search = '';
     this.kind = 'all';
     this.selected = new Set();
+    this.loadSeq = 0;
     this.root = null;
   }
 
@@ -130,6 +130,7 @@ export class AddonPicker {
   }
 
   clearUrl() {
+    this.loadSeq += 1;
     this.urlInput.value = '';
     this.catalogUrl = '';
     this.catalog = null;
@@ -192,18 +193,11 @@ export class AddonPicker {
   }
 
   removePin(id, version) {
-    const saved = loadSavedAddonProfile(this.storage);
-    const pins = saved?.pins?.filter(pin => pin.id !== id || pin.version !== version) ?? [];
-    if (pins.length) {
-      try {
-        const remaining = serializeProfile({ schemaVersion: 1, coreVersion: saved.coreVersion, pins });
-        this.storage.setItem(SAVED_ADDON_PROFILE_KEY, remaining);
-      } catch (error) {
-        this.status.textContent = `${this.labels.saveError}: ${error.message}`;
-        return false;
-      }
-    } else {
-      clearSavedAddonProfile(this.storage);
+    try {
+      removeSavedAddonPin(id, version, { storage: this.storage });
+    } catch (error) {
+      this.status.textContent = `${this.labels.saveError}: ${error.message}`;
+      return false;
     }
     this.selected.delete(id);
     if (this.catalog) this.render();
@@ -213,6 +207,7 @@ export class AddonPicker {
   }
 
   async load(url) {
+    const seq = ++this.loadSeq;
     this.selected.clear();
     if (this.applyBtn) this.applyBtn.hidden = true;
     this.hideShareLink();
@@ -221,6 +216,7 @@ export class AddonPicker {
         fetchImpl: this.fetchImpl,
         validate: this.validateCatalog,
       });
+      if (seq !== this.loadSeq) return;
       this.catalog = catalog;
       this.catalogUrl = resolveCatalogUrl(url);
       const saved = loadSavedAddonProfile(this.storage);
@@ -234,6 +230,7 @@ export class AddonPicker {
       this.status.textContent = '';
       this.render();
     } catch (error) {
+      if (seq !== this.loadSeq) return;
       this.catalog = null;
       this.filters.hidden = true;
       this.list.replaceChildren();
@@ -287,7 +284,7 @@ export class AddonPicker {
   apply() {
     if (!this.catalog || this.selected.size === 0) return false;
     try {
-      saveSelectedAddons(this.catalog, [...this.selected], {
+      mergeSelectedAddons(this.catalog, [...this.selected], {
         coreVersion: this.coreVersion ?? null,
         storage: this.storage,
       });

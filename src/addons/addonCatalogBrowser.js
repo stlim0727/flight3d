@@ -65,7 +65,26 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
       coreVersion: effectiveCore,
       pins: [{ id: manifest.id, version: manifest.version, url: encoded, sha256: checksum, manifest }],
     };
-    return regionPackFromProfile(profile, manifest.id, { coreVersion: effectiveCore });
+    if (manifest.region) {
+      return regionPackFromProfile(profile, manifest.id, { coreVersion: effectiveCore });
+    }
+    if (manifest.aircraft) {
+      const aircraft = aircraftPackFromProfile(profile, manifest.id, { coreVersion: effectiveCore });
+      return Object.freeze({
+        id: manifest.id,
+        version: aircraft.version,
+        sha256: checksum,
+        profile,
+        aircraft,
+        aircrafts: Object.freeze([aircraft]),
+      });
+    }
+    return Object.freeze({
+      id: manifest.id,
+      version: manifest.version,
+      sha256: checksum,
+      profile,
+    });
   }
 
   const sharedProfile = readProfileShareParams(search);
@@ -82,20 +101,27 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
   const regionPin = requestedPin?.manifest?.region
     ? requestedPin
     : resolved.pins.find(pin => pin.manifest?.region);
+  const aircraftPins = resolved.pins.filter(pin => pin.manifest?.aircraft);
+  const aircrafts = Object.freeze(aircraftPins.map(pin =>
+    aircraftPackFromProfile(resolved, pin.id, { coreVersion: effectiveCore })));
+  const aircraft = (requestedPin?.manifest?.aircraft
+    ? aircrafts.find(item => item.packId === requestedPin.id)
+    : aircrafts[0]) ?? null;
   if (regionPin) {
-    return regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore });
-  }
-  const aircraftPin = requestedPin?.manifest?.aircraft
-    ? requestedPin
-    : resolved.pins.find(pin => pin.manifest?.aircraft);
-  if (aircraftPin) {
-    const aircraft = aircraftPackFromProfile(resolved, aircraftPin.id, { coreVersion: effectiveCore });
     return Object.freeze({
-      id: aircraftPin.id,
+      ...regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore }),
+      profile: resolved,
+      ...(aircraft ? { aircraft, aircrafts } : {}),
+    });
+  }
+  if (aircraft) {
+    return Object.freeze({
+      id: aircraft.packId,
       version: aircraft.version,
       sha256: aircraft.sha256,
       profile: resolved,
       aircraft,
+      aircrafts,
     });
   }
   const primaryPin = requestedPin ?? resolved.pins[0];
@@ -125,16 +151,24 @@ function resolveGitHostCatalogUrl(value) {
   }
   if (url.hostname !== 'github.com') return value;
   const parts = url.pathname.split('/').filter(Boolean);
-  if (parts.length < 2 || !/^[A-Za-z0-9._-]+$/.test(parts[0]) || !/^[A-Za-z0-9._-]+$/.test(parts[1])) return value;
-  let ref = 'main';
-  if (parts[2] === 'tree' || parts[2] === 'blob') {
-    const path = parts.slice(3).join('/');
-    const segments = path.split('/').filter(Boolean);
-    if (parts[2] === 'blob' && segments.at(-1) === 'catalog.json') segments.pop();
-    ref = segments.join('/');
-    if (!ref || !/^[A-Za-z0-9._/-]+$/.test(ref)) return value;
+  if (parts.length < 2) return value;
+  const owner = parts[0];
+  const repo = parts[1].replace(/\.git$/, '');
+  if (!/^[A-Za-z0-9._-]+$/.test(owner) || !repo || !/^[A-Za-z0-9._-]+$/.test(repo)) return value;
+  if (parts.length === 2) {
+    return `https://raw.githubusercontent.com/${owner}/${repo}/main/catalog.json`;
   }
-  return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${ref}/catalog.json`;
+  if (parts[2] === 'tree') {
+    const ref = parts.slice(3).join('/');
+    if (!ref || !/^[A-Za-z0-9._/-]+$/.test(ref)) return value;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/catalog.json`;
+  }
+  if (parts[2] === 'blob' && parts.at(-1) === 'catalog.json') {
+    const ref = parts.slice(3, -1).join('/');
+    if (!ref || !/^[A-Za-z0-9._/-]+$/.test(ref)) return value;
+    return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/catalog.json`;
+  }
+  return value;
 }
 
 export async function loadAddonCatalog(url, { fetchImpl = globalThis.fetch, validate = validateCatalog } = {}) {
