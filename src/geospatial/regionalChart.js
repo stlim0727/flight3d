@@ -47,7 +47,7 @@ export function chartSceneFrame(sim) {
     origin,
     // Invert the same tangent plane as the local terrain (especially at Lukla).
     toWgs: (x, z) => worldPositionToWgs84(anchor, x, z, origin),
-    placeAirport: sceneAirportPlacement(anchor, origin, customOrigin),
+    placeAirport: sceneAirportPlacement(anchor, origin, customOrigin, sim.world?.anchorPlacementOffset),
   };
 }
 
@@ -170,14 +170,15 @@ function endPoint(end) {
 /**
  * Where the scenery shows an airport-index coordinate, as WGS84 in the scene
  * frame. Streamed airports without a custom origin are laid out on the shared
- * Incheon plane and shifted into the anchor frame (overrides such as VNLK are
- * pre-distorted for that), so the chart repeats that placement before
- * inverting the scene plane. A custom origin or isolated regional anchor (such
- * as Patagonia) streams in its own plane.
+ * Incheon plane and shifted into the anchor frame by the anchor's world-frame
+ * placement offset (overrides such as VNLK are pre-distorted for that), so the
+ * chart repeats that placement before inverting the scene plane. A custom
+ * origin streams in its own plane; an isolated regional anchor still uses its
+ * placement offset even though its geodesy is not on the Incheon plane.
  */
-function sceneAirportPlacement(anchor, origin, customOrigin) {
+function sceneAirportPlacement(anchor, origin, customOrigin, anchorOffset = null) {
   if (origin === customOrigin) return point => point;
-  const offset = realOffsetInIncheonFrame(anchor);
+  const offset = anchorOffset ?? realOffsetInIncheonFrame(anchor);
   if (!offset) return point => point;
   const [ox, oz] = offset;
   return point => {
