@@ -10,7 +10,7 @@ import { REGIONAL_CRUISES, regionalCruiseSpawn } from '../src/config/regionalCru
 import { chartAircraft, insideSoutheastAtlas } from '../src/geospatial/busanChart.js';
 import { distanceKm } from '../src/geospatial/airportIndex.js';
 import {
-  CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartMetersPerPixel, chartNeedsRecenter,
+  CHART_WATER_ZOOM, chartAircraftMark, chartAirports, chartCenterWaterTiles, chartMetersPerPixel, chartNeedsRecenter,
   chartProjection, chartScaleBar, chartSceneFrame, chartSceneOrigin, chartTileTransform, chartWaterTiles,
   formatChartPosition,
 } from '../src/geospatial/regionalChart.js';
@@ -24,6 +24,13 @@ const near = (actual, expected, tolerance, label = '') =>
   assert.ok(Math.abs(actual - expected) <= tolerance, `${label} ${actual} differs from ${expected}`);
 const angleError = (a, b) => Math.abs(((a - b + 540) % 360) - 180);
 const degrees = radians => (radians * 180 / Math.PI + 360) % 360;
+
+test('prefetch includes the aircraft tile and its nearest neighbour across the date line', () => {
+  const center = { latitude: 35, longitude: 179.9999 };
+  const { x, y, zoom } = wgs84ToTile(center.latitude, center.longitude, CHART_WATER_ZOOM);
+  assert.deepEqual(chartCenterWaterTiles(center), [{ x, y, zoom }, { x: 0, y, zoom }]);
+  assert.deepEqual(chartCenterWaterTiles({ latitude: 89, longitude: 7 }), []);
+});
 
 const manifest = JSON.parse(readFileSync(new URL('../public/data/airports/manifest.json', import.meta.url)));
 function indexAirport(icao) {

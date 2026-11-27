@@ -22,6 +22,26 @@ function fixture() {
   return { layer, calls, decoded, select };
 }
 
+test('first unfold adopts ready and pending centre tiles, retrying a failed prefetch immediately', async () => {
+  const { layer, calls, decoded, select } = fixture();
+  layer.prefetch([tile(1), tile(2), tile(3)]);
+  calls[0].resolve({ data: ['shore'] });
+  calls[2].reject(new Error('offline'));
+  await settle();
+  select(tile(1), tile(2), tile(3), tile(4));
+  assert.deepEqual(layer.visible[0].data, ['shore']);
+  assert.deepEqual(calls.map(c => c.x), [1, 2, 3, 3, 4]);
+  assert.equal(calls[1].signal.aborted, false);
+  // A failure after opening should also get one ordinary foreground attempt.
+  calls[1].reject(new Error('timeout'));
+  await settle();
+  layer.refresh(performance.now());
+  assert.deepEqual(calls.map(c => c.x), [1, 2, 3, 3, 4, 2]);
+  assert.deepEqual(decoded, ['7/1/11']);
+  select();
+  assert.equal(calls.at(-1).signal.aborted, true);
+});
+
 test('unfold restores decoded tiles synchronously and a neighbouring sheet requests only missing tiles', async () => {
   const { layer, calls, decoded, select } = fixture();
   select(tile(10), tile(11));

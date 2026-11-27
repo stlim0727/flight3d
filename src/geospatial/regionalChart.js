@@ -128,6 +128,22 @@ export function chartWaterTiles(projection, width, height, metersPerPixel, zoom 
   return [];
 }
 
+/** Two tiles nearest the aircraft at the nominal paper scale. A wider sheet
+ * can choose a coarser zoom when opened and will request its own tiles. */
+export function chartCenterWaterTiles(center) {
+  const [width, height] = CHART_SPAN_M;
+  const tiles = chartWaterTiles(chartProjection(center), width, height, 1);
+  if (tiles.length <= 2) return tiles;
+  const { x, y, fx, fy, zoom } = wgs84ToTile(center.latitude, center.longitude, tiles[0].zoom);
+  const columns = 2 ** zoom;
+  const distanceSquared = tile => {
+    const dx = Math.abs(tile.x + 0.5 - (x + fx));
+    const dy = tile.y + 0.5 - (y + fy);
+    return Math.min(dx, columns - dx) ** 2 + dy ** 2;
+  };
+  return tiles.sort((a, b) => distanceSquared(a) - distanceSquared(b)).slice(0, 2);
+}
+
 /**
  * Affine [a, b, c, d, e, f] from tile units (0..1 across, 0..1 down) to chart
  * metres. Three projected corners keep the tile's rotation and scale on the
