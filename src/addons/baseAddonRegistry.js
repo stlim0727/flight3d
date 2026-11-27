@@ -34,7 +34,12 @@ export function parseBaseAddonPrNumber(input) {
   }
   try {
     const parsed = new URL(text);
-    const match = /^\/[^/]+\/[^/]+\/pull\/(\d+)(?:\/|$)/.exec(parsed.pathname);
+    const host = parsed.hostname.toLowerCase();
+    if (host !== 'github.com' && host !== 'www.github.com') return null;
+    const expectedPrefix = `/${BASE_ADDON_REPO.toLowerCase()}/pull/`;
+    if (!parsed.pathname.toLowerCase().startsWith(expectedPrefix)) return null;
+    const rest = parsed.pathname.slice(expectedPrefix.length);
+    const match = /^(\d+)(?:\/|$)/.exec(rest);
     if (match) {
       const num = Number(match[1]);
       return Number.isSafeInteger(num) && num > 0 ? num : null;
@@ -282,10 +287,13 @@ export function buildAddonPackFromProfile(resolved, {
 } = {}) {
   const effectiveCore = resolved.coreVersion ?? coreVersion;
   const requestedPin = requestedPackId ? resolved.pins.find(pin => pin.id === requestedPackId) : null;
+  const regionPins = resolved.pins.filter(pin => pin.manifest?.region);
   const regionPin = requestedPin?.manifest?.region
     ? requestedPin
-    : resolved.pins.find(pin => pin.manifest?.region && !String(pin.id).startsWith('demo/'))
-      ?? resolved.pins.find(pin => pin.manifest?.region);
+    : regionPins.find(pin => !String(pin.id).startsWith('demo/'))
+      ?? regionPins[0];
+  const regions = Object.freeze(regionPins.map(pin =>
+    regionPackFromProfile(resolved, pin.id, { coreVersion: effectiveCore })));
   const aircraftPins = resolved.pins.filter(pin => pin.manifest?.aircraft);
   const aircrafts = Object.freeze(aircraftPins.map(pin =>
     aircraftPackFromProfile(resolved, pin.id, { coreVersion: effectiveCore })));
@@ -295,8 +303,15 @@ export function buildAddonPackFromProfile(resolved, {
   const meta = metadata && typeof metadata === 'object' ? metadata : {};
 
   if (regionPin) {
+    const primaryRegion = regions.find(region => region.id === regionPin.id)
+      ?? regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore });
+    const mergedBookmarks = Object.freeze(regions.flatMap(region => region.bookmarks ?? []));
+    const mergedOverrides = Object.freeze(regions.flatMap(region => region.buildingOverrides ?? []));
     return Object.freeze({
-      ...regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore }),
+      ...primaryRegion,
+      bookmarks: mergedBookmarks,
+      buildingOverrides: mergedOverrides,
+      regions,
       profile: resolved,
       ...(aircraft ? { aircraft, aircrafts } : {}),
       ...meta,

@@ -6,7 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 import { applyJejuAirLivery } from './JejuAirLivery.js';
-import { applyAircraftLivery } from './applyAircraftLivery.js';
+import { applyAircraftLivery, disposeLiveryGroup, restoreBaseLiveryMaterials } from './applyAircraftLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
 import { clampGearExtension, calculateGearFold, isGearCollapsed } from './common/GearKinematicsRig.js';
@@ -748,12 +748,14 @@ export class Boeing737 {
 
   applyCurrentLivery() {
     if (!this.gltfModel) return;
-    const existingKorean = this.gltfGroup.getObjectByName('KoreanAirLivery');
-    if (existingKorean) this.gltfGroup.remove(existingKorean);
-    const existingJeju = this.gltfGroup.getObjectByName('JejuAirLivery');
-    if (existingJeju) this.gltfGroup.remove(existingJeju);
-    const existingAddon = this.gltfGroup.getObjectByName('AddonAircraftLivery');
-    if (existingAddon) this.gltfGroup.remove(existingAddon);
+    for (const name of ['KoreanAirLivery', 'JejuAirLivery', 'AddonAircraftLivery']) {
+      const existing = this.gltfGroup.getObjectByName(name);
+      if (existing) {
+        this.gltfGroup.remove(existing);
+        disposeLiveryGroup(existing);
+      }
+    }
+    restoreBaseLiveryMaterials(this.gltfModel);
 
     if (this.customLivery) {
       applyAircraftLivery(this.gltfModel, this.group, this.gltfGroup, this.customLivery);

@@ -252,11 +252,11 @@ test('createExternalAirportLighting builds PAPI and updates glideslope indicatio
   lighting.update(0.5, onSlopePos);
 
   const colorsOnSlope = rwy07Papi.units.map(u => u.lensMat.color.getHex());
-  // Standard 2 White (0xffffff), 2 Red (0xff1a1a)
-  assert.equal(colorsOnSlope[0], 0xffffff, 'Unit 0 must be white on slope');
-  assert.equal(colorsOnSlope[1], 0xffffff, 'Unit 1 must be white on slope');
-  assert.equal(colorsOnSlope[2], 0xff1a1a, 'Unit 2 must be red on slope');
-  assert.equal(colorsOnSlope[3], 0xff1a1a, 'Unit 3 must be red on slope');
+  // Standard ICAO/FAA 2 Red inner (units 0-1 nearest runway), 2 White outer (units 2-3 farthest)
+  assert.equal(colorsOnSlope[0], 0xff1a1a, 'Unit 0 (innermost) must be red on slope');
+  assert.equal(colorsOnSlope[1], 0xff1a1a, 'Unit 1 (inner) must be red on slope');
+  assert.equal(colorsOnSlope[2], 0xffffff, 'Unit 2 (outer) must be white on slope');
+  assert.equal(colorsOnSlope[3], 0xffffff, 'Unit 3 (outermost) must be white on slope');
 
   // 2. High approach (3.6° > 3.5°): 4 White
   const highAlt = center.y + 2000 * Math.tan(THREE.MathUtils.degToRad(3.6));

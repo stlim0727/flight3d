@@ -85,6 +85,14 @@ test('a pinned region palette reaches both ocean and sky uniforms', () => {
   assert.equal(sky.sky.material.uniforms.uDeepColor.value.getHexString(), '0b3a63');
   assert.equal(sky.sky.material.uniforms.uRoughness.value, 0.22);
   assert.equal(sky.sky.material.uniforms.uDaylightScale.value, 1.45);
+
+  applyRegionPalette(null, { water, sky });
+  assert.equal(water.material.uniforms.uDeepColor.value.getHexString(), '0a284a');
+  assert.equal(water.material.uniforms.uShallowColor.value.getHexString(), '136a8a');
+  assert.equal(water.material.uniforms.uRoughness.value, 0.252);
+  assert.equal(water.material.uniforms.uDaylightScale.value, 1.0);
+  assert.equal(sky.hazePalette, null);
+
   water.geometry.dispose();
   water.material.dispose();
 });

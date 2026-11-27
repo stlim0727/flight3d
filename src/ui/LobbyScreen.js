@@ -7,7 +7,7 @@ import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
 import { DEFAULT_AIRPORT, DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
-import { mergeScoredResults, searchAirportIndexScored, searchMapPlacesScored, searchPlaceIndexScored } from '../config/airportSearch.js';
+import { mergeScoredResults, placeCruiseAltitude, searchAirportIndexScored, searchMapPlacesScored, searchPlaceIndexScored } from '../config/airportSearch.js';
 import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
@@ -226,6 +226,9 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       longitude: place.longitude,
       iata: place.iata ?? '',
       ...(place.tileId ? { tileId: place.tileId } : {}),
+      ...(Number.isFinite(place.altitudeM) ? { altitudeM: place.altitudeM } : {}),
+      ...(Number.isFinite(place.headingDeg) ? { headingDeg: place.headingDeg } : {}),
+      ...(Number.isFinite(place.elevationM) ? { elevationM: place.elevationM } : {}),
     };
   }
   function globalSearchEntries() {
@@ -722,7 +725,14 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     }
     if (target.dataset.placeSource === 'place-index') {
       const place = placeIndexState.entries.find(entry => entry.id === id);
-      if (place) selectMapPlace({ ...place, kind: 'point' });
+      if (place) {
+        selectMapPlace({
+          ...place,
+          kind: 'point',
+          altitudeM: placeCruiseAltitude(place),
+          headingDeg: 90,
+        });
+      }
       return;
     }
     selectMapPlace(findMapPlace(kind, id));

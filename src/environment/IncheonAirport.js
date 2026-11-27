@@ -1,4 +1,5 @@
 import { loadSihwaRegion } from '../geospatial/SihwaRegion.js';
+import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
 import { createSihwaScenery } from './SihwaScenery.js';
 import { createDepartureJetBridge, createJetBridgeMaterials, findTerminalZ } from './DepartureJetBridge.js';
 import * as THREE from 'three';
@@ -30,17 +31,18 @@ export const INCHEON_APRON_LAMPS = [
 function shape(points) { return new THREE.Shape(points.slice(0,-1).map(([x,z])=>new THREE.Vector2(x,-z))); }
 export async function loadIncheonAirport(base, options = {}) {
   const json=async file=> {const r=await fetch(base+file);if(!r.ok)throw new Error(`${file}: ${r.status}`);return r.json();};
-  const [patch,dressing,trafficData,region]=await Promise.all([
+  const [patch,dressing,trafficData,region,source]=await Promise.all([
     json('patch.json'),
     json('dressing.json'),
     json('traffic.json'),
     loadSihwaRegion(base),
+    options.source ? Promise.resolve(options.source) : loadIncheonTerrain(base),
   ]);
-  const terrain=new IncheonFlightSurface(null,region);
+  const terrain=new IncheonFlightSurface(source,region);
   terrain.mesh=new THREE.Group();
   const group=new THREE.Group();
   const sihwa=createSihwaScenery(region);
-  terrain.mesh.add(sihwa.group);
+  group.add(sihwa.group);
   const height=(x,z)=>terrain.getHeight(x,z);
   group.add(createDepartureStand(INCHEON_AIRFIELD.elevationM));
   const bridgeMaterials = createJetBridgeMaterials();

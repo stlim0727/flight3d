@@ -170,6 +170,7 @@ export class AddonPicker {
     saveAddonCatalogUrl('', { storage: this.storage });
     this.syncRemoveButton();
     this.status.textContent = this.labels.urlCleared;
+    this.onApplied?.();
   }
 
   async copyShareLink() {
@@ -227,6 +228,7 @@ export class AddonPicker {
     if (this.catalog) this.render();
     else this.syncRemoveButton();
     this.status.textContent = this.labels.removeReady;
+    this.onApplied?.();
     return true;
   }
 

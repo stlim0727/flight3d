@@ -100,7 +100,13 @@ export function mapCruisePoint(plan, places = {}) {
   return {
     ...location,
     headingDeg: location.headingDeg ?? 90,
-    altitudeM: location.altitudeM ?? (airport ? Math.max(0, airport.elevationM ?? 0) + 1200 : 3500),
+    altitudeM: location.altitudeM ?? (
+      airport
+        ? Math.max(0, airport.elevationM ?? 0) + 1200
+        : Number.isFinite(location.elevationM)
+          ? Math.max(600, Math.round((location.elevationM + 700) / 50) * 50)
+          : 3500
+    ),
   };
 }
 

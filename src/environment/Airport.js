@@ -464,10 +464,10 @@ export class Airport {
       // Only evaluate when aircraft is approaching from the west (dx > 40m)
       if (dx > 40) {
         const gsDeg = THREE.MathUtils.radToDeg(Math.atan2(dy, dx));
-        // Real-world PAPI calibration for standard 3.0° Glideslope.
-        // Unit 0 is nearest the runway (shallowest angle) and unit 3 is
-        // farthest away (steepest angle), matching the common airport path.
-        const thresholds = [2.5, 2.8, 3.2, 3.5];
+        // Real-world PAPI calibration for standard 3.0° Glideslope (ICAO Annex 14 / FAA AIM).
+        // Unit 0 is nearest the runway (steepest angle, turns red first) and unit 3 is
+        // farthest away (shallowest angle), displaying White-White-Red-Red left-to-right on 3.0°.
+        const thresholds = [3.5, 3.2, 2.8, 2.5];
         this.papiLights.forEach((papi, idx) => {
           const isWhite = gsDeg >= thresholds[idx];
           const colorHex = isWhite ? 0xffffff : 0xff1a1a;
@@ -475,15 +475,15 @@ export class Airport {
           papi.pointLight.color.setHex(colorHex);
         });
       } else {
-        // Passed threshold: default to 2 white 2 red
-        this.papiLights[0].lensMat.color.setHex(0xffffff);
-        this.papiLights[0].pointLight.color.setHex(0xffffff);
-        this.papiLights[1].lensMat.color.setHex(0xffffff);
-        this.papiLights[1].pointLight.color.setHex(0xffffff);
-        this.papiLights[2].lensMat.color.setHex(0xff1a1a);
-        this.papiLights[2].pointLight.color.setHex(0xff1a1a);
-        this.papiLights[3].lensMat.color.setHex(0xff1a1a);
-        this.papiLights[3].pointLight.color.setHex(0xff1a1a);
+        // Passed threshold: default to 2 white (outer) 2 red (inner)
+        this.papiLights[0].lensMat.color.setHex(0xff1a1a);
+        this.papiLights[0].pointLight.color.setHex(0xff1a1a);
+        this.papiLights[1].lensMat.color.setHex(0xff1a1a);
+        this.papiLights[1].pointLight.color.setHex(0xff1a1a);
+        this.papiLights[2].lensMat.color.setHex(0xffffff);
+        this.papiLights[2].pointLight.color.setHex(0xffffff);
+        this.papiLights[3].lensMat.color.setHex(0xffffff);
+        this.papiLights[3].pointLight.color.setHex(0xffffff);
       }
     }
   }

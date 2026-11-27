@@ -216,15 +216,21 @@ function verifyStrictBodySupportPoints(raw, errors) {
   }
 }
 
-function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings, stats }) {
+function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, dependencyManifests = [], errors, warnings, stats }) {
   if (strict) {
     verifyStrictBodySupportPoints(manifest.aircraft.physics?.landingGear?.bodySupportPoints, errors);
   }
   const effectiveCore = coreVersion ?? manifest.coreRange?.min ?? '1.8.0';
+  const pins = [{ id: manifest.id, version: manifest.version, sha256: '0'.repeat(64), manifest }];
+  for (const dep of dependencyManifests) {
+    if (dep?.id && dep?.version && dep.id !== manifest.id) {
+      pins.push({ id: dep.id, version: dep.version, sha256: '0'.repeat(64), manifest: dep });
+    }
+  }
   const profile = {
     schemaVersion: 1,
     coreVersion: effectiveCore,
-    pins: [{ id: manifest.id, version: manifest.version, sha256: '0'.repeat(64), manifest }],
+    pins,
   };
   let descriptor;
   try {
@@ -356,6 +362,7 @@ function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, w
 export async function verifyAddonRuntime(manifest, {
   coreVersion,
   addonDir = null,
+  dependencyManifests = [],
   fetchImpl = globalThis.fetch,
   verifyRemoteAssets = false,
   requireLocalAssets = false,
@@ -375,7 +382,7 @@ export async function verifyAddonRuntime(manifest, {
   }
 
   if (manifest.aircraft) {
-    verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings, stats });
+    verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, dependencyManifests, errors, warnings, stats });
   }
 
   const resources = collectDeclaredResources(manifest);
@@ -401,7 +408,13 @@ export async function verifyAddonRuntime(manifest, {
         errors.push(`${resource.label}: fetch unavailable to verify ${resource.url}`);
         continue;
       }
-      const response = await fetchImpl(resource.url);
+      let response;
+      try {
+        response = await fetchImpl(resource.url);
+      } catch (error) {
+        errors.push(`${resource.label}: asset fetch failed (${error?.message ?? 'network'}) at ${resource.url}`);
+        continue;
+      }
       if (!response?.ok) {
         errors.push(`${resource.label}: asset fetch failed (${response?.status ?? 'network'}) at ${resource.url}`);
         continue;

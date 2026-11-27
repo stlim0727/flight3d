@@ -329,10 +329,10 @@ export class WaterOcean {
 
   setPalette({ deepColor, shallowColor, roughness, daylightScale } = {}) {
     if (!this.material?.uniforms) return;
-    if (deepColor) this.material.uniforms.uDeepColor.value.set(deepColor);
-    if (shallowColor) this.material.uniforms.uShallowColor.value.set(shallowColor);
-    if (Number.isFinite(roughness)) this.material.uniforms.uRoughness.value = roughness;
-    if (Number.isFinite(daylightScale)) this.material.uniforms.uDaylightScale.value = daylightScale;
+    this.material.uniforms.uDeepColor.value.set(deepColor ?? 0x0a284a);
+    this.material.uniforms.uShallowColor.value.set(shallowColor ?? 0x136a8a);
+    this.material.uniforms.uRoughness.value = Number.isFinite(roughness) ? roughness : 0.252;
+    this.material.uniforms.uDaylightScale.value = Number.isFinite(daylightScale) ? daylightScale : 1.0;
   }
 
   syncWithAtmosphere(sky) {

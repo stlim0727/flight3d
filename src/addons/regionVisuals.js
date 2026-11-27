@@ -1,5 +1,22 @@
 import * as THREE from 'three';
 
+export function regionContainsOrigin(bounds, origin) {
+  if (!bounds || !origin) return false;
+  const lat = origin.latitude ?? origin.lat;
+  const lon = origin.longitude ?? origin.lon;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+  return Number.isFinite(bounds.west) && Number.isFinite(bounds.east)
+    && Number.isFinite(bounds.south) && Number.isFinite(bounds.north)
+    && lon >= bounds.west && lon <= bounds.east
+    && lat >= bounds.south && lat <= bounds.north;
+}
+
+export function regionPackForOrigin(pack, origin) {
+  if (!pack || !origin) return null;
+  const candidates = Array.isArray(pack.regions) && pack.regions.length > 0 ? pack.regions : [pack];
+  return candidates.find(region => regionContainsOrigin(region?.bounds, origin)) ?? null;
+}
+
 export function regionPaletteHex(pack) {
   return {
     deepColor: pack?.palette?.sea?.deepColor ?? null,
@@ -34,14 +51,25 @@ export function buildingOverrideTint(override) {
 }
 
 export function addonMapBookmarks(pack) {
-  return (pack?.bookmarks ?? []).map(bookmark => ({
-    kind: 'point',
-    id: bookmark.id,
-    label: bookmark.label,
-    latitude: bookmark.latitude,
-    longitude: bookmark.longitude,
-    headingDeg: bookmark.headingDeg ?? 0,
-    altitudeM: bookmark.altitudeM ?? 1200,
-    addonId: pack.id,
-  }));
+  const regions = Array.isArray(pack?.regions) && pack.regions.length > 0 ? pack.regions : (pack ? [pack] : []);
+  const seen = new Set();
+  const bookmarks = [];
+  for (const region of regions) {
+    for (const bookmark of region?.bookmarks ?? []) {
+      const key = `${region.id ?? ''}:${bookmark.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      bookmarks.push({
+        kind: 'point',
+        id: bookmark.id,
+        label: bookmark.label,
+        latitude: bookmark.latitude,
+        longitude: bookmark.longitude,
+        headingDeg: bookmark.headingDeg ?? 0,
+        altitudeM: bookmark.altitudeM ?? 1200,
+        addonId: region.id ?? pack.id,
+      });
+    }
+  }
+  return bookmarks;
 }

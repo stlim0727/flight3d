@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "kind": "flight3d-place-index",
   "version": "20261127T140900Z-ea709603",
-  "generatedAt": "2026-11-27T14:24:49.056Z",
+  "generatedAt": "2026-11-27T15:43:53.112Z",
   "horizontalDatum": "WGS84",
   "config": {
     "maxCities": 10000,
