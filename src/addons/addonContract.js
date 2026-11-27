@@ -89,8 +89,8 @@ function validateBuildingOverrides(overrides, errors, label) {
       errors.push(`${where} needs exactly one of id, overtureId or nameContains`);
     }
     if (override.bounds !== undefined && !validBounds(override.bounds)) errors.push(`${where} bounds are invalid`);
-    if (!override.model || typeof override.model.url !== 'string' || !HEX_COLOR.test(override.material?.baseColor ?? '')) {
-      errors.push(`${where} needs a model url and a baseColor`);
+    if (!HEX_COLOR.test(override.material?.baseColor ?? '')) {
+      errors.push(`${where} needs a baseColor`);
     }
     if (override.model) validResource(override.model, errors, `${where}.model`);
     if (override.collision !== undefined && !['replace', 'suppress'].includes(override.collision)) {
