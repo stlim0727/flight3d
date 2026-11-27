@@ -4,6 +4,8 @@ import {
   wgs84ToJejuLocal,
 } from '../geospatial/CorridorCoordinateSystem.js';
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
+import { IncheonTerrain } from '../geospatial/IncheonTerrain.js';
+import { IncheonFlightSurface } from '../geospatial/IncheonFlightSurface.js';
 import luklaGrid from './luklaTerrainGrid.json' with { type: 'json' };
 import incheonAirfield from './incheonAirfield.json' with { type: 'json' };
 
@@ -18,6 +20,15 @@ export const REGION_SURFACES = Object.freeze({
     origin: INCHEON_PATCH.origin,
     elevationM: incheonAirfield.elevationM,
     precinctExtent: Object.freeze([-6000, -6000, 6000, 6000]),
+    airportCode: 'RKSI',
+    localTerrain: Object.freeze({
+      base: 'scenery/incheon/',
+      Terrain: IncheonTerrain,
+      createFlightSurface: source => new IncheonFlightSurface(source),
+      size: 12000,
+      segments: 240,
+      localImageryExtent: Object.freeze([-6000, -6000, 6000, 6000]),
+    }),
   }),
   jeju: Object.freeze({
     origin: JEJU_ORIGIN,

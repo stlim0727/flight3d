@@ -15,9 +15,8 @@ import { UrbanWindField } from '../physics/UrbanWindField.js';
 import { alignSpawnToWind } from './windSpawn.js';
 import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 import { OpenWorldRegionSurface } from '../environment/OpenWorldRegionSurface.js';
+import { createConfiguredRegionSurface, createRegionAirportFacade } from '../environment/RegionSurfaceFactory.js';
 import { CorridorFlightSurface } from '../environment/CorridorFlightSurface.js';
-import { loadIncheonTerrain } from '../geospatial/IncheonTerrain.js';
-import { IncheonFlightSurface } from '../geospatial/IncheonFlightSurface.js';
 import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { castFarSunShadow } from '../environment/FarSunShadow.js';
@@ -1041,36 +1040,21 @@ class PresetSpawnerMethods {
 
   async ensureIncheonRegion() {
     if (this.incheonAirport) return this.incheonAirport;
-    this.incheonLoad ??= Promise.all([
-      import('../environment/IncheonAirport.js'),
-      loadIncheonTerrain(`${import.meta.env.BASE_URL}scenery/incheon/`),
-    ]).then(async ([{ loadIncheonAirport }, source]) => {
-      const airport = await loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`);
-      const config = REGION_SURFACES.incheon;
-      const flightSurface = new IncheonFlightSurface(source);
-      const fallback = new CorridorFlightSurface({ activeOrigin: config.origin, incheonSurface: flightSurface });
-      const surface = new OpenWorldRegionSurface({
-        ...config, fallback,
-        localImageryExtent: [-6000, -6000, 6000, 6000],
-      });
-      const streamedAirport = () => this.airportStreamer?.regionFor?.('RKSI')?.airport ?? null;
-      this.incheonAirportFacade = {
-        isOnRunway: (x, z) => Boolean(streamedAirport()?.isOnRunway?.(...this.world.local('RKSI', x, z)))
-          || flightSurface.isOnRunway(x, z),
-        isRunwaySafetyArea: (x, z) => Boolean(streamedAirport()?.isRunwaySafetyArea?.(...this.world.local('RKSI', x, z)))
-          || flightSurface.isRunwaySafetyArea(x, z),
-        hasModeledBuilding: (x, z) => airport.hasModeledBuilding(x, z),
-        checkBuildingCollision: probes => airport.checkBuildingCollision(probes),
-        getGazeTargets: () => airport.getGazeTargets(),
-        nightLighting: airport.nightLighting,
-        resetTraffic: () => airport.resetTraffic(),
-        update: (dt, position, time, options) => airport.update(dt, position, time, options),
-      };
-      this.incheonSurface = surface;
-      this.incheonAirport = airport;
-      airport.group.visible = false;
-      this.scene?.add(airport.group, surface.mesh);
-      return airport;
+    this.incheonLoad ??= import('../environment/IncheonAirport.js')
+      .then(async ({ loadIncheonAirport }) => {
+        const airport = await loadIncheonAirport(`${import.meta.env.BASE_URL}scenery/incheon/`);
+        const config = REGION_SURFACES.incheon;
+        const { surface, flightSurface } = await createConfiguredRegionSurface(config, {
+          baseUrl: import.meta.env.BASE_URL,
+        });
+        this.incheonAirportFacade = createRegionAirportFacade({
+          config, world: this.world, airportStreamer: this.airportStreamer, airport, flightSurface,
+        });
+        this.incheonSurface = surface;
+        this.incheonAirport = airport;
+        airport.group.visible = false;
+        this.scene?.add(airport.group, surface.mesh);
+        return airport;
       })
       .catch(error => {
         this.incheonLoad = null;

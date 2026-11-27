@@ -1592,7 +1592,6 @@ const frames = {
   lukla: { origin: luklaGrid.origin },
   incheon: {
     origin: INCHEON_PATCH.origin,
-    protectedAreas: [[-6000, -6000, 6000, 6000]],
     insets: getInsetsForRegion('incheon'),
   },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
@@ -1642,6 +1641,8 @@ export function updateOpenWorldTerrain(sim) {
         const half = surface.size / 2;
         protectedAreas = [[-half, -half, half, half]];
         localSurface = surface;
+      } else if (!customOrigin && surface.localSurface) {
+        localSurface = surface.localSurface;
       } else if (!customOrigin && airportMesh?.geometry) {
         localSurface = {
           geometry: airportMesh.geometry,
