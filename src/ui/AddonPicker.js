@@ -1,6 +1,7 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
 import {
-  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile, saveSelectedAddons,
+  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
+  saveAddonCatalogUrl, saveSelectedAddons,
 } from '../addons/savedAddonProfile.js';
 import { serializeProfile } from '../addons/addonContract.js';
 
@@ -141,6 +142,7 @@ export class AddonPicker {
     this.shareBtn.hidden = true;
     this.hideShareLink();
     clearSavedAddonProfile(this.storage);
+    saveAddonCatalogUrl('', { storage: this.storage });
     this.syncRemoveButton();
     this.status.textContent = this.labels.urlCleared;
   }
@@ -289,6 +291,7 @@ export class AddonPicker {
         coreVersion: this.coreVersion ?? null,
         storage: this.storage,
       });
+      saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       this.status.textContent = this.labels.applyReady;
       this.render();
       return true;

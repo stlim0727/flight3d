@@ -14,6 +14,7 @@ import { AddonPicker } from '../src/ui/AddonPicker.js';
 import {
   SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
   hasExplicitAddonParams, resolveAddonSearch, saveSelectedAddons,
+  SAVED_ADDON_CATALOG_KEY, loadSavedAddonCatalogUrl, saveAddonCatalogUrl,
 } from '../src/addons/savedAddonProfile.js';
 import { installAddonPicker } from '../src/ui/installAddonPicker.js';
 
@@ -615,4 +616,62 @@ test('removing one saved addon keeps the remaining pin and selection', async () 
     assert.equal(slots['.addon-remove'].hidden, false);
     assert.equal(fetchCount, 1);
   });
+});
+
+test('saved catalog URL restores selected addons in the picker after reload', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+  ] };
+  const otherCatalog = { schemaVersion: 1, addons: [
+    { id: 'demo/aircraft/jet', version: '1.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+  ] };
+  const catalogUrl = 'https://packs.example/catalog.json';
+  const otherCatalogUrl = 'https://other.example/catalog.json';
+  const fetchImpl = async url => {
+    if (url === catalogUrl) return { ok: true, json: async () => catalog };
+    if (url === otherCatalogUrl) return { ok: true, json: async () => otherCatalog };
+    return { ok: false, status: 404 };
+  };
+  const storage = memoryStorage();
+
+  await withFakeDocument(async ({ parent }) => {
+    const initial = installAddonPicker(parent, { storage, fetchImpl });
+    await initial.load(catalogUrl);
+    assert.equal(loadSavedAddonCatalogUrl(storage), null);
+    initial.selected.add('demo/region/sky');
+    assert.equal(initial.apply(), true);
+    assert.equal(loadSavedAddonCatalogUrl(storage), catalogUrl);
+
+    // Previewing another catalog without applying must not overwrite the saved catalog URL.
+    await initial.load(otherCatalogUrl);
+    assert.equal(loadSavedAddonCatalogUrl(storage), catalogUrl);
+  });
+
+  await withFakeDocument(async ({ parent, slots }) => {
+    const reloaded = installAddonPicker(parent, { storage, fetchImpl });
+    assert.equal(slots['.addon-catalog-url'].value, catalogUrl);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.deepEqual([...reloaded.selected], ['demo/region/sky']);
+    assert.equal(slots['.addon-apply'].hidden, false);
+    assert.equal(slots['.addon-share'].hidden, false);
+    assert.equal(slots['.addon-remove'].hidden, false);
+
+    slots['.addon-catalog-clear'].dispatch('click');
+    assert.equal(storage.getItem(SAVED_ADDON_PROFILE_KEY), null);
+    assert.equal(storage.getItem(SAVED_ADDON_CATALOG_KEY), null);
+  });
+
+  storage.setItem(SAVED_ADDON_CATALOG_KEY, 'javascript:alert(1)');
+  assert.equal(loadSavedAddonCatalogUrl(storage), null);
+
+  const blocked = {
+    getItem() { throw new Error('storage blocked'); },
+    setItem() { throw new Error('storage blocked'); },
+    removeItem() { throw new Error('storage blocked'); },
+  };
+  assert.equal(loadSavedAddonCatalogUrl(blocked), null);
+  assert.doesNotThrow(() => saveAddonCatalogUrl(catalogUrl, { storage: blocked }));
+  assert.doesNotThrow(() => saveAddonCatalogUrl('', { storage: blocked }));
 });

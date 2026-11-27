@@ -1,13 +1,15 @@
 import { AddonPicker } from './AddonPicker.js';
 import { validateCatalog } from '../addons/addonContract.js';
 import { profileShareParams } from '../addons/regionPackBinding.js';
+import { loadSavedAddonCatalogUrl } from '../addons/savedAddonProfile.js';
 
 export function installAddonPicker(parent, options = {}) {
   if (!parent || typeof document === 'undefined') return null;
   const picker = new AddonPicker({
-    catalogUrl: options.catalogUrl ?? '',
+    catalogUrl: options.catalogUrl ?? loadSavedAddonCatalogUrl(options.storage) ?? '',
     coreVersion: options.coreVersion,
     fetchImpl: options.fetchImpl,
+    storage: options.storage,
     profileShareParams,
     validateCatalog,
   });
