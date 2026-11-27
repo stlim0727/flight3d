@@ -112,6 +112,132 @@ function validateRegionPalette(palette, errors) {
   }
 }
 
+function hasFiniteVector3(value) {
+  if (Array.isArray(value)) {
+    return value.length >= 3 && value.slice(0, 3).every(Number.isFinite);
+  }
+  return Boolean(value && typeof value === 'object'
+    && Number.isFinite(value.x) && Number.isFinite(value.y) && Number.isFinite(value.z));
+}
+
+function validateMassProperties(massProps, errors) {
+  if (massProps === undefined) return;
+  if (!massProps || typeof massProps !== 'object' || Array.isArray(massProps)) {
+    errors.push('aircraft.physics.massProperties must be an object');
+    return;
+  }
+  for (const field of ['currentMassKg', 'emptyWeightKg', 'maxTakeoffWeightKg', 'Ixx', 'Iyy', 'Izz']) {
+    if (massProps[field] !== undefined && (!Number.isFinite(massProps[field]) || massProps[field] <= 0)) {
+      errors.push(`aircraft.physics.massProperties.${field} must be positive`);
+    }
+  }
+  if (Number.isFinite(massProps.emptyWeightKg) && Number.isFinite(massProps.maxTakeoffWeightKg)
+    && massProps.emptyWeightKg > massProps.maxTakeoffWeightKg) {
+    errors.push('aircraft.physics.massProperties.emptyWeightKg must not exceed maxTakeoffWeightKg');
+  }
+}
+
+function validateAerodynamics(aero, errors) {
+  if (aero === undefined) return;
+  if (!aero || typeof aero !== 'object' || Array.isArray(aero)) {
+    errors.push('aircraft.physics.aerodynamics must be an object');
+    return;
+  }
+  for (const field of ['wingspanM', 'wingAreaM2', 'clAlpha']) {
+    if (aero[field] !== undefined && (!Number.isFinite(aero[field]) || aero[field] <= 0)) {
+      errors.push(`aircraft.physics.aerodynamics.${field} must be positive`);
+    }
+  }
+  if (aero.cd0 !== undefined && (!Number.isFinite(aero.cd0) || aero.cd0 < 0)) {
+    errors.push('aircraft.physics.aerodynamics.cd0 must be non-negative');
+  }
+  if (aero.oswaldEfficiency !== undefined
+    && (!Number.isFinite(aero.oswaldEfficiency) || aero.oswaldEfficiency <= 0 || aero.oswaldEfficiency > 1)) {
+    errors.push('aircraft.physics.aerodynamics.oswaldEfficiency must be in (0, 1]');
+  }
+  if (aero.flapAngles !== undefined && (!Array.isArray(aero.flapAngles)
+    || aero.flapAngles.length === 0 || !aero.flapAngles.every(Number.isFinite))) {
+    errors.push('aircraft.physics.aerodynamics.flapAngles must be a non-empty array of finite numbers');
+  }
+}
+
+function validatePropulsion(propulsion, errors) {
+  if (propulsion === undefined) return;
+  if (!propulsion || typeof propulsion !== 'object' || Array.isArray(propulsion)) {
+    errors.push('aircraft.physics.propulsion must be an object');
+    return;
+  }
+  if (propulsion.numEngines !== undefined
+    && (!Number.isInteger(propulsion.numEngines) || propulsion.numEngines < 1)) {
+    errors.push('aircraft.physics.propulsion.numEngines must be a positive integer');
+  }
+  if (propulsion.maxStaticThrustPerEngineN !== undefined
+    && (!Number.isFinite(propulsion.maxStaticThrustPerEngineN) || propulsion.maxStaticThrustPerEngineN <= 0)) {
+    errors.push('aircraft.physics.propulsion.maxStaticThrustPerEngineN must be positive');
+  }
+  if (propulsion.fuelCapacityKg !== undefined
+    && (!Number.isFinite(propulsion.fuelCapacityKg) || propulsion.fuelCapacityKg < 0)) {
+    errors.push('aircraft.physics.propulsion.fuelCapacityKg must be non-negative');
+  }
+}
+
+function validateLandingGear(gear, errors) {
+  if (gear === undefined) return;
+  if (!gear || typeof gear !== 'object' || Array.isArray(gear)) {
+    errors.push('aircraft.physics.landingGear must be an object');
+    return;
+  }
+  if (gear.cgGroundHeightM !== undefined
+    && (!Number.isFinite(gear.cgGroundHeightM) || gear.cgGroundHeightM <= 0)) {
+    errors.push('aircraft.physics.landingGear.cgGroundHeightM must be positive');
+  }
+  if (gear.contacts !== undefined) {
+    if (!Array.isArray(gear.contacts) || gear.contacts.length < 3) {
+      errors.push('aircraft.physics.landingGear.contacts must contain at least 3 gear struts');
+    } else {
+      gear.contacts.forEach((contact, index) => {
+        const where = `aircraft.physics.landingGear.contacts[${index}]`;
+        if (!contact || typeof contact !== 'object') {
+          errors.push(`${where} must be an object`);
+          return;
+        }
+        if (typeof contact.id !== 'string' || !contact.id) errors.push(`${where}.id is required`);
+        if (!hasFiniteVector3(contact.localPos)) errors.push(`${where}.localPos must have finite x, y and z`);
+        for (const field of ['wheelRadius', 'restLength', 'kSpring', 'cDamper']) {
+          if (!Number.isFinite(contact[field]) || contact[field] <= 0) {
+            errors.push(`${where}.${field} must be positive`);
+          }
+        }
+      });
+    }
+  }
+  if (gear.bodySupportPoints !== undefined) {
+    const raw = gear.bodySupportPoints;
+    const entries = Array.isArray(raw)
+      ? raw.map((item, index) => ({ where: `aircraft.physics.landingGear.bodySupportPoints[${index}]`, item }))
+      : (raw && typeof raw === 'object'
+        ? Object.entries(raw).map(([key, item]) => ({
+          where: `aircraft.physics.landingGear.bodySupportPoints.${key}`,
+          item,
+        }))
+        : null);
+    if (!entries || entries.length === 0) {
+      errors.push('aircraft.physics.landingGear.bodySupportPoints must be a non-empty array or map');
+    } else {
+      for (const { where, item } of entries) {
+        const position = item?.position ?? item;
+        if (!hasFiniteVector3(position)) errors.push(`${where} needs finite 3D coordinates`);
+        if (item?.weight !== undefined && (!Number.isFinite(item.weight) || item.weight <= 0)) {
+          errors.push(`${where}.weight must be positive`);
+        }
+        if (item?.id !== undefined && (typeof item.id !== 'string' || !item.id)) {
+          errors.push(`${where}.id must be a non-empty string`);
+        }
+      }
+    }
+  }
+}
+
 function validateAircraftBinding(aircraft, errors) {
   if (!aircraft || typeof aircraft !== 'object') {
     errors.push('aircraft declaration is required');
@@ -127,6 +253,12 @@ function validateAircraftBinding(aircraft, errors) {
     if (!Number.isFinite(aircraft.physics?.[field]) || aircraft.physics[field] <= 0) {
       errors.push(`aircraft.physics.${field} must be positive`);
     }
+  }
+  if (aircraft.physics && typeof aircraft.physics === 'object') {
+    validateMassProperties(aircraft.physics.massProperties, errors);
+    validateAerodynamics(aircraft.physics.aerodynamics, errors);
+    validatePropulsion(aircraft.physics.propulsion, errors);
+    validateLandingGear(aircraft.physics.landingGear, errors);
   }
   if (aircraft.model) validResource(aircraft.model, errors, 'aircraft.model');
   else errors.push('aircraft.model is required');

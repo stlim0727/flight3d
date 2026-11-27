@@ -104,7 +104,7 @@ export function savedAddonSearchParams(storage) {
 
 export function hasExplicitAddonParams(search) {
   const params = new URLSearchParams(search);
-  return ['pack', 'version', 'profile', 'addonManifest', 'addonSha256'].some(key => params.has(key));
+  return ['pack', 'version', 'profile', 'addonManifest', 'addonSha256', 'addonPr'].some(key => params.has(key));
 }
 
 export function resolveAddonSearch(search, { storage } = {}) {

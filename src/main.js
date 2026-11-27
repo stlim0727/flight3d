@@ -8,7 +8,7 @@ import { FlightPerformanceMonitor, FlightGpuTimer } from './core/FlightPerforman
 import { FrameTransitionMonitor } from './core/FrameTransitionMonitor.js';
 import { longTaskSummary } from './core/inputLatency.js';
 import { createSimulatorScenarioStart } from './core/simulatorScenarioStart.js';
-import { createSimulatorFlightStart } from './core/simulatorFlightStart.js';
+import { createSimulatorFlightStart, recoverSimulatorFlightStart } from './core/simulatorFlightStart.js';
 import { MultiplayerController } from './multiplayer/MultiplayerController.js';
 import { FlightWarnings } from './systems/FlightWarnings.js';
 import { AircraftBreakup } from './effects/AircraftBreakup.js';
@@ -80,6 +80,11 @@ import {
 } from './config/flightSelection.js';
 import { resolveFlightUrl, parsePoseUrlParams } from './config/flightUrls.js';
 import { pinnedAddonAircraftList, resolveSharedAddonPack } from './addons/addonCatalogBrowser.js';
+import {
+  BASE_ADDON_CATALOG_URL,
+  loadDefaultBaseAddonCatalog,
+  resolveCatalogAddons,
+} from './addons/baseAddonRegistry.js';
 import { AddonAircraft } from './aircraft/AddonAircraft.js';
 import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
@@ -136,15 +141,25 @@ async function startupStage(value, message) {
 
 async function resolveAddonPinnedPack(search) {
   if (hasExplicitAddonParams(search)) return resolveSharedAddonPack(search);
-  try {
-    return await resolveSharedAddonPack(resolveAddonSearch(search));
-  } catch (error) {
-    if (!savedAddonSearchParams()) throw error;
-    const message = error instanceof Error ? error.message : String(error);
-    window.addonStartupError = message;
-    console.warn('Saved addons could not be loaded:', error);
-    return resolveSharedAddonPack(search);
+  if (savedAddonSearchParams()) {
+    try {
+      const savedPack = await resolveSharedAddonPack(resolveAddonSearch(search));
+      if (savedPack) return savedPack;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      window.addonStartupError = message;
+      console.warn('Saved addons could not be loaded:', error);
+    }
   }
+  try {
+    const baseCatalog = await loadDefaultBaseAddonCatalog();
+    if (baseCatalog?.addons?.length) {
+      return await resolveCatalogAddons(baseCatalog);
+    }
+  } catch (error) {
+    console.warn('Default base addon catalog could not be loaded:', error);
+  }
+  return null;
 }
 
 async function startupDetail(key) {
@@ -179,10 +194,32 @@ class FlightSimulator {
     this.startupProgress = startupProgress;
     initUiScale();
     await startupStage(0, 'startup.scene');
+    this.addonAircraftDescriptors = new Map();
     try {
       this.pinnedAddonPack = await resolveAddonPinnedPack(window.location.search);
-      const addonAircrafts = pinnedAddonAircraftList(this.pinnedAddonPack);
-      if (addonAircrafts.length > 0) registerAddonAircraft(addonAircrafts);
+      for (const descriptor of pinnedAddonAircraftList(this.pinnedAddonPack)) {
+        if (descriptor?.id) this.addonAircraftDescriptors.set(descriptor.id, descriptor);
+      }
+      if (!hasExplicitAddonParams(window.location.search) && savedAddonSearchParams()) {
+        try {
+          const baseCatalog = await loadDefaultBaseAddonCatalog();
+          const aircraftEntries = (baseCatalog?.addons ?? [])
+            .filter(entry => entry.id?.includes('/aircraft/') && entry.compatible !== false);
+          if (aircraftEntries.length > 0) {
+            const basePack = await resolveCatalogAddons({ schemaVersion: 1, addons: aircraftEntries });
+            for (const descriptor of pinnedAddonAircraftList(basePack)) {
+              if (descriptor?.id && !this.addonAircraftDescriptors.has(descriptor.id)) {
+                this.addonAircraftDescriptors.set(descriptor.id, descriptor);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn('Default base aircraft addons skipped:', error);
+        }
+      }
+      if (this.addonAircraftDescriptors.size > 0) {
+        registerAddonAircraft([...this.addonAircraftDescriptors.values()]);
+      }
     } catch (error) {
       startupProgress.failure?.(error.message);
       throw error;
@@ -1181,7 +1218,9 @@ class FlightSimulator {
    * second one ahead of the user's pick costs memory but cannot disturb the current view.
    */
   buildAircraftInstance(aircraftId) {
-    const addon = pinnedAddonAircraftList(this.pinnedAddonPack).find(item => item.id === aircraftId) ?? null;
+    const addon = this.addonAircraftDescriptors?.get(aircraftId)
+      ?? pinnedAddonAircraftList(this.pinnedAddonPack).find(item => item.id === aircraftId)
+      ?? null;
     const instance = addon
       ? new AddonAircraft(addon, { pfdCanvas: this.pfdCanvas, ndCanvas: this.ndCanvas })
       : aircraftId === 'F16'
@@ -1653,7 +1692,25 @@ class FlightSimulator {
     } else if (this.freezePhysics || this.startingFlight || this.replayDirector?.loading || this.multiplayer?.modalOpen || this.multiplayer?.room?.session.state === 'starting' || this.gameFlow.isPhysicsFrozen() || this.devRunner.blocksPhysics || this.pilotArena?.active || this.demoDirector?.isRestartConfirmOpen) {
       this.physicsAccumulator = 0;
     } else {
-      advancePhysicsFrame(this, frameDelta);
+      try {
+        advancePhysicsFrame(this, frameDelta);
+      } catch (error) {
+        this.lastRuntimeError = {
+          message: error?.message ?? String(error),
+          stack: typeof error?.stack === 'string' ? error.stack.slice(0, 1500) : null,
+          aircraft: this.currentAircraftId ?? null,
+          airport: this.activeAirport ?? null,
+          scenario: this.lastPresetType ?? null,
+          atIso: new Date().toISOString(),
+        };
+        captureException?.(error, {
+          subsystem: 'physics-loop',
+          aircraft: this.currentAircraftId,
+          airport: this.activeAirport,
+        });
+        recoverSimulatorFlightStart(this, error);
+        return;
+      }
     }
 
     this.airportStreamer?.update({
@@ -1895,7 +1952,9 @@ installSimulatorHudAndBindings(FlightSimulator);
 async function initFlightSimulator() {
   if (typeof document !== 'undefined') {
     const { installAddonPicker } = await import('./ui/installAddonPicker.js').catch(() => ({}));
-    installAddonPicker?.(document.getElementById('lobby-addon-picker'));
+    installAddonPicker?.(document.getElementById('lobby-addon-picker'), {
+      defaultCatalogUrl: BASE_ADDON_CATALOG_URL,
+    });
   }
   if (!window.simulator) {
     document.getElementById('startup-retry').addEventListener('click', () => location.reload());

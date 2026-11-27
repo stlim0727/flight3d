@@ -10,6 +10,7 @@ adds the developer quick-start tooling and the in-app user picker.
 node scripts/addon-dev.mjs init region --publisher demo --name my-pack --core 1.8.0 --out my-addon
 cd my-addon
 node /path/to/flight3d/scripts/addon-contract.mjs validate addon.json --core 1.8.0
+node /path/to/flight3d/scripts/addon-contract.mjs verify-runtime addon.json --core 1.8.0 --addon-dir .
 node /path/to/flight3d/scripts/addon-contract.mjs lint-set addon.json --core 1.8.0
 node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json <owner>/<repo>
 ```
@@ -18,8 +19,20 @@ node /path/to/flight3d/scripts/addon-dev.mjs catalog addon.json <owner>/<repo>
 
 - `addon.json` — a kind-specific v1 manifest with valid identifiers and ranges;
 - `catalog.json` — a single exact-version pin;
-- `.github/workflows/validate-addon.yml` — the same CLI in CI;
+- `.github/workflows/validate-addon.yml` — runs both `validate` and `verify-runtime` in CI;
 - `README.md` — the remaining publisher steps.
+
+## Official Base Addon Repository & PR Workflow
+
+Official addons live in [`stlim0727/flight3d-addons`](https://github.com/stlim0727/flight3d-addons), keeping Flight3d itself strictly addon-agnostic:
+
+1. **Fork & develop**: Fork `stlim0727/flight3d-addons` and add your addon directory under `addons/<publisher>/<type>/<name>/addon.json` along with local assets.
+2. **Open a Pull Request**: On PR creation/update, CI checks out `stlim0727/flight3d` and runs:
+   - Schema validation (`validateAddonManifest` + deep `aircraft.physics` checks)
+   - Set lint (`lintAddonSet`)
+   - Headless runtime verification (`verifyAddonRuntime`: strict canonical `bodySupportPoints`, `B738 -> addon` switch, `runway`/`cruise`/`approach` simulation, forced ground/water contact, `airportSpawnPlan`, SHA-256 + byte budget, and GLB mesh/node checks)
+3. **Preview verified PRs before merge**: Successful CI publishes `previews/pr-<N>.json` (`ciPassed: true`, `headSha`, SHA-pinned catalog). Users can test any PR safely in Flight3d via **로비 → 옵션 → 애드온 관리 → PR 번호 (`#N`)** or directly with `?addonPr=<N>`. Unverified or failed PRs are rejected before loading.
+4. **Merge & default loading**: Merging a PR rebuilds `catalog.json` on `gh-pages` (`https://stlim0727.github.io/flight3d-addons/catalog.json`), which Flight3d loads fail-open by default at startup and as the default catalog in the Addon Manager.
 
 Replace placeholder URLs (`packs.example`) and SHA-256 values before publishing.
 `catalog` computes the manifest SHA-256 from the file and accepts either a full
