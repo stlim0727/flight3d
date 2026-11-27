@@ -54,6 +54,12 @@ export function createWorldAirportFacade(world, spawnAirport) {
         region.airport?.updateRenderLights?.(cameraY, limit);
       }
     },
+    resetTraffic() {
+      for (const [regionId, region] of world.regions) {
+        if (!isRegionActive(regionId)) continue;
+        region.airport?.resetTraffic?.();
+      }
+    },
   };
   const spawnRegion = [...world.regions].find(([, region]) => region.airport === spawnAirport);
   const [ox, oz] = (spawnRegion && world.offsets.get(spawnRegion[0])) || [0, 0];
