@@ -246,26 +246,26 @@ test('headless approach preset starts and advances with an addon aircraft', () =
   assert.equal(Number.isFinite(sim.telemetry.iasKnots), true);
 });
 
-function skyhawkObjectSupportManifest() {
+function gaMapSupportManifest() {
   return {
     schemaVersion: 1,
-    id: 'demo/aircraft/skyhawk',
+    id: 'demo/aircraft/light-prop',
     publisher: 'demo',
     version: '1.0.0',
     coreRange: { min: '1.8.0', maxExclusive: '2.0.0' },
     dependencies: [],
     license: 'CC-BY-4.0',
-    attribution: 'Skyhawk Sport by demo',
+    attribution: 'Light Prop by demo',
     aircraft: {
-      id: 'skyhawk',
+      id: 'lightprop',
       physics: {
         profile: 'rigid-body-v1',
         massKg: 1050,
         wingAreaM2: 16.2,
         wingspanM: 11,
         lengthM: 8.2,
-        id: 'SKYHAWK',
-        name: 'Skyhawk Sport',
+        id: 'LIGHTPROP',
+        name: 'Light Prop',
         configurationLimits: { flap: [0, 110, 85, 85], gearOperating: 85, gearExtended: 85 },
         massDistribution: {
           referenceMassKg: 1050,
@@ -346,12 +346,12 @@ function skyhawkObjectSupportManifest() {
           maxBrakingFriction: 0.4,
           tireLateralFriction: 0.7,
         },
-        specs: { id: 'SKYHAWK', name: 'Skyhawk Sport', type: 'generalAviation' },
+        specs: { id: 'LIGHTPROP', name: 'Light Prop', type: 'generalAviation' },
       },
-      model: { url: 'https://example.com/skyhawk.glb', sha256: 'a'.repeat(64) },
+      model: { url: 'https://example.com/light-prop.glb', sha256: 'a'.repeat(64) },
       controlBindings: { elevator: 'elevator_node' },
     },
-    assets: [{ url: 'https://example.com/skyhawk.glb', sha256: 'a'.repeat(64) }],
+    assets: [{ url: 'https://example.com/light-prop.glb', sha256: 'a'.repeat(64) }],
   };
 }
 
@@ -366,12 +366,12 @@ function applyInPlaceAircraftSwitch(sim, aircraftId, config) {
 }
 
 test('full-config addon with map bodySupportPoints normalizes and runs across scenarios without freezing', () => {
-  const skyManifest = skyhawkObjectSupportManifest();
+  const gaManifest = gaMapSupportManifest();
   const descriptor = aircraftPackFromProfile({
     schemaVersion: 1,
     coreVersion: '1.8.0',
-    pins: [{ id: skyManifest.id, version: skyManifest.version, sha256: 'a'.repeat(64), manifest: skyManifest }],
-  }, skyManifest.id, { coreVersion: '1.8.0' });
+    pins: [{ id: gaManifest.id, version: gaManifest.version, sha256: 'a'.repeat(64), manifest: gaManifest }],
+  }, gaManifest.id, { coreVersion: '1.8.0' });
   registerAddonAircraft([descriptor]);
 
   const validIds = new Set(BODY_CONTACTS.map(point => point.id));
@@ -459,12 +459,12 @@ test('partial physics.id addon fills missing runtime defaults for headless stepp
 });
 
 test('spawn planners give GA addon aircraft non-zero GA speeds and configured ground clearance', () => {
-  const skyManifest = skyhawkObjectSupportManifest();
+  const gaManifest = gaMapSupportManifest();
   const descriptor = aircraftPackFromProfile({
     schemaVersion: 1,
     coreVersion: '1.8.0',
-    pins: [{ id: skyManifest.id, version: skyManifest.version, sha256: 'a'.repeat(64), manifest: skyManifest }],
-  }, skyManifest.id, { coreVersion: '1.8.0' });
+    pins: [{ id: gaManifest.id, version: gaManifest.version, sha256: 'a'.repeat(64), manifest: gaManifest }],
+  }, gaManifest.id, { coreVersion: '1.8.0' });
   registerAddonAircraft([descriptor]);
 
   for (const code of ['RKPC', 'RKSI', 'VNLK']) {
