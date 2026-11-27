@@ -13,7 +13,7 @@ import { localToWgs84, tileToWgs84, wgs84ToTile, wgs84ToLocal } from './TileCoor
 export const CHART_WATER_ZOOM = 11;
 export const CHART_TILE_LIMIT = 64;
 /** Smallest ground area the paper shows, east-west by north-south. */
-export const CHART_SPAN_M = Object.freeze([60000, 42000]);
+export const CHART_SPAN_M = Object.freeze([40000, 28000]);
 /** The paper re-centres once the aircraft leaves this share of the half-extent. */
 export const RECENTER_FRACTION = 0.55;
 /** Airports are looked up within this radius of the chart centre. */
