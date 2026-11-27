@@ -1,7 +1,7 @@
 // Pure geometry for map-based flight starts (#922). No DOM and no simulator state.
 import { projectToLocal } from '../geospatial/incheon.js';
 import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
-import { AIRCRAFT_REGISTRY } from './aircraftConfigs.js';
+import { resolveAircraftConfig, spawnProfileAircraftId } from './aircraftConfigs.js';
 const finite = Number.isFinite;
 const DEG = Math.PI / 180;
 const TAKEOFF_DISTANCE_M = 100;
@@ -32,7 +32,7 @@ function numberOr(value, fallback) {
 }
 
 function clearanceFor(aircraftId) {
-  return AIRCRAFT_REGISTRY[aircraftId]?.landingGear?.cgGroundHeightM ?? DEFAULT_CLEARANCE_M;
+  return resolveAircraftConfig(aircraftId)?.landingGear?.cgGroundHeightM ?? DEFAULT_CLEARANCE_M;
 }
 
 /** Offsets may be [x, z] arrays or {x, z}; anything else means no offset. */
@@ -167,7 +167,8 @@ export function cruiseSpawnPlan({
     return null;
   }
   const anchor = offsetParts(anchorBase);
-  const speed = aircraftId === 'C172' ? 48 : aircraftId === 'F16' ? 180 : 108;
+  const profileId = spawnProfileAircraftId(aircraftId);
+  const speed = profileId === 'C172' ? 48 : profileId === 'F16' ? 180 : 108;
   const direction = headingToDirection(headingDeg);
   return {
     x: projected[0] - anchor.x,
@@ -196,7 +197,8 @@ export function approachSpawnPlan({
   const z = frame.threshold.z - distanceM * frame.direction.z + lateralOffsetM * right.z;
   const world = worldXZ(x, z, baseOffset, anchorBase);
   const surface = worldXZ(frame.threshold.x, frame.threshold.z, baseOffset, anchorBase);
-  const speed = aircraftId === 'B738' ? 74.5 : aircraftId === 'C172' ? 33 : aircraftId === 'F16' ? 90 : 74.5;
+  const profileId = spawnProfileAircraftId(aircraftId);
+  const speed = profileId === 'B738' ? 74.5 : profileId === 'C172' ? 33 : profileId === 'F16' ? 90 : 74.5;
   const interceptHeading = frame.headingDeg + interceptOffsetDeg;
   const clearance = numberOr(groundClearanceM, clearanceFor(aircraftId));
   const glideTangent = Math.tan(glideslopeDeg * DEG);

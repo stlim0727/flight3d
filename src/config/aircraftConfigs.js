@@ -46,3 +46,17 @@ export function resolveAircraftSpec(aircraftId) {
 export function addonAircraftIds() {
   return [...addonConfigs.keys()];
 }
+
+/** Map any aircraft (including registered addons) to its closest built-in spawn speed profile. */
+export function spawnProfileAircraftId(aircraftId) {
+  if (aircraftId === 'B738' || aircraftId === 'C172' || aircraftId === 'F16') return aircraftId;
+  const config = resolveAircraftConfig(aircraftId);
+  if (!config) return 'B738';
+  const specType = config.specs?.type;
+  if (specType === 'fighter' || specType === 'military') return 'F16';
+  if (specType === 'generalAviation' || config.audio?.engineType === 'piston'
+    || (Number.isFinite(config.massProperties?.currentMassKg) && config.massProperties.currentMassKg < 5000)) {
+    return 'C172';
+  }
+  return 'B738';
+}

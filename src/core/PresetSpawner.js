@@ -4,7 +4,7 @@ import { BridgeFlightScenario } from '../director/BridgeFlightScenario.js';
 import { regionalCruise, regionalCruiseSpawn } from '../config/regionalCruises.js';
 import { NEON_RIVER } from '../config/neonRiver.js';
 import { NEON_WIND } from '../config/neonWind.js';
-import { BOEING_737_800 } from '../config/aircraftConfigs.js';
+import { BOEING_737_800, spawnProfileAircraftId } from '../config/aircraftConfigs.js';
 import { Atmosphere } from '../physics/Atmosphere.js';
 import { solveTrim } from '../physics/TrimSolver.js';
 import { rebaseCgVelocity } from '../physics/massKinematics.js';
@@ -187,6 +187,7 @@ class PresetSpawnerMethods {
       this.aero.spoilers = 0;
     } else if (this.activeAirport === 'neon') {
       const isC172 = this.currentAircraftId === 'C172';
+      const isGa = spawnProfileAircraftId(this.currentAircraftId) === 'C172';
       const c172Clearance = this.gear?.cgGroundHeightM ?? 1.4;
       const clearance = isC172 ? c172Clearance : groundClearance;
 
@@ -202,15 +203,15 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        setPresetFlaps(this, isC172 ? 1 : 2);
+        setPresetFlaps(this, isGa ? 1 : 2);
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = isC172 ? 1.2 : 1.8;
+        this.aero.pitchTrim = isGa ? 1.2 : 1.8;
         this.controls.pitchTrim = this.aero.pitchTrim;
 
         this.showToast(() => t('preset.neon.runway'));
       } else if (type === 'approach') {
         // Urban Canyon Slalom: 110m altitude, right between the 350m glowing skyscrapers!
-        const speedMs = isC172 ? 46.0 : 70.0;
+        const speedMs = isGa ? 46.0 : 70.0;
         this.position.set(200, 110, 0);
         this.linearVelocity.set(speedMs, 0, 0);
         this.angularVelocity.set(0, 0, 0);
@@ -223,12 +224,12 @@ class PresetSpawnerMethods {
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         setPresetFlaps(this, 0);
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = isC172 ? 0.8 : 1.4;
+        this.aero.pitchTrim = isGa ? 0.8 : 1.4;
         this.controls.pitchTrim = this.aero.pitchTrim;
 
         this.showToast(() => t('preset.neon.canyon'));
       } else if (type === 'cruise') {
-        const speedMs = isC172 ? 52.0 : 120.0;
+        const speedMs = isGa ? 52.0 : 120.0;
         this.position.set(-600, 760, -800);
         const headingRad = THREE.MathUtils.degToRad(110);
         this.linearVelocity.set(speedMs * Math.sin(headingRad), 0, -speedMs * Math.cos(headingRad));
@@ -242,7 +243,7 @@ class PresetSpawnerMethods {
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
         setPresetFlaps(this, 0);
         this.aero.spoilers = 0.0;
-        this.aero.pitchTrim = isC172 ? 0.9 : 1.2;
+        this.aero.pitchTrim = isGa ? 0.9 : 1.2;
         this.controls.pitchTrim = this.aero.pitchTrim;
 
         this.showToast(() => t('preset.neon.cruise'));
@@ -425,7 +426,7 @@ class PresetSpawnerMethods {
       // Mountain-context cruise near Fitz Roy (49.271278 S, 73.043222 W).
       // Heights come directly from the measured DEM; no grading is applied.
       const headingRad = THREE.MathUtils.degToRad(215);
-      const speedMs = this.currentAircraftId === 'C172' ? 48 : 96;
+      const speedMs = spawnProfileAircraftId(this.currentAircraftId) === 'C172' ? 48 : 96;
       const startX = 0, startZ = 1600;
       const ground = this.currentTerrain?.getHeight?.(startX, startZ) ?? 2492;
       this.position.set(startX, ground + 500, startZ);
@@ -500,7 +501,7 @@ class PresetSpawnerMethods {
         // C172 flies the same track at 48 m/s (~90 KIAS), below its 163 KIAS Vne (#599).
         this.position.set(-600, 750, 3200);
         this.linearVelocity.set(96, 0, -49); // Aligned with heading 153° (yaw -0.35pi)
-        if (this.currentAircraftId === 'C172') this.linearVelocity.setLength(48);
+        if (spawnProfileAircraftId(this.currentAircraftId) === 'C172') this.linearVelocity.setLength(48);
         this.angularVelocity.set(0, 0, 0);
         this.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI * 0.35);
 

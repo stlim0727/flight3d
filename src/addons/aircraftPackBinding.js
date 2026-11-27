@@ -1,4 +1,5 @@
 import { validateAddonManifest } from './addonContract.js';
+import { defaultBodySupportPoints, normalizeBodySupportPoints } from '../physics/groundContacts.js';
 
 const DEFAULT_ANIMATION = {
   azimuth: { node: 'azimuth_node', axis: 'x', input: 'rpm', continuous: true, rpmRange: [25, 100] },
@@ -7,6 +8,126 @@ const DEFAULT_ANIMATION = {
   flaps: { node: 'flaps_node', axis: 'x', input: 'flapsIndex', rangeDeg: [0, 40] },
   gear: { node: 'gear_node', axis: 'y', input: 'gearState', rangeDeg: [0, 90] },
 };
+
+function buildDefaultLandingGear({ lengthM = 8, wingspanM = 11, cgGroundHeightM = 1.3 } = {}) {
+  return {
+    isFixed: true,
+    cgGroundHeightM,
+    gearTransitTimeSec: 0.1,
+    bodySupportPoints: defaultBodySupportPoints({ wingspanM, lengthM, cgGroundHeightM }),
+    contacts: [
+      { id: 'nose', localPos: { x: 0, y: -1.1, z: -lengthM * 0.2 }, wheelRadius: 0.2, restLength: 0.5, kSpring: 120000, cDamper: 15000, isSteerable: true, maxSteeringDeg: 30 },
+      { id: 'mainLeft', localPos: { x: -1, y: -1.15, z: lengthM * 0.05 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000 },
+      { id: 'mainRight', localPos: { x: 1, y: -1.15, z: lengthM * 0.05 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000 },
+    ],
+    rollingFriction: 0.025,
+    maxBrakingFriction: 0.4,
+    tireLateralFriction: 0.7,
+  };
+}
+
+function buildDefaultPropulsion(massKg, fuelCapacityKg) {
+  return {
+    numEngines: 1,
+    engineName: 'Generic piston engine',
+    maxStaticThrustPerEngineN: massKg * 4,
+    idleN1Percent: 25,
+    togaN1Percent: 100,
+    spoolUpTimeSec: 0.8,
+    spoolDownTimeSec: 0.8,
+    reverseThrustEfficiency: 0,
+    baseFuelFlowKgPerHour: 20,
+    maxFuelFlowKgPerHour: 50,
+    fuelCapacityKg,
+    momentArmMeters: 0,
+  };
+}
+
+function buildDefaultSpecs(id, name) {
+  return {
+    id,
+    name,
+    type: 'generalAviation',
+    limitLoad: { min: -1.5, max: 3.8 },
+    ultimateLoad: { min: -2.25, max: 5.7 },
+    oleoStrokeM: 0.15,
+    hardLandingGThreshold: 1.7,
+    crashGThreshold: 2.5,
+    landingRatings: [],
+  };
+}
+
+function normalizeLandingGear(gear, { lengthM, wingspanM }) {
+  const cgGroundHeightM = gear?.cgGroundHeightM ?? 1.3;
+  const defaults = buildDefaultLandingGear({ lengthM, wingspanM, cgGroundHeightM });
+  return {
+    ...defaults,
+    ...gear,
+    contacts: Array.isArray(gear?.contacts) && gear.contacts.length >= 3
+      ? gear.contacts
+      : defaults.contacts,
+    bodySupportPoints: normalizeBodySupportPoints(gear?.bodySupportPoints, defaults.bodySupportPoints),
+  };
+}
+
+function normalizeFullPhysicsConfig(aircraft, manifest) {
+  const physics = aircraft.physics;
+  const wingspanM = physics.aerodynamics?.wingspanM ?? physics.wingspanM ?? 11;
+  const wingAreaM2 = physics.aerodynamics?.wingAreaM2 ?? physics.wingAreaM2 ?? 16;
+  const lengthM = physics.lengthM ?? 8;
+  const massKg = physics.massProperties?.currentMassKg ?? physics.massKg ?? 1050;
+  const fuelCapacityKg = physics.propulsion?.fuelCapacityKg ?? physics.fuelCapacityKg ?? 0;
+  const emptyWeightKg = physics.massProperties?.emptyWeightKg ?? Math.max(1, massKg - fuelCapacityKg);
+  const maxTakeoffWeightKg = physics.massProperties?.maxTakeoffWeightKg ?? massKg;
+  const massProperties = {
+    currentMassKg: massKg,
+    emptyWeightKg,
+    maxTakeoffWeightKg,
+    Ixx: massKg * lengthM ** 2 / 12,
+    Iyy: massKg * lengthM ** 2 / 12,
+    Izz: massKg * wingspanM ** 2 / 12,
+    ...physics.massProperties,
+  };
+  const initialFuelKg = Math.min(fuelCapacityKg, Math.max(0, massProperties.currentMassKg - massProperties.emptyWeightKg));
+  const initialPayloadKg = Math.max(0, massProperties.currentMassKg - massProperties.emptyWeightKg - initialFuelKg);
+  const massDistribution = physics.massDistribution ?? {
+    referenceMassKg: massProperties.currentMassKg,
+    initialFuelKg,
+    initialPayloadKg,
+    tanks: fuelCapacityKg > 0
+      ? [{ id: 'main', capacityKg: fuelCapacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0 }]
+      : [],
+    stations: [{ id: 'payload', capacityKg: massProperties.maxTakeoffWeightKg, position: { x: 0, y: 0, z: 0 } }],
+  };
+  const flapAngles = Array.isArray(physics.aerodynamics?.flapAngles) && physics.aerodynamics.flapAngles.length > 0
+    ? physics.aerodynamics.flapAngles
+    : [0];
+  return {
+    ...physics,
+    name: physics.name ?? manifest.attribution,
+    configurationLimits: physics.configurationLimits ?? { flap: [0], gearOperating: Infinity, gearExtended: Infinity },
+    massProperties,
+    massDistribution,
+    aerodynamics: {
+      ...physics.aerodynamics,
+      wingspanM,
+      wingAreaM2,
+      flapAngles,
+    },
+    stallWarning: physics.stallWarning ?? { type: 'lowSpeed', marginDeg: 2 },
+    propulsion: physics.propulsion ?? buildDefaultPropulsion(massKg, fuelCapacityKg),
+    landingGear: normalizeLandingGear(physics.landingGear, { lengthM, wingspanM }),
+    cockpit: physics.cockpit ?? {
+      hasPhotoCockpit: false,
+      captainEyePos: { x: 0, y: 0.7, z: -lengthM * 0.15 },
+      defaultFov: 68,
+      exteriorFov: 55,
+      chaseDistance: 14,
+      chaseHeight: 3,
+    },
+    specs: physics.specs ?? buildDefaultSpecs(physics.id, physics.name ?? manifest.attribution),
+  };
+}
 
 export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   const pin = profile?.pins?.find(entry => entry.id === packId);
@@ -77,7 +198,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     }
   }
   const config = aircraft.physics?.id
-    ? aircraft.physics
+    ? normalizeFullPhysicsConfig(aircraft, manifest)
     : {
       ...aircraft.physics,
       id: aircraft.id.toUpperCase(),
@@ -107,33 +228,11 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
         flapAngles: aircraft.physics.aerodynamics?.flapAngles ?? [0],
       },
       stallWarning: aircraft.physics.stallWarning ?? { type: 'lowSpeed', marginDeg: 2 },
-      propulsion: aircraft.physics.propulsion ?? {
-        numEngines: 1,
-        engineName: 'Generic piston engine',
-        maxStaticThrustPerEngineN: aircraft.physics.massKg * 4,
-        idleN1Percent: 25,
-        togaN1Percent: 100,
-        spoolUpTimeSec: 0.8,
-        spoolDownTimeSec: 0.8,
-        reverseThrustEfficiency: 0,
-        baseFuelFlowKgPerHour: 20,
-        maxFuelFlowKgPerHour: 50,
-        fuelCapacityKg: physics.fuelCapacityKg ?? 0,
-        momentArmMeters: 0,
-      },
-      landingGear: aircraft.physics.landingGear ?? {
-        isFixed: true,
-        cgGroundHeightM: 1.3,
-        gearTransitTimeSec: 0.1,
-        contacts: [
-          { id: 'nose', localPos: { x: 0, y: -1.1, z: -aircraft.physics.lengthM * 0.2 }, wheelRadius: 0.2, restLength: 0.5, kSpring: 120000, cDamper: 15000, isSteerable: true, maxSteeringDeg: 30 },
-          { id: 'mainLeft', localPos: { x: -1, y: -1.15, z: aircraft.physics.lengthM * 0.05 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000 },
-          { id: 'mainRight', localPos: { x: 1, y: -1.15, z: aircraft.physics.lengthM * 0.05 }, wheelRadius: 0.25, restLength: 0.5, kSpring: 180000, cDamper: 20000 },
-        ],
-        rollingFriction: 0.025,
-        maxBrakingFriction: 0.4,
-        tireLateralFriction: 0.7,
-      },
+      propulsion: aircraft.physics.propulsion ?? buildDefaultPropulsion(aircraft.physics.massKg, physics.fuelCapacityKg ?? 0),
+      landingGear: normalizeLandingGear(aircraft.physics.landingGear, {
+        lengthM: aircraft.physics.lengthM,
+        wingspanM: aircraft.physics.wingspanM,
+      }),
       cockpit: aircraft.physics.cockpit ?? {
         hasPhotoCockpit: false,
         captainEyePos: { x: 0, y: 0.7, z: -aircraft.physics.lengthM * 0.15 },
@@ -142,17 +241,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
         chaseDistance: 14,
         chaseHeight: 3,
       },
-      specs: aircraft.physics.specs ?? {
-        id: aircraft.id.toUpperCase(),
-        name: manifest.attribution,
-        type: 'generalAviation',
-        limitLoad: { min: -1.5, max: 3.8 },
-        ultimateLoad: { min: -2.25, max: 5.7 },
-        oleoStrokeM: 0.15,
-        hardLandingGThreshold: 1.7,
-        crashGThreshold: 2.5,
-        landingRatings: [],
-      },
+      specs: aircraft.physics.specs ?? buildDefaultSpecs(aircraft.id.toUpperCase(), manifest.attribution),
     };
   return Object.freeze({
     id: aircraft.id,

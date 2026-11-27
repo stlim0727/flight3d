@@ -1,6 +1,7 @@
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import { projectToLocal } from '../geospatial/incheon.js';
 import { wgs84ToLocal } from '../geospatial/TileCoordinateSystem.js';
+import { spawnProfileAircraftId } from './aircraftConfigs.js';
 
 /** Scenic start locations. Altitudes are above mean sea level. */
 export const REGIONAL_CRUISES = Object.freeze({
@@ -19,6 +20,7 @@ export function regionalCruiseSpawn(region, aircraftId) {
   const { airport, latitude, longitude, altitudeM, headingDeg } = region;
   const [x, z] = airport === 'jeju' ? wgs84ToLocal(latitude, longitude, JEJU_ORIGIN) : projectToLocal(latitude, longitude);
   const angle = headingDeg * Math.PI / 180;
-  const speed = aircraftId === 'C172' ? 48 : aircraftId === 'F16' ? 180 : 108;
+  const profileId = spawnProfileAircraftId(aircraftId);
+  const speed = profileId === 'C172' ? 48 : profileId === 'F16' ? 180 : 108;
   return { x, y: altitudeM, z, vx: speed * Math.sin(angle), vy: 0, vz: -speed * Math.cos(angle), yaw: -angle };
 }

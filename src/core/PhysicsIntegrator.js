@@ -3,7 +3,7 @@ import { t } from '../i18n/index.js';
 import { terrainConflictSeconds } from '../systems/FlightWarnings.js';
 import { cockpitCasterState } from '../aircraft/CockpitLighting.js';
 import { GForceFilter } from '../physics/loadFactor.js';
-import { BODY_SUPPORT_POINTS } from '../physics/groundContacts.js';
+import { BODY_SUPPORT_POINTS, resolveBodySupportPoints } from '../physics/groundContacts.js';
 import { FlightPhysicsCore } from '../physics/FlightPhysicsCore.js';
 import { stepPhysics } from './physicsTiming.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
@@ -128,8 +128,10 @@ export class PhysicsIntegratorMethods {
     // transform before physics so a rendered interpolation never feeds back.
     this.aircraft.group.position.copy(this.position);
     this.aircraft.group.quaternion.copy(this.quaternion);
-    this.gear.bodySupportPoints = this.currentAircraftConfig?.landingGear?.bodySupportPoints
-      ?? BODY_SUPPORT_POINTS;
+    this.gear.bodySupportPoints = resolveBodySupportPoints(
+      this.currentAircraftConfig?.landingGear?.bodySupportPoints,
+      BODY_SUPPORT_POINTS,
+    );
 
     const core = this.ensurePhysicsCore();
     const groundSurface = this.ensureGroundSurfaceQueries();
