@@ -172,11 +172,14 @@ function endPoint(end) {
  * frame. Streamed airports without a custom origin are laid out on the shared
  * Incheon plane and shifted into the anchor frame (overrides such as VNLK are
  * pre-distorted for that), so the chart repeats that placement before
- * inverting the scene plane. A custom origin streams in its own plane.
+ * inverting the scene plane. A custom origin or isolated regional anchor (such
+ * as Patagonia) streams in its own plane.
  */
 function sceneAirportPlacement(anchor, origin, customOrigin) {
   if (origin === customOrigin) return point => point;
-  const [ox, oz] = realOffsetInIncheonFrame(anchor);
+  const offset = realOffsetInIncheonFrame(anchor);
+  if (!offset) return point => point;
+  const [ox, oz] = offset;
   return point => {
     const [x, z] = projectToLocal(point.latitude, point.longitude);
     return localToWgs84(x - ox, z - oz, origin);

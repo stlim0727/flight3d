@@ -2,13 +2,8 @@ import { APPROACH_DATA } from '../config/approachData.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH, projectToLocal } from './incheon.js';
 import { JEJU_ORIGIN, jejuLocalToWgs84, incheonSceneryLocalToWgs84 } from './CorridorCoordinateSystem.js';
+import { PATAGONIA_ORIGIN } from './patagonia.js';
 import { localToWgs84 } from './TileCoordinateSystem.js';
-
-/** Offset of a real airport's origin in the Incheon scenery frame, if it has one. */
-export function realOffsetInIncheonFrame(id) {
-  const origin = AIRPORT_ORIGINS[id];
-  return origin ? projectToLocal(origin.latitude, origin.longitude) : null;
-}
 
 /**
  * WGS84 reference points for airports that have real-world coordinates.
@@ -21,7 +16,17 @@ export const AIRPORT_ORIGINS = Object.freeze({
   incheon: Object.freeze(INCHEON_PATCH.origin),
   jeju: Object.freeze({ latitude: JEJU_ORIGIN.latitude, longitude: JEJU_ORIGIN.longitude }),
   lukla: Object.freeze(luklaGrid.origin),
+  patagonia: Object.freeze({ latitude: PATAGONIA_ORIGIN.lat, longitude: PATAGONIA_ORIGIN.lon }),
 });
+
+const INCHEON_PLANE_ANCHORS = new Set(REAL_AIRPORTS);
+
+/** Offset of a shared-Incheon-frame real airport's origin, if it has one. */
+export function realOffsetInIncheonFrame(id) {
+  if (!INCHEON_PLANE_ANCHORS.has(id)) return null;
+  const origin = AIRPORT_ORIGINS[id];
+  return origin ? projectToLocal(origin.latitude, origin.longitude) : null;
+}
 
 function thresholdAt(id) {
   const t = APPROACH_DATA[id]?.threshold;
@@ -39,15 +44,19 @@ export const RUNWAY_THRESHOLDS = Object.freeze({
 });
 
 /**
- * Latitude/longitude of a world-frame position when the anchor is a real airport.
- * UnifiedWorld positions live on the Incheon tangent plane: anchor-local (x, z)
- * must be rebased by the anchor's offset in that plane before inversion.
- * Fictional anchors have no WGS84 frame and report null.
+ * Latitude/longitude of a world-frame position when the anchor has real geodesy.
+ * Shared-Incheon-plane anchors (Incheon, Jeju, Lukla) live on the Incheon tangent
+ * plane, so anchor-local (x, z) is rebased by the anchor's offset in that plane
+ * before inversion. Isolated real anchors (such as Patagonia) invert their own
+ * local tangent-plane origin directly. Fictional anchors have no WGS84 frame and
+ * report null.
  */
 export function worldPositionToWgs84(anchor, x, z, customOrigin = null) {
   if (customOrigin && Number.isFinite(customOrigin.latitude) && Number.isFinite(customOrigin.longitude)) {
     return localToWgs84(x, z, customOrigin);
   }
   const offset = realOffsetInIncheonFrame(anchor);
-  return offset ? localToWgs84(x + offset[0], z + offset[1], AIRPORT_ORIGINS.incheon) : null;
+  if (offset) return localToWgs84(x + offset[0], z + offset[1], AIRPORT_ORIGINS.incheon);
+  const origin = AIRPORT_ORIGINS[anchor];
+  return origin ? localToWgs84(x, z, origin) : null;
 }
