@@ -121,6 +121,12 @@ const imageryNeighbors = [[-1, 0], [0, -1], [1, 0], [0, 1]];
 const tileSphere = new THREE.Sphere();
 const viewCenter = new THREE.Vector3();
 
+export function isExampleTileUrl(url) {
+  return typeof url !== 'string'
+    || url.includes('://packs.example/')
+    || url.includes('://raw.githubusercontent.com/example/');
+}
+
 function projectedTilePixels(mesh, camera, viewportHeight) {
   if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
   mesh.updateWorldMatrix(true, false);
@@ -671,7 +677,7 @@ function heightOnTriangle(positions, x, z, a, b, c, heights) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced', seaPalette = null }) {
+  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, fallbackImagery = false, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced', seaPalette = null }) {
     this.origin = origin;
     this.renderQuality = resolveRenderQuality(quality);
     this.protectedAreas = protectedAreas;
@@ -682,7 +688,7 @@ export class OpenWorldTerrain {
     this._runwayVisibilityKey = '';
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
-    this.fallbackImageryCache = imageryCache
+    this.fallbackImageryCache = imageryCache && fallbackImagery
       ? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 })
       : null;
     this.waterSource = waterSource;
@@ -1642,12 +1648,13 @@ export function updateOpenWorldTerrain(sim) {
         localSurface,
         world: sim.world,
         quality: sim.renderQuality,
-        ...(sim.pinnedAddonPack?.cacheOptions ? { imageryCache: new TileCacheManager({
+        ...(sim.pinnedAddonPack?.cacheOptions && !isExampleTileUrl(sim.pinnedAddonPack.urlTemplate) ? { imageryCache: new TileCacheManager({
           ...sim.pinnedAddonPack.cacheOptions,
           enableBrowserCache: false,
           maxMemoryTiles: 128,
           maxConcurrent: 6,
         }) } : {}),
+        ...(sim.pinnedAddonPack?.cacheOptions && !isExampleTileUrl(sim.pinnedAddonPack.urlTemplate) ? { fallbackImagery: true } : {}),
         ...(sim.pinnedAddonPack?.palette?.sea ? { seaPalette: sim.pinnedAddonPack.palette.sea } : {}),
       });
       surface.mesh.add(surface.openWorld.group);
