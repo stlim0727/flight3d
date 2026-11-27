@@ -8,6 +8,7 @@ import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../geospat
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
+import { PATAGONIA_ORIGIN } from '../geospatial/patagonia.js';
 import { getInsetsForRegion } from '../config/terrainInsets.js';
 import { parisShowcaseInsets } from '../config/parisShowcase.js';
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
@@ -1595,6 +1596,7 @@ const frames = {
     insets: getInsetsForRegion('incheon'),
   },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
+  patagonia: { origin: PATAGONIA_ORIGIN, protectedAreas: [[-22000, -22000, 22000, 22000]] },
 };
 
 function setCorridorStreamersVisible(surface, visible) {
