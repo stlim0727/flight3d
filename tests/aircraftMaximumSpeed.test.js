@@ -13,17 +13,16 @@ const CONCORDE_MANIFEST = new URL(
   import.meta.url,
 );
 
-// Spec target and the current physics ceiling are recorded separately. The
-// regression floor prevents silent performance loss without claiming that an
-// aircraft already meets its published limit. B738/C172 reach their published
-// Vne/Mach ceiling; F16 and the Concorde addon currently do not, so their
-// floors track the measured achievable envelope until propulsion/aero work
-// closes the gap.
+// A spec maximum-speed target must be measurably approached in headless
+// physics, not only declared in configuration. The 80% floor leaves room for
+// atmospheric and configuration differences while still catching aircraft
+// whose thrust/drag model makes their published limit unreachable.
+const MIN_SPEC_FRACTION = 0.8;
 const CASES = [
-  { id: 'B738', altitudeM: 11000, startKt: 260, metric: 'mach', spec: 0.82, floor: 0.8 },
-  { id: 'C172', altitudeM: 3000, startKt: 120, metric: 'iasKnots', spec: 163, floor: 140 },
-  { id: 'F16', altitudeM: 15000, startKt: 450, metric: 'mach', spec: 2.05, floor: 1.1 },
-  { id: 'concorde', altitudeM: 18300, startKt: 520, metric: 'mach', spec: 2.0, floor: 1.1 },
+  { id: 'B738', altitudeM: 11000, startKt: 260, metric: 'mach', spec: 0.82 },
+  { id: 'C172', altitudeM: 3000, startKt: 120, metric: 'iasKnots', spec: 163 },
+  { id: 'F16', altitudeM: 15000, startKt: 450, metric: 'mach', spec: 2.05 },
+  { id: 'concorde', altitudeM: 18300, startKt: 520, metric: 'mach', spec: 2.0 },
 ];
 
 function registerConcordeAddon() {
@@ -44,7 +43,7 @@ function measuredValue(sim, metric) {
 }
 
 for (const entry of CASES) {
-  test(`${entry.id} maximum speed stays within measured physics envelope`, t => {
+  test(`${entry.id} reaches at least ${MIN_SPEC_FRACTION * 100}% of its spec maximum speed`, t => {
     if (entry.id === 'concorde') registerConcordeAddon();
     const sim = createHeadlessSimulation({ aircraftId: entry.id, airportId: 'coastal' });
     sim.setPreset('cruise');
@@ -74,7 +73,8 @@ for (const entry of CASES) {
       if (sim.isCrashed) break;
     }
     assert.equal(Boolean(sim.isCrashed), false, `${entry.id} crashed during acceleration`);
-    assert.ok(peak >= entry.floor, `${entry.id} peak ${peak.toFixed(2)} below floor ${entry.floor}`);
+    assert.ok(peak >= entry.spec * MIN_SPEC_FRACTION,
+      `${entry.id} peak ${peak.toFixed(2)} is only ${(peak / entry.spec * 100).toFixed(0)}% of spec ${entry.spec}`);
     assert.ok(Number.isFinite(peak) && peak < entry.spec * 1.25, `${entry.id} peak ${peak.toFixed(2)} inconsistent with spec ${entry.spec}`);
     t.diagnostic(`${entry.id}: spec ${entry.spec} ${entry.metric}, peak ${peak.toFixed(2)}, ${(peak / entry.spec * 100).toFixed(0)}% of spec`);
   });
