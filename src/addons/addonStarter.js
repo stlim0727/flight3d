@@ -62,7 +62,7 @@ function aircraftTemplate({ id, publisher, version, coreVersion, title }) {
     attribution: `${title} by ${publisher}`,
     aircraft: {
       id: name.slice(0, 24),
-      physics: { profile: 'rigid-body-v1', massKg: 1200, wingAreaM2: 16, wingspanM: 11, lengthM: 8 },
+      physics: { profile: 'rigid-body-v1', massKg: 1200, fuelCapacityKg: 120, wingAreaM2: 16, wingspanM: 11, lengthM: 8 },
       model: { url: modelUrl, sha256: PLACEHOLDER_SHA256 },
       cockpit: { url: cockpitUrl, sha256: PLACEHOLDER_SHA256 },
       controlBindings: { elevator: 'elevator_node', rudder: 'rudder_node' },

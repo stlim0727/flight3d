@@ -1,8 +1,9 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
 import {
-  clearSavedAddonProfile, loadSavedAddonProfile,
+  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
   saveAddonCatalogUrl, saveSelectedAddons,
 } from '../addons/savedAddonProfile.js';
+import { serializeProfile } from '../addons/addonContract.js';
 
 const LABELS = {
   title: '애드온',
@@ -21,7 +22,10 @@ const LABELS = {
   empty: '표시할 애드온이 없습니다.',
   share: '선택 공유 링크 만들기',
   apply: '선택 추가',
-  remove: '저장된 애드온 제거',
+  savedTitle: '적용된 애드온',
+  savedEmpty: '저장된 애드온이 없습니다.',
+  savedRemove: '이 애드온만 제거',
+  remove: '저장된 애드온 모두 제거',
   shareReady: '공유 링크가 준비되었습니다.',
   copy: '링크 복사',
   copied: '링크를 복사했습니다.',
@@ -66,6 +70,10 @@ export class AddonPicker {
           ${['all', 'region', 'aircraft', 'scenario'].map(kind => `<button type="button" class="btn addon-kind" data-kind="${kind}" aria-pressed="${kind === 'all'}">${this.labels[kind]}</button>`).join('')}
         </div>
       </div>
+      <div class="addon-saved">
+        <h4>${this.labels.savedTitle}</h4>
+        <div class="addon-saved-list" role="list"></div>
+      </div>
       <div class="addon-list" role="list"></div>
       <p class="addon-picker-status" role="status" aria-live="polite"></p>
       <button type="button" class="btn addon-apply" hidden>${this.labels.apply}</button>
@@ -81,6 +89,7 @@ export class AddonPicker {
     this.urlInput.value = this.catalogUrl;
     this.filters = this.root.querySelector('.addon-picker-filters');
     this.list = this.root.querySelector('.addon-list');
+    this.savedList = this.root.querySelector('.addon-saved-list');
     this.status = this.root.querySelector('.addon-picker-status');
     this.applyBtn = this.root.querySelector('.addon-apply');
     this.removeBtn = this.root.querySelector('.addon-remove');
@@ -149,7 +158,58 @@ export class AddonPicker {
   }
 
   syncRemoveButton() {
-    if (this.removeBtn) this.removeBtn.hidden = !loadSavedAddonProfile(this.storage);
+    const saved = loadSavedAddonProfile(this.storage);
+    if (this.removeBtn) this.removeBtn.hidden = !saved;
+    this.renderSaved(saved);
+  }
+
+  renderSaved(saved = loadSavedAddonProfile(this.storage)) {
+    if (!this.savedList) return;
+    this.savedList.replaceChildren();
+    if (!saved?.pins?.length) {
+      const empty = document.createElement('p');
+      empty.textContent = this.labels.savedEmpty;
+      this.savedList.appendChild(empty);
+      return;
+    }
+    for (const pin of saved.pins) {
+      const item = document.createElement('div');
+      item.className = 'addon-saved-item';
+      item.setAttribute('role', 'listitem');
+      const body = document.createElement('span');
+      body.className = 'addon-item-body';
+      const title = document.createElement('strong');
+      title.textContent = `${pin.id} · ${pin.version}`;
+      body.appendChild(title);
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'btn addon-saved-remove';
+      remove.textContent = this.labels.savedRemove;
+      remove.addEventListener('click', () => this.removePin(pin.id, pin.version));
+      item.append(body, remove);
+      this.savedList.appendChild(item);
+    }
+  }
+
+  removePin(id, version) {
+    const saved = loadSavedAddonProfile(this.storage);
+    const pins = saved?.pins?.filter(pin => pin.id !== id || pin.version !== version) ?? [];
+    if (pins.length) {
+      try {
+        const remaining = serializeProfile({ schemaVersion: 1, coreVersion: saved.coreVersion, pins });
+        this.storage.setItem(SAVED_ADDON_PROFILE_KEY, remaining);
+      } catch (error) {
+        this.status.textContent = `${this.labels.saveError}: ${error.message}`;
+        return false;
+      }
+    } else {
+      clearSavedAddonProfile(this.storage);
+    }
+    this.selected.delete(id);
+    if (this.catalog) this.render();
+    else this.syncRemoveButton();
+    this.status.textContent = this.labels.removeReady;
+    return true;
   }
 
   async load(url) {

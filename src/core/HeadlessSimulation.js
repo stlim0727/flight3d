@@ -3,7 +3,7 @@ import { Aerodynamics, createAeroResult } from '../physics/Aerodynamics.js';
 import { EngineModel } from '../physics/EngineModel.js';
 import { LandingGear } from '../physics/LandingGear.js';
 import { FlightControls } from '../controls/FlightControls.js';
-import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { Terrain } from '../environment/Terrain.js';
 import { Airport } from '../environment/Airport.js';
 import { CollisionDetector } from '../physics/CollisionDetector.js';
@@ -25,7 +25,7 @@ installPresetSpawner(PhysicsHost);
 /** Production forces, control response, terrain and contacts without a renderer. */
 export function createHeadlessSimulation({ aircraftId = 'B738', airportId = 'coastal',
   terrain: suppliedTerrain, airport: suppliedAirport } = {}) {
-  const config = AIRCRAFT_REGISTRY[aircraftId];
+  const config = resolveAircraftConfig(aircraftId);
   if (!config) throw new TypeError('Unknown aircraft');
   const terrain = suppliedTerrain ?? new PhysicsTerrain(20000, 16, { textures: {} });
   const airport = suppliedAirport ?? new PhysicsAirport();

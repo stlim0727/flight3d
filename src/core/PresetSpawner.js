@@ -40,6 +40,11 @@ export const REGION_STREAM_DISTANCE_M = 65000;
 const REGION_STREAM_INTERVAL_MS = 500;
 const REGION_STREAM_MOVE_M = 500;
 
+function setPresetFlaps(simulator, index) {
+  const limit = (simulator.aero?.flapAngles?.length ?? 1) - 1;
+  simulator.aero?.setFlapPosition?.(Math.min(index, Math.max(0, limit)));
+}
+
 export function distanceToRegionBoundsM(x, z, offset, extent) {
   if (!offset || !extent) return Infinity;
   const minX = offset[0] + extent.minX;
@@ -178,7 +183,7 @@ class PresetSpawnerMethods {
       this.engines.setReverser(false, false);
       this.gear.setGearTarget(true);
       this.gear.gearState = 1;
-      this.aero.setFlapPosition(0);
+      setPresetFlaps(this, 0);
       this.aero.spoilers = 0;
     } else if (this.activeAirport === 'neon') {
       const isC172 = this.currentAircraftId === 'C172';
@@ -197,7 +202,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(isC172 ? 1 : 2);
+        setPresetFlaps(this, isC172 ? 1 : 2);
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = isC172 ? 1.2 : 1.8;
         this.controls.pitchTrim = this.aero.pitchTrim;
@@ -216,7 +221,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
-        this.aero.setFlapPosition(0);
+        setPresetFlaps(this, 0);
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = isC172 ? 0.8 : 1.4;
         this.controls.pitchTrim = this.aero.pitchTrim;
@@ -235,7 +240,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(false);
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
-        this.aero.setFlapPosition(0);
+        setPresetFlaps(this, 0);
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = isC172 ? 0.9 : 1.2;
         this.controls.pitchTrim = this.aero.pitchTrim;
@@ -254,7 +259,7 @@ class PresetSpawnerMethods {
       this.engines.setReverser(false, true);
       this.gear.setGearTarget(false);
       this.gear.gearState = this.gear.isFixed ? 1 : 0;
-      this.aero.setFlapPosition(0);
+      setPresetFlaps(this, 0);
       this.aero.spoilers = 0;
       this.showToast(() => t(`regional.cruise.${type}`));
     } else if (this.activeAirport === 'incheon') {
@@ -275,7 +280,7 @@ class PresetSpawnerMethods {
       this.engines.setReverser(false, true);
       this.gear.setGearTarget(!cruise);
       this.gear.gearState = this.gear.isFixed || !cruise ? 1 : 0;
-      this.aero.setFlapPosition(type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
+      setPresetFlaps(this, type === 'approach' ? 5 : (type === 'challenge' || type === 'runway') ? 2 : 0);
       this.aero.spoilers = 0;
       this.controls.pitchTrim = this.aero.pitchTrim = type === 'challenge' ? 1.4 : 1.6;
       if (type === 'challenge') {
@@ -305,7 +310,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(false);
         this.gear.gearState = 0;
-        this.aero.setFlapPosition(0);
+        setPresetFlaps(this, 0);
         this.aero.spoilers = 0;
         this.controls.pitchTrim = this.aero.pitchTrim = 1.4;
       } else {
@@ -316,7 +321,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(type !== 'cruise');
         this.gear.gearState = this.gear.isFixed || type !== 'cruise' ? 1 : 0;
-        this.aero.setFlapPosition(type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
+        setPresetFlaps(this, type === 'approach' ? 5 : type === 'runway' ? 2 : 0);
         this.aero.spoilers = 0;
         this.controls.pitchTrim = this.aero.pitchTrim = 1.6;
       }
@@ -354,7 +359,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(isC172 ? 1 : 2); // Flaps 5 (or 10 for C172)
+        setPresetFlaps(this, isC172 ? 1 : 2); // Flaps 5 (or 10 for C172)
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = luklaTrim;
         this.controls.pitchTrim = luklaTrim;
@@ -374,7 +379,7 @@ class PresetSpawnerMethods {
         this.engines.setThrottle(0.56);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(5); // Flaps 30 for short runway landing
+        setPresetFlaps(this, 5); // Flaps 30 for short runway landing
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.2;
 
@@ -393,7 +398,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(isC172 ? 1 : isF16 ? 1 : 3); // Flaps 15 for B738, Flaps 1 for F16/C172
+        setPresetFlaps(this, isC172 ? 1 : isF16 ? 1 : 3); // Flaps 15 for B738, Flaps 1 for F16/C172
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = luklaTrim;
         this.controls.pitchTrim = luklaTrim;
@@ -410,7 +415,7 @@ class PresetSpawnerMethods {
         this.engines.setThrottle(0.65);
         this.gear.setGearTarget(false);
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
-        this.aero.setFlapPosition(0);
+        setPresetFlaps(this, 0);
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 0.9;
 
@@ -432,7 +437,7 @@ class PresetSpawnerMethods {
       this.engines.setReverser(false, true);
       this.gear.setGearTarget(false);
       this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
-      this.aero.setFlapPosition(0);
+      setPresetFlaps(this, 0);
       this.aero.spoilers = 0;
       this.aero.pitchTrim = 0.9;
       this.showToast(() => t('patagonia.fitz.roy'));
@@ -448,7 +453,7 @@ class PresetSpawnerMethods {
       this.engines.setReverser(false, false);
       this.gear.setGearTarget(false);
       this.gear.gearState = 0;
-      this.aero.setFlapPosition(0);
+      setPresetFlaps(this, 0);
       this.aero.spoilers = 0.0;
       this.showToast(() => t('valley.slalom.title'));
     } else {
@@ -465,7 +470,7 @@ class PresetSpawnerMethods {
         this.engines.setReverser(false, true);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(2); // Flaps 5 for takeoff
+        setPresetFlaps(this, 2); // Flaps 5 for takeoff
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 1.6; // Takeoff trim
 
@@ -485,7 +490,7 @@ class PresetSpawnerMethods {
         this.engines.setThrottle(0.52);
         this.gear.setGearTarget(true);
         this.gear.gearState = 1.0;
-        this.aero.setFlapPosition(5); // Flaps 30 for landing
+        setPresetFlaps(this, 5); // Flaps 30 for landing
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 2.1;
 
@@ -503,7 +508,7 @@ class PresetSpawnerMethods {
         this.engines.setThrottle(0.65);
         this.gear.setGearTarget(false);
         this.gear.gearState = this.gear.isFixed ? 1.0 : 0.0;
-        this.aero.setFlapPosition(0); // Clean
+        setPresetFlaps(this, 0); // Clean
         this.aero.spoilers = 0.0;
         this.aero.pitchTrim = 0.9;
 
@@ -636,7 +641,7 @@ class PresetSpawnerMethods {
     if (this.telemetry) this.telemetry.onGround = state === 'runway';
     this.gear.setGearTarget(state !== 'cruise');
     this.gear.gearState = state === 'cruise' && !this.gear.isFixed ? 0 : 1;
-    this.aero.setFlapPosition(state === 'approach' ? 5 : state === 'runway' ? 2 : 0);
+    setPresetFlaps(this, state === 'approach' ? 5 : state === 'runway' ? 2 : 0);
     this.aero.spoilers = 0;
     this.controls.throttle = state === 'cruise' ? 0.5 : state === 'runway' ? 0 : this.controls.throttle;
     this.engines.setThrottle(this.controls.throttle);

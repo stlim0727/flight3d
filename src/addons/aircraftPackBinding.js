@@ -19,6 +19,51 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   }
   const aircraft = manifest.aircraft;
   if (!aircraft) throw new Error(`${packId} is not an aircraft addon`);
+  const physics = aircraft.physics ?? {};
+  const derived = !physics.id;
+  if (derived) {
+    for (const [field, value] of Object.entries({
+      massKg: physics.massKg,
+      wingspanM: physics.wingspanM,
+      wingAreaM2: physics.wingAreaM2,
+      lengthM: physics.lengthM,
+    })) {
+      if (!Number.isFinite(value) || value <= 0) throw new Error(`${packId} physics.${field} must be a positive number`);
+    }
+    const fuelCapacityKg = physics.fuelCapacityKg ?? 0;
+    if (!Number.isFinite(fuelCapacityKg) || fuelCapacityKg < 0) {
+      throw new Error(`${packId} physics.fuelCapacityKg must be a non-negative number`);
+    }
+    if (fuelCapacityKg >= physics.massKg) {
+      throw new Error(`${packId} physics.fuelCapacityKg must leave a positive empty mass`);
+    }
+    if (physics.massDistribution) {
+      const distribution = physics.massDistribution;
+      const tanks = distribution.tanks ?? [];
+      if (tanks.length === 0) {
+        throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+      }
+      const tankCapacityKg = tanks.reduce((total, tank) => {
+        if (!Number.isFinite(tank?.capacityKg) || tank.capacityKg <= 0) {
+          throw new Error(`${packId} physics.massDistribution tanks need positive capacity`);
+        }
+        return total + tank.capacityKg;
+      }, 0);
+      if (tankCapacityKg !== fuelCapacityKg) {
+        throw new Error(`${packId} physics.massDistribution tank capacity must match declared fuel capacity`);
+      }
+      const referenceMassKg = distribution.referenceMassKg ?? physics.massKg;
+      if (referenceMassKg - (physics.massKg - fuelCapacityKg) - tankCapacityKg < 0) {
+        throw new Error(`${packId} physics.massDistribution tank capacity exceeds the reference payload`);
+      }
+      if (Number.isFinite(distribution.initialFuelKg) && distribution.initialFuelKg > tankCapacityKg) {
+        throw new Error(`${packId} physics.massDistribution initial fuel exceeds tank capacity`);
+      }
+    }
+    if (physics.massProperties && physics.massProperties.currentMassKg < physics.massKg - fuelCapacityKg) {
+      throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);
+    }
+  }
   for (const resource of [aircraft.model, aircraft.cockpit].filter(Boolean)) {
     if (!/^https?:\/\//.test(resource.url)) throw new Error('aircraft asset URL must be absolute http(s)');
   }
@@ -40,7 +85,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
       configurationLimits: { flap: [0], gearOperating: Infinity, gearExtended: Infinity },
       massProperties: {
         currentMassKg: aircraft.physics.massKg,
-        emptyWeightKg: aircraft.physics.massKg,
+        emptyWeightKg: aircraft.physics.massKg - (physics.fuelCapacityKg ?? 0),
         maxTakeoffWeightKg: aircraft.physics.massKg,
         Ixx: aircraft.physics.massKg * aircraft.physics.lengthM ** 2 / 12,
         Iyy: aircraft.physics.massKg * aircraft.physics.lengthM ** 2 / 12,
@@ -48,9 +93,11 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
       },
       massDistribution: aircraft.physics.massDistribution ?? {
         referenceMassKg: aircraft.physics.massKg,
-        initialFuelKg: 0,
+        initialFuelKg: physics.fuelCapacityKg ?? 0,
         initialPayloadKg: 0,
-        tanks: [],
+        tanks: physics.fuelCapacityKg
+          ? [{ id: 'main', capacityKg: physics.fuelCapacityKg, position: { x: 0, y: 0, z: 0 }, priority: 0 }]
+          : [],
         stations: [{ id: 'payload', capacityKg: aircraft.physics.massKg, position: { x: 0, y: 0, z: 0 } }],
       },
       aerodynamics: {
@@ -71,7 +118,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
         reverseThrustEfficiency: 0,
         baseFuelFlowKgPerHour: 20,
         maxFuelFlowKgPerHour: 50,
-        fuelCapacityKg: 1,
+        fuelCapacityKg: physics.fuelCapacityKg ?? 0,
         momentArmMeters: 0,
       },
       landingGear: aircraft.physics.landingGear ?? {
