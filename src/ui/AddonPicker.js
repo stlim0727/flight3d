@@ -1,5 +1,8 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
-import { clearSavedAddonProfile, loadSavedAddonProfile, saveSelectedAddons } from '../addons/savedAddonProfile.js';
+import {
+  SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile, saveSelectedAddons,
+} from '../addons/savedAddonProfile.js';
+import { serializeProfile } from '../addons/addonContract.js';
 
 const LABELS = {
   title: '애드온',
@@ -191,10 +194,8 @@ export class AddonPicker {
     const pins = saved?.pins?.filter(pin => pin.id !== id || pin.version !== version) ?? [];
     if (pins.length) {
       try {
-        saveSelectedAddons({ addons: pins }, pins.map(pin => pin.id), {
-          coreVersion: saved.coreVersion,
-          storage: this.storage,
-        });
+        const remaining = serializeProfile({ schemaVersion: 1, coreVersion: saved.coreVersion, pins });
+        this.storage.setItem(SAVED_ADDON_PROFILE_KEY, remaining);
       } catch (error) {
         this.status.textContent = `${this.labels.saveError}: ${error.message}`;
         return false;

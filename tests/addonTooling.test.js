@@ -40,9 +40,18 @@ function createFakeElement(tagName) {
     setAttribute(name, value) { this.attributes.set(name, String(value)); if (name === 'href') this._href = String(value); },
     getAttribute(name) { return this.attributes.get(name) ?? null; },
     removeAttribute(name) { this.attributes.delete(name); if (name === 'href') this._href = ''; },
-    appendChild(child) { this.children.push(child); return child; },
-    append(...nodes) { this.children.push(...nodes); },
-    replaceChildren(...nodes) { this.children = [...nodes]; },
+    appendChild(child) {
+      el.children.push(child);
+      if (child.className) (el._childrenBySelector ??= {})[`.${child.className.split(' ').join('.')}`] = [child];
+      return child;
+    },
+    append(...nodes) {
+      for (const child of nodes) {
+        el.children.push(child);
+        if (child.className) (el._childrenBySelector ??= {})[`.${child.className.split(' ').join('.')}`] = [child];
+      }
+    },
+    replaceChildren(...nodes) { el.children = [...nodes]; el._childrenBySelector = {}; },
     addEventListener(type, fn) {
       if (!listeners.has(type)) listeners.set(type, []);
       listeners.get(type).push(fn);
@@ -51,7 +60,7 @@ function createFakeElement(tagName) {
       for (const fn of listeners.get(type) ?? []) fn({ target: el, ...event });
     },
     querySelector(selector) {
-      return el._slots?.[selector] ?? null;
+      return el._slots?.[selector] ?? el._childrenBySelector?.[selector]?.[0] ?? null;
     },
     querySelectorAll(selector) {
       return el._slotLists?.[selector] ?? [];
@@ -552,4 +561,58 @@ test('GitHub repository URL resolves to the catalog raw URL', () => {
     resolveCatalogUrl('https://raw.githubusercontent.com/owner/repo/main/catalog.json'),
     'https://raw.githubusercontent.com/owner/repo/main/catalog.json',
   );
+});
+
+test('GitHub branch and blob URLs preserve slash-separated refs', () => {
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/tree/feat/addons'),
+    'https://raw.githubusercontent.com/owner/repo/feat/addons/catalog.json',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/blob/feat/addons/catalog.json'),
+    'https://raw.githubusercontent.com/owner/repo/feat/addons/catalog.json',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/blob/main/docs/catalog.json'),
+    'https://raw.githubusercontent.com/owner/repo/main/docs/catalog.json',
+  );
+});
+
+test('removing one saved addon keeps the remaining pin and selection', async () => {
+  const catalog = { schemaVersion: 1, addons: [
+    { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+    { id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+  ] };
+  const storage = memoryStorage();
+  saveSelectedAddons(catalog, ['demo/region/sky', 'demo/aircraft/jet'], { coreVersion: '1.8.0', storage });
+  await withFakeDocument(async ({ parent, slots }) => {
+    slots['.addon-saved-list'] = createFakeElement('div');
+    slots['.addon-saved-remove'] = createFakeElement('button');
+    let fetchCount = 0;
+    const picker = new AddonPicker({
+      fetchImpl: async () => {
+        fetchCount += 1;
+        return { ok: true, json: async () => catalog };
+      },
+      validateCatalog,
+      storage,
+    });
+    picker.mount(parent);
+    await picker.load('https://packs.example/catalog.json');
+    assert.deepEqual([...picker.selected], ['demo/region/sky', 'demo/aircraft/jet']);
+    assert.equal(slots['.addon-saved-list'].children.length, 2);
+
+    const firstRemove = slots['.addon-saved-list'].children[0].children[1];
+    firstRemove.dispatch('click');
+    const saved = loadSavedAddonProfile(storage);
+    assert.equal(saved?.coreVersion, '1.8.0');
+    assert.deepEqual(saved?.pins, [{
+      id: 'demo/aircraft/jet', version: '2.0.0',
+      url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64),
+    }]);
+    assert.deepEqual([...picker.selected], ['demo/aircraft/jet']);
+    assert.equal(slots['.addon-saved-list'].children.length, 1);
+    assert.equal(slots['.addon-remove'].hidden, false);
+    assert.equal(fetchCount, 1);
+  });
 });

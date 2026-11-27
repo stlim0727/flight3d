@@ -32,8 +32,9 @@ Binary asset checksums still need to be calculated by the publisher.
 The lobby **Options** tab contains an addon picker. Enter a catalog URL or
 `<owner>/<repo>` for a GitHub-hosted addon, load it, filter by name or type, and
 select compatible addons, then click
-**선택 추가** to save the selected addons in local storage, or
-**저장된 애드온 제거** to remove them. Saved pins are restored when the
+**선택 추가** to save the selected addons in local storage. The manager lists
+saved pins under **적용된 애드온**; use **이 애드온만 제거** for one pin or
+**저장된 애드온 모두 제거** to clear all of them. Saved pins are restored when the
 catalog is loaded again and are applied by `resolveAddonSearch()` whenever the
 game opens without addon URL parameters, so the ordinary default URL loads them.
 An invalid or unreachable saved profile is skipped so the simulator can still

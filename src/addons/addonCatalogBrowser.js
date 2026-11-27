@@ -126,8 +126,14 @@ function resolveGitHostCatalogUrl(value) {
   if (url.hostname !== 'github.com') return value;
   const parts = url.pathname.split('/').filter(Boolean);
   if (parts.length < 2 || !/^[A-Za-z0-9._-]+$/.test(parts[0]) || !/^[A-Za-z0-9._-]+$/.test(parts[1])) return value;
-  const branch = parts[2] === 'tree' || parts[2] === 'blob' ? parts[3] : null;
-  const ref = branch && /^[A-Za-z0-9._/-]+$/.test(branch) ? branch : 'main';
+  let ref = 'main';
+  if (parts[2] === 'tree' || parts[2] === 'blob') {
+    const path = parts.slice(3).join('/');
+    const segments = path.split('/').filter(Boolean);
+    if (parts[2] === 'blob' && segments.at(-1) === 'catalog.json') segments.pop();
+    ref = segments.join('/');
+    if (!ref || !/^[A-Za-z0-9._/-]+$/.test(ref)) return value;
+  }
   return `https://raw.githubusercontent.com/${parts[0]}/${parts[1]}/${ref}/catalog.json`;
 }
 
