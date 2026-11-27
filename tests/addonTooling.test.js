@@ -163,10 +163,20 @@ test('scaffolding produces valid manifests and catalogs for every addon kind and
       const manifestCheck = validateAddonManifest(result.files['addon.json'], { coreVersion });
       assert.equal(manifestCheck.ok, true, `${kind}@${coreVersion} manifest invalid: ${manifestCheck.errors.join('; ')}`);
       const lintCheck = lintAddonSet([result.files['addon.json']], { coreVersion });
-      assert.equal(lintCheck.ok, true, `${kind}@${coreVersion} lint invalid: ${lintCheck.errors.join('; ')}`);
-      const catalog = JSON.parse(result.files['catalog.json']);
-      assert.equal(validateCatalog(catalog).ok, true);
-      assert.equal(catalog.addons.length, 1);
+      assert.equal(lintCheck.ok, true, `${kind}@${coreVersion} lint failed: ${lintCheck.errors.join('; ')}`);
+      const catalogCheck = validateCatalog(result.files['catalog.json']);
+      assert.equal(catalogCheck.ok, true, `${kind}@${coreVersion} catalog invalid: ${catalogCheck.errors.join('; ')}`);
+      assert.match(result.files['README.md'], /scripts\/addon-dev\.mjs catalog/);
+      assert.doesNotMatch(result.files['README.md'], /scripts\/addon-contract\.mjs catalog/);
+      assert.match(result.files['.github/workflows/validate-addon.yml'], /repository: stlim0727\/flight3d/);
+      const usesLines = result.files['.github/workflows/validate-addon.yml']
+        .split('\n')
+        .map(line => line.match(/uses:\s*([^\s#]+)/)?.[1])
+        .filter(Boolean);
+      assert.ok(usesLines.length > 0);
+      for (const ref of usesLines) {
+        assert.match(ref, /^[\w.-]+\/[\w./-]+@[a-f0-9]{40}$/, `unpinned workflow action: ${ref}`);
+      }
     }
   }
 });
@@ -293,9 +303,10 @@ test('installAddonPicker opens and closes the separate detail dialog', async () 
     closeButton.dispatch('click');
     assert.equal(dialog.open, false);
     assert.equal(closed, 1);
+
     picker.open();
-    assert.equal(shown, 2);
-    picker.close();
+    dialog.dispatch('click', { target: dialog });
+    assert.equal(dialog.open, false);
     assert.equal(closed, 2);
   });
 });
@@ -345,22 +356,44 @@ test('share URL round-trips through resolveSharedAddonPack for profile and legac
     baseUrl: 'https://flight.example/?',
     coreVersion: '1.8.0',
   });
-  const aircraftPack = await resolveSharedAddonPack(new URL(aircraftUrl).search, { fetchImpl });
-  assert.equal(aircraftPack.aircraft.id, aircraftManifest.id);
+  const boundAircraft = await resolveSharedAddonPack(new URL(aircraftUrl).search, { fetchImpl });
+  assert.equal(boundAircraft.id, 'demo/aircraft/jet');
+  assert.equal(boundAircraft.profile.pins.length, 1);
 
-  const manifestBytes = Buffer.from(JSON.stringify(regionManifest), 'utf8');
-  const encoded = manifestBytes.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
-  const legacy = await resolveSharedAddonPack(
-    `?addonManifest=${encoded}&addonSha256=${regionSha}`,
-    { fetchImpl: async () => { throw new Error('unexpected fetch'); } },
+  await assert.rejects(
+    resolveSharedAddonPack(new URL(shareUrl).search, {
+      fetchImpl: async () => ({ ok: true, arrayBuffer: async () => Buffer.from('{}') }),
+    }),
+    /checksum mismatch/,
   );
-  assert.equal(legacy.id, regionManifest.id);
+
+  const encodedLegacy = regionBytes.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  const legacyPack = await resolveSharedAddonPack(
+    `?addonManifest=${encodedLegacy}&addonSha256=${regionSha}`,
+    { coreVersion: '1.8.0' },
+  );
+  assert.equal(legacyPack.id, 'demo/region/sky');
+  assert.equal(await resolveSharedAddonPack(''), null);
 });
 
-test('owner/repo catalog shorthand resolves without altering raw picker input', () => {
+
+test('owner/repo catalog shorthand resolves without altering raw picker input', async () => {
   assert.equal(resolveCatalogUrl('owner/repo'), 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
-  assert.equal(resolveCatalogUrl(' https://example.test/catalog.json '), 'https://example.test/catalog.json');
-  assert.equal(resolveCatalogUrl(''), '');
+  await withFakeDocument(async ({ parent, slots }) => {
+    const requested = [];
+    const catalog = { schemaVersion: 1, addons: [] };
+    const picker = new AddonPicker({
+      fetchImpl: async url => { requested.push(url); return { ok: true, json: async () => catalog }; },
+      validateCatalog,
+    });
+    picker.mount(parent);
+    slots['.addon-catalog-url'].value = 'owner/repo';
+    slots['.addon-catalog-load'].dispatch('click');
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(slots['.addon-catalog-url'].value, 'owner/repo');
+    assert.deepEqual(requested, ['https://raw.githubusercontent.com/owner/repo/main/catalog.json']);
+    assert.equal(picker.catalogUrl, 'https://raw.githubusercontent.com/owner/repo/main/catalog.json');
+  });
 });
 
 test('saved addon profile applies selected pins to a plain URL and loads again', async () => {
@@ -504,29 +537,58 @@ test('incompatible saved pins are not restored into the picker', async () => {
 
 test('saved catalog URL restores selected addons in the picker after reload', async () => {
   globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
   const catalog = { schemaVersion: 1, addons: [
     { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
   ] };
+  const otherCatalog = { schemaVersion: 1, addons: [
+    { id: 'demo/aircraft/jet', version: '1.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+  ] };
   const catalogUrl = 'https://packs.example/catalog.json';
+  const otherCatalogUrl = 'https://other.example/catalog.json';
+  const fetchImpl = async url => {
+    if (url === catalogUrl) return { ok: true, json: async () => catalog };
+    if (url === otherCatalogUrl) return { ok: true, json: async () => otherCatalog };
+    return { ok: false, status: 404 };
+  };
   const storage = memoryStorage();
-  saveSelectedAddons(catalog, ['demo/region/sky'], { storage });
-  saveAddonCatalogUrl(catalogUrl, { storage });
+
+  await withFakeDocument(async ({ parent }) => {
+    const initial = installAddonPicker(parent, { storage, fetchImpl });
+    await initial.load(catalogUrl);
+    assert.equal(loadSavedAddonCatalogUrl(storage), null);
+    initial.selected.add('demo/region/sky');
+    assert.equal(initial.apply(), true);
+    assert.equal(loadSavedAddonCatalogUrl(storage), catalogUrl);
+
+    // Previewing another catalog without applying must not overwrite the saved catalog URL.
+    await initial.load(otherCatalogUrl);
+    assert.equal(loadSavedAddonCatalogUrl(storage), catalogUrl);
+  });
 
   await withFakeDocument(async ({ parent, slots }) => {
-    const reloaded = installAddonPicker(parent, {
-      storage,
-      validateCatalog,
-      fetchImpl: async url => url === catalogUrl
-        ? { ok: true, json: async () => catalog }
-        : { ok: false, status: 404 },
-    });
+    const reloaded = installAddonPicker(parent, { storage, fetchImpl });
     assert.equal(slots['.addon-catalog-url'].value, catalogUrl);
     await new Promise(resolve => setTimeout(resolve, 0));
     assert.deepEqual([...reloaded.selected], ['demo/region/sky']);
     assert.equal(slots['.addon-apply'].hidden, false);
     assert.equal(slots['.addon-share'].hidden, false);
+    assert.equal(slots['.addon-remove'].hidden, false);
 
     slots['.addon-catalog-clear'].dispatch('click');
+    assert.equal(storage.getItem(SAVED_ADDON_PROFILE_KEY), null);
     assert.equal(storage.getItem(SAVED_ADDON_CATALOG_KEY), null);
   });
+
+  storage.setItem(SAVED_ADDON_CATALOG_KEY, 'javascript:alert(1)');
+  assert.equal(loadSavedAddonCatalogUrl(storage), null);
+
+  const blocked = {
+    getItem() { throw new Error('storage blocked'); },
+    setItem() { throw new Error('storage blocked'); },
+    removeItem() { throw new Error('storage blocked'); },
+  };
+  assert.equal(loadSavedAddonCatalogUrl(blocked), null);
+  assert.doesNotThrow(() => saveAddonCatalogUrl(catalogUrl, { storage: blocked }));
+  assert.doesNotThrow(() => saveAddonCatalogUrl('', { storage: blocked }));
 });
