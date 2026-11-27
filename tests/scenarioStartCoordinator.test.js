@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { ScenarioStartCoordinator } from '../src/core/ScenarioStartCoordinator.js';
-import { createSimulatorScenarioStart } from '../src/core/simulatorScenarioStart.js';
+import { createSimulatorScenarioStart, alignCruiseSpawnToTerrain } from '../src/core/simulatorScenarioStart.js';
+import { createPilotMissionSimulation } from './helpers/pilotMissionFlight.js';
 import { loadSavedFlightSelection, saveFlightSelection } from '../src/config/flightSelection.js';
 import { saveSimulatorPreferences, loadSimulatorPreferences } from '../src/config/simulatorPreferences.js';
 import { cruisePlaces } from '../src/config/mapFlightPlaces.js';
@@ -193,4 +194,98 @@ test('map flight plan is captured before install and applies the resolved spawn'
     assert.ok(Number.isFinite(applied.spawn.x) && Number.isFinite(applied.spawn.yaw));
     assert.deepEqual(gyroRestores, [{ userGesture: true }]);
   });
+});
+
+test('high-elevation map cruise aligns above streamed DEM and survives physics start (Pangong Tso)', async () => {
+  await withStorage(async () => {
+    let demLoaded = false;
+    const terrain = {
+      getHeight(x, z) {
+        if (!demLoaded) return 0;
+        // 4240 m lake at origin, rising to a 4500 m ridge 500 m east along heading 090
+        return x >= 400 ? 4500 : 4240;
+      },
+      openWorld: {
+        readyAt() { return demLoaded; },
+      },
+    };
+    const sim = createPilotMissionSimulation({ aircraftId: 'C172', airportId: 'incheon', terrain });
+    sim.devRunner = { stop() {} };
+    sim.shadowDemo = { stop() {} };
+    sim.replayDirector = { stop() {} };
+    sim.demoDirector = { userTimeOfDayOverridden: true, stop() {} };
+    sim.gameFlow = new GameFlowController();
+    sim.sky = { timeOfDay: 12 };
+    sim.lobby = {
+      airport: 'incheon',
+      aircraft: 'C172',
+      preset: 'cruise',
+      pilotMode: 'human',
+      demoProfile: 'standard',
+      mapPlan: {
+        state: 'cruise',
+        pointId: 'geonames:1281682',
+        point: {
+          id: 'geonames:1281682',
+          label: 'Pangong Tso',
+          latitude: 33.716,
+          longitude: 79.34574,
+          altitudeM: 700,
+          headingDeg: 90,
+        },
+      },
+    };
+    sim.mapPlaces = { airports: [], points: [] };
+    let snapCount = 0;
+    sim.cameraSystem = { snapToTarget() { snapCount++; } };
+    sim.ensureGeographicLayers = async () => ({
+      updateOpenWorldTerrain() {
+        demLoaded = true;
+      },
+    });
+
+    await createSimulatorScenarioStart(sim).start();
+
+    assert.equal(demLoaded, true);
+    assert.equal(sim.position.y, 4500 + 750, 'cruise altitude should clear streamed terrain and nearby ridge');
+    assert.ok(snapCount >= 2, 'camera should re-snap after post-DEM altitude alignment');
+
+    // Run 2 seconds of physics at 120 Hz: must not crash on start
+    for (let i = 0; i < 240; i++) {
+      sim.integratePhysics(1 / 120);
+    }
+    assert.equal(sim.isCrashed, false, `unexpected crash: ${sim.crashResult?.type}`);
+    assert.ok(sim.position.y > 4500, 'aircraft should remain well above terrain');
+  });
+});
+
+test('alignCruiseSpawnToTerrain preserves intentionally low authored showcases like Paris Eiffel', () => {
+  const sim = {
+    position: { x: 0, y: 120, z: 0 },
+    linearVelocity: { x: -48, y: 0, z: 5 },
+    currentTerrain: {
+      getHeight: () => 30,
+      openWorld: { readyAt: () => true },
+    },
+  };
+  const changed = alignCruiseSpawnToTerrain(sim, { isMapPlan: true });
+  assert.equal(changed, false);
+  assert.equal(sim.position.y, 120);
+});
+
+test('alignCruiseSpawnToTerrain raises regional cruise after asynchronous DEM load', () => {
+  let trimmed = false;
+  const sim = {
+    position: { x: 0, y: 750, z: 1600 },
+    linearVelocity: { x: -30, y: 0, z: 40 },
+    currentTerrain: {
+      getHeight: () => 2400,
+      openWorld: { readyAt: () => true },
+    },
+    applyComputedTrim() { trimmed = true; },
+  };
+  const changed = alignCruiseSpawnToTerrain(sim, { isMapPlan: false });
+  assert.equal(changed, true);
+  assert.equal(sim.position.y, 2400 + 750);
+  assert.equal(trimmed, true);
 });

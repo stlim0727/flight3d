@@ -100,8 +100,15 @@ export function createSimulatorScenarioStart(sim) {
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
           alignMapSpawnToContact(sim, request.mapPlan.spawn);
         }
-        if (!regionalCruise(request.scenario) && !(request.mapPlan?.scenario === 'cruise' && request.mapPlan?.origin)) return result;
-        return waitForRegionalTerrain(sim);
+        const needsRegionalTerrain = Boolean(
+          regionalCruise(request.scenario)
+          || request.mapPlan?.scenario === 'cruise'
+          || (request.scenario === 'cruise' && (request.airport === 'patagonia' || request.airport === 'lukla')),
+        );
+        if (!needsRegionalTerrain) return result;
+        await waitForRegionalTerrain(sim);
+        alignCruiseSpawnToTerrain(sim, { isMapPlan: Boolean(request.mapPlan) });
+        return result;
       },
       async demo(request) {
         sim.setCustomWorldOrigin?.(null);
@@ -223,15 +230,79 @@ function alignMapSpawnToContact(sim, spawn) {
   sim.position.y = ground + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
 }
 
+const DEFAULT_CRUISE_CLEARANCE_M = 750;
+const CRUISE_LOOKAHEAD_DISTANCES_M = [500, 1000];
+
+function sampleCruiseGroundM(sim) {
+  const getHeight = sim.currentTerrain?.getHeight;
+  if (typeof getHeight !== 'function' || !sim.position) return null;
+  const { x, z } = sim.position;
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+  let maxGround = getHeight.call(sim.currentTerrain, x, z);
+  if (!Number.isFinite(maxGround)) return null;
+  const vx = sim.linearVelocity?.x ?? 0;
+  const vz = sim.linearVelocity?.z ?? 0;
+  const speed = Math.hypot(vx, vz);
+  if (speed > 1) {
+    const dx = vx / speed;
+    const dz = vz / speed;
+    const openWorld = sim.currentTerrain?.openWorld;
+    for (const distM of CRUISE_LOOKAHEAD_DISTANCES_M) {
+      const sx = x + dx * distM;
+      const sz = z + dz * distM;
+      if (openWorld?.readyAt && !openWorld.readyAt(sx, sz)) continue;
+      const h = getHeight.call(sim.currentTerrain, sx, sz);
+      if (Number.isFinite(h) && h > maxGround) maxGround = h;
+    }
+  }
+  return maxGround;
+}
+
+/**
+ * Re-align a cruise spawn once open-world DEM tiles have loaded so high-elevation
+ * destinations (e.g. GeoNames places with elevationM: 0 or mountain map clicks)
+ * never start underground, while preserving intentionally low authored showcases.
+ */
+export function alignCruiseSpawnToTerrain(sim, { isMapPlan = false } = {}) {
+  const maxGround = sampleCruiseGroundM(sim);
+  if (!Number.isFinite(maxGround)) return false;
+  const currentY = sim.position.y;
+  if (!Number.isFinite(currentY)) return false;
+  let targetY = currentY;
+  if (isMapPlan) {
+    const minAglM = Math.min(200, Math.max(60, currentY * 0.5));
+    if (currentY < maxGround + minAglM) {
+      targetY = maxGround + DEFAULT_CRUISE_CLEARANCE_M;
+    }
+  } else {
+    const desiredY = maxGround + DEFAULT_CRUISE_CLEARANCE_M;
+    if (currentY < desiredY) targetY = desiredY;
+  }
+  if (Math.abs(targetY - currentY) < 1e-3) return false;
+  sim.position.y = targetY;
+  sim.applyComputedTrim?.();
+  sim.engines?.settleSpool?.();
+  sim.refreshTakeoffPerformance?.();
+  sim.aircraft?.group?.position?.copy?.(sim.position);
+  sim.aircraft?.group?.quaternion?.copy?.(sim.quaternion);
+  sim.aircraft?.group?.updateMatrixWorld?.(true);
+  sim.renderPose?.reset?.(sim.position, sim.quaternion);
+  sim.cameraSystem?.snapToTarget?.(sim.aircraft?.group);
+  return true;
+}
+
 async function waitForRegionalTerrain(sim) {
+  if (!sim.currentTerrain || !sim.position) return;
   const layers = sim.ensureGeographicLayers
     ? await sim.ensureGeographicLayers()
     : await import('../environment/OpenWorldTerrain.js');
-  const updateTerrain = layers.updateOpenWorldTerrain;
+  const updateTerrain = layers?.updateOpenWorldTerrain;
+  if (typeof updateTerrain !== 'function') return;
   const deadline = performance.now() + 6000;
   do {
     updateTerrain(sim);
-    if (sim.currentTerrain.openWorld?.readyAt(sim.position.x, sim.position.z)) return;
+    const openWorld = sim.currentTerrain?.openWorld;
+    if (!openWorld || openWorld.readyAt?.(sim.position.x, sim.position.z)) return;
     await new Promise(resolve => setTimeout(resolve, 50));
   } while (performance.now() < deadline);
 }
