@@ -15,6 +15,7 @@ export function installAddonPicker(parent, options = {}) {
     storage: options.storage,
     profileShareParams,
     validateCatalog,
+    onApplied: options.onApplied,
   });
   picker.mount(parent);
   const startupError = globalThis.window?.addonStartupError;

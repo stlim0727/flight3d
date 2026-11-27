@@ -41,7 +41,7 @@ const LABELS = {
 };
 
 export class AddonPicker {
-  constructor({ catalogUrl = '', defaultCatalogUrl = '', coreVersion, profileShareParams, fetchImpl, validateCatalog, storage, prLoader, labels = LABELS } = {}) {
+  constructor({ catalogUrl = '', defaultCatalogUrl = '', coreVersion, profileShareParams, fetchImpl, validateCatalog, storage, prLoader, onApplied = () => {}, labels = LABELS } = {}) {
     this.catalogUrl = catalogUrl;
     this.defaultCatalogUrl = defaultCatalogUrl;
     this.coreVersion = coreVersion;
@@ -53,6 +53,7 @@ export class AddonPicker {
       fetchImpl: this.fetchImpl,
       coreVersion: this.coreVersion,
     }));
+    this.onApplied = onApplied;
     this.labels = labels;
     this.catalog = null;
     this.activePr = null;
@@ -358,6 +359,7 @@ export class AddonPicker {
       if (this.catalogUrl) saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       this.status.textContent = this.labels.applyReady;
       this.render();
+      this.onApplied?.();
       return true;
     } catch (error) {
       this.status.textContent = `${this.labels.saveError}: ${error.message}`;
@@ -370,6 +372,7 @@ export class AddonPicker {
     this.status.textContent = this.labels.removeReady;
     this.syncRemoveButton();
     if (this.catalog) this.render();
+    this.onApplied?.();
     return true;
   }
 
