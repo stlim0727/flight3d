@@ -229,6 +229,14 @@ export function gatherFeedbackDiagnostics(sim) {
     gearContacts: (sim.gear?.contacts ?? []).map(contact => ({ id: contact.id,
       state: contact.damageState, damage: finite(contact.damage),
       sinkRateMps: finite(contact.sinkRateMs), compressionM: finite(contact.compression) })),
+    lastRuntimeError: sim.lastRuntimeError ?? null,
+    loadedAddons: {
+      packId: sim.pinnedAddonPack?.id ?? null,
+      prNumber: sim.pinnedAddonPack?.prNumber ?? null,
+      headSha: sim.pinnedAddonPack?.headSha ?? null,
+      pins: (sim.pinnedAddonPack?.profile?.pins ?? []).map(pin => ({ id: pin.id, version: pin.version })),
+      aircraftIds: sim.addonAircraftDescriptors ? [...sim.addonAircraftDescriptors.keys()] : [],
+    },
   };
   return JSON.parse(JSON.stringify(diagnostics));
 }

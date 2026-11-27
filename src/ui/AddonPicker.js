@@ -1,4 +1,5 @@
 import { listAddons, loadAddonCatalog, buildAddonProfileUrl, resolveCatalogUrl } from '../addons/addonCatalogBrowser.js';
+import { loadBaseAddonPrCatalog } from '../addons/baseAddonRegistry.js';
 import {
   clearSavedAddonProfile, loadSavedAddonProfile, mergeSelectedAddons,
   removeSavedAddonPin, saveAddonCatalogUrl,
@@ -6,10 +7,14 @@ import {
 
 const LABELS = {
   title: '애드온',
-  hint: '카탈로그 URL을 넣고 비행에 사용할 애드온을 고르세요. 저장하면 기본 주소에서도 적용됩니다.',
+  hint: '기본 카탈로그, 커스텀 URL 또는 기본 레포 PR 번호(#123)로 애드온을 불러오세요. 저장하면 기본 주소에서도 적용됩니다.',
   catalogUrl: '카탈로그 URL',
   load: '불러오기',
   clearUrl: '주소 지우기',
+  baseLoad: '기본 카탈로그',
+  prNumber: 'PR 번호 (기본 레포)',
+  prLoad: 'PR 불러오기',
+  prStatusVerified: 'CI 검증 완료',
   urlCleared: '카탈로그 주소를 지웠습니다.',
   search: '검색',
   all: '전체',
@@ -36,15 +41,21 @@ const LABELS = {
 };
 
 export class AddonPicker {
-  constructor({ catalogUrl = '', coreVersion, profileShareParams, fetchImpl, validateCatalog, storage, labels = LABELS } = {}) {
+  constructor({ catalogUrl = '', defaultCatalogUrl = '', coreVersion, profileShareParams, fetchImpl, validateCatalog, storage, prLoader, labels = LABELS } = {}) {
     this.catalogUrl = catalogUrl;
+    this.defaultCatalogUrl = defaultCatalogUrl;
     this.coreVersion = coreVersion;
     this.profileShareParams = profileShareParams;
     this.fetchImpl = fetchImpl;
     this.validateCatalog = validateCatalog;
     this.storage = storage;
+    this.prLoader = prLoader ?? (prInput => loadBaseAddonPrCatalog(prInput, {
+      fetchImpl: this.fetchImpl,
+      coreVersion: this.coreVersion,
+    }));
     this.labels = labels;
     this.catalog = null;
+    this.activePr = null;
     this.search = '';
     this.kind = 'all';
     this.selected = new Set();
@@ -63,6 +74,11 @@ export class AddonPicker {
         <label><span>${this.labels.catalogUrl}</span><input type="url" class="addon-catalog-url" placeholder="https://.../catalog.json"></label>
         <button type="button" class="btn addon-catalog-load">${this.labels.load}</button>
         <button type="button" class="btn addon-catalog-clear">${this.labels.clearUrl}</button>
+      </div>
+      <div class="addon-picker-pr">
+        <label><span>${this.labels.prNumber}</span><input type="text" class="addon-pr-number" placeholder="#42"></label>
+        <button type="button" class="btn addon-pr-load">${this.labels.prLoad}</button>
+        ${this.defaultCatalogUrl ? `<button type="button" class="btn addon-base-load">${this.labels.baseLoad}</button>` : ''}
       </div>
       <div class="addon-picker-filters" hidden>
         <input type="search" class="addon-search" placeholder="${this.labels.search}" aria-label="${this.labels.search}">
@@ -87,6 +103,9 @@ export class AddonPicker {
     parent.appendChild(this.root);
     this.urlInput = this.root.querySelector('.addon-catalog-url');
     this.urlInput.value = this.catalogUrl;
+    this.prInput = this.root.querySelector('.addon-pr-number');
+    this.prLoadBtn = this.root.querySelector('.addon-pr-load');
+    this.baseLoadBtn = this.root.querySelector('.addon-base-load');
     this.filters = this.root.querySelector('.addon-picker-filters');
     this.list = this.root.querySelector('.addon-list');
     this.savedList = this.root.querySelector('.addon-saved-list');
@@ -101,6 +120,8 @@ export class AddonPicker {
 
     this.root.querySelector('.addon-catalog-load').addEventListener('click', () => this.load(resolveCatalogUrl(this.urlInput.value)));
     this.root.querySelector('.addon-catalog-clear').addEventListener('click', () => this.clearUrl());
+    this.prLoadBtn?.addEventListener('click', () => this.loadPr(this.prInput?.value ?? ''));
+    this.baseLoadBtn?.addEventListener('click', () => this.loadBase());
     this.root.querySelector('.addon-search').addEventListener('input', event => {
       this.search = event.target.value;
       this.render();
@@ -132,8 +153,10 @@ export class AddonPicker {
   clearUrl() {
     this.loadSeq += 1;
     this.urlInput.value = '';
+    if (this.prInput) this.prInput.value = '';
     this.catalogUrl = '';
     this.catalog = null;
+    this.activePr = null;
     this.selected.clear();
     this.search = '';
     this.kind = 'all';
@@ -206,8 +229,36 @@ export class AddonPicker {
     return true;
   }
 
+  applyCatalog(catalog, { catalogUrl = '', activePr = null, status = '' } = {}) {
+    this.catalog = catalog;
+    this.catalogUrl = catalogUrl;
+    this.activePr = activePr;
+    const saved = loadSavedAddonProfile(this.storage);
+    if (saved) {
+      for (const pin of saved.pins) {
+        if (catalog.addons.some(entry => entry.id === pin.id && entry.version === pin.version
+          && entry.compatible !== false)) this.selected.add(pin.id);
+      }
+    }
+    this.filters.hidden = false;
+    this.status.textContent = status;
+    this.render();
+  }
+
+  failCatalogLoad(error) {
+    this.catalog = null;
+    this.activePr = null;
+    this.filters.hidden = true;
+    this.list.replaceChildren();
+    this.applyBtn.hidden = true;
+    this.syncRemoveButton();
+    this.shareBtn.hidden = true;
+    this.status.textContent = `${this.labels.error}: ${error.message}`;
+  }
+
   async load(url) {
     const seq = ++this.loadSeq;
+    this.activePr = null;
     this.selected.clear();
     if (this.applyBtn) this.applyBtn.hidden = true;
     this.hideShareLink();
@@ -217,27 +268,43 @@ export class AddonPicker {
         validate: this.validateCatalog,
       });
       if (seq !== this.loadSeq) return;
-      this.catalog = catalog;
-      this.catalogUrl = resolveCatalogUrl(url);
-      const saved = loadSavedAddonProfile(this.storage);
-      if (saved) {
-        for (const pin of saved.pins) {
-          if (catalog.addons.some(entry => entry.id === pin.id && entry.version === pin.version
-            && entry.compatible !== false)) this.selected.add(pin.id);
-        }
-      }
-      this.filters.hidden = false;
-      this.status.textContent = '';
-      this.render();
+      this.applyCatalog(catalog, { catalogUrl: resolveCatalogUrl(url) });
     } catch (error) {
       if (seq !== this.loadSeq) return;
-      this.catalog = null;
-      this.filters.hidden = true;
-      this.list.replaceChildren();
-      this.applyBtn.hidden = true;
-      this.syncRemoveButton();
-      this.shareBtn.hidden = true;
-      this.status.textContent = `${this.labels.error}: ${error.message}`;
+      this.failCatalogLoad(error);
+    }
+  }
+
+  async loadBase() {
+    if (!this.defaultCatalogUrl) return null;
+    if (this.urlInput) this.urlInput.value = this.defaultCatalogUrl;
+    if (this.prInput) this.prInput.value = '';
+    return this.load(this.defaultCatalogUrl);
+  }
+
+  async loadPr(prInput) {
+    const seq = ++this.loadSeq;
+    this.activePr = null;
+    this.selected.clear();
+    if (this.applyBtn) this.applyBtn.hidden = true;
+    this.hideShareLink();
+    try {
+      const preview = await this.prLoader(prInput);
+      if (seq !== this.loadSeq) return null;
+      this.applyCatalog(preview.catalog, {
+        catalogUrl: '',
+        activePr: {
+          prNumber: preview.prNumber,
+          headSha: preview.headSha,
+          checkName: preview.checkName,
+        },
+        status: `PR #${preview.prNumber} (${this.labels.prStatusVerified} · ${preview.headSha.slice(0, 7)})`,
+      });
+      return preview;
+    } catch (error) {
+      if (seq !== this.loadSeq) return null;
+      this.failCatalogLoad(error);
+      return null;
     }
   }
 
@@ -288,7 +355,7 @@ export class AddonPicker {
         coreVersion: this.coreVersion ?? null,
         storage: this.storage,
       });
-      saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
+      if (this.catalogUrl) saveAddonCatalogUrl(this.catalogUrl, { storage: this.storage });
       this.status.textContent = this.labels.applyReady;
       this.render();
       return true;
