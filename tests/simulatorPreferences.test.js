@@ -122,12 +122,15 @@ test('first visit starts at device time without overriding scripted demo time; s
   assert.equal(fresh.sky.timeOfDay, 21.5);
   assert.equal(fresh.foliage.hour, 21.5);
   assert.equal(fresh.water.hour, 21.5);
+  assert.equal(fresh.deviceTimeOfDay, true);
   fresh.demoDirector.setTimeOfDay(9);
   assert.equal(fresh.sky.timeOfDay, 9, 'Device time is a default, not a user override of demo lighting');
+  assert.equal(fresh.deviceTimeOfDay, false);
 
   const returning = makeSim();
   restoreSimulatorPreferences(returning, { timeOfDay: 12.5 }, { now });
   assert.equal(returning.sky.timeOfDay, 12.5);
+  assert.equal(returning.deviceTimeOfDay, false);
   returning.demoDirector.setTimeOfDay(9);
   assert.equal(returning.sky.timeOfDay, 12.5);
 

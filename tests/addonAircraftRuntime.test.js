@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { validateAddonManifest } from '../src/addons/addonContract.js';
 import { aircraftPackFromProfile } from '../src/addons/aircraftPackBinding.js';
-import { buildAddonProfileUrl, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
+import { buildAddonProfileUrl, pinnedAddonAircraftList, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
 import { registerAddonAircraft, resolveAircraftConfig, addonAircraftIds } from '../src/config/aircraftConfigs.js';
 import { AddonAircraft } from '../src/aircraft/AddonAircraft.js';
 import { buildAddonStarter } from '../src/addons/addonStarter.js';
@@ -657,10 +657,6 @@ test('shared profile pinning two aircraft packs registers and resolves both airc
   assert.equal(resolved.aircrafts.length, 2);
   assert.deepEqual(resolved.aircrafts.map(item => item.id), ['multi-one', 'multi-two']);
 
-  const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
-  const helperMatch = mainSource.match(/function pinnedAddonAircraftList\(pack\) \{[\s\S]*?\n\}/);
-  assert.ok(helperMatch, 'pinnedAddonAircraftList helper should exist in src/main.js');
-  const pinnedAddonAircraftList = new Function(`return (${helperMatch[0]});`)();
   const list = pinnedAddonAircraftList(resolved);
   assert.equal(list.length, 2);
   assert.deepEqual(pinnedAddonAircraftList({ aircraft: resolved.aircrafts[1] }), [resolved.aircrafts[1]]);
