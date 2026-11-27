@@ -89,8 +89,8 @@ function validateBuildingOverrides(overrides, errors, label) {
       errors.push(`${where} needs exactly one of id, overtureId or nameContains`);
     }
     if (override.bounds !== undefined && !validBounds(override.bounds)) errors.push(`${where} bounds are invalid`);
-    if (!override.model || typeof override.model.url !== 'string' || !HEX_COLOR.test(override.material?.baseColor ?? '')) {
-      errors.push(`${where} needs a model url and a baseColor`);
+    if (!HEX_COLOR.test(override.material?.baseColor ?? '')) {
+      errors.push(`${where} needs a baseColor`);
     }
     if (override.model) validResource(override.model, errors, `${where}.model`);
     if (override.collision !== undefined && !['replace', 'suppress'].includes(override.collision)) {
@@ -113,6 +113,35 @@ function validateRegionPalette(palette, errors) {
     && (!Number.isFinite(palette.sea.roughness) || palette.sea.roughness < 0 || palette.sea.roughness > 1)) {
     errors.push('region.palette.sea.roughness must be between 0 and 1');
   }
+  if (palette?.sea?.daylightScale !== undefined
+    && (!Number.isFinite(palette.sea.daylightScale) || palette.sea.daylightScale < 0 || palette.sea.daylightScale > 3)) {
+    errors.push('region.palette.sea.daylightScale must be between 0 and 3');
+  }
+}
+
+function validateRegionBookmarks(bookmarks, errors) {
+  if (bookmarks === undefined) return;
+  if (!Array.isArray(bookmarks)) {
+    errors.push('region.bookmarks must be an array');
+    return;
+  }
+  bookmarks.forEach((bookmark, index) => {
+    const where = `region.bookmarks[${index}]`;
+    if (!IDENTIFIER.test(bookmark?.id ?? '') || typeof bookmark?.label !== 'string' || !bookmark.label.trim()) {
+      errors.push(`${where} needs an id and label`);
+    }
+    if (!Number.isFinite(bookmark?.latitude) || bookmark.latitude < -90 || bookmark.latitude > 90
+      || !Number.isFinite(bookmark?.longitude) || bookmark.longitude < -180 || bookmark.longitude > 180) {
+      errors.push(`${where} needs WGS84 latitude and longitude`);
+    }
+    if (bookmark?.headingDeg !== undefined
+      && (!Number.isFinite(bookmark.headingDeg) || bookmark.headingDeg < 0 || bookmark.headingDeg >= 360)) {
+      errors.push(`${where}.headingDeg must be in [0, 360)`);
+    }
+    if (bookmark?.altitudeM !== undefined && (!Number.isFinite(bookmark.altitudeM) || bookmark.altitudeM < 0)) {
+      errors.push(`${where}.altitudeM must be non-negative`);
+    }
+  });
 }
 
 function hasFiniteVector3(value) {
@@ -638,6 +667,7 @@ export function validateAddonManifest(manifest, { coreVersion } = {}) {
   if (type === 'region') {
     validateBuildingOverrides(manifest.region?.buildingOverrides, errors, 'region.buildingOverrides');
     validateRegionPalette(manifest.region?.palette, errors);
+    validateRegionBookmarks(manifest.region?.bookmarks, errors);
   }
   if (type === 'aircraft') {
     validateAircraftBinding(manifest.aircraft, errors, manifest);

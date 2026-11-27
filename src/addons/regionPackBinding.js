@@ -41,6 +41,13 @@ export function regionPackFromProfile(profile, packId, { coreVersion, baseUrl } 
     verticalDatum: manifest.region.verticalDatum,
     tileFormat: manifest.region.tiles.format,
     tileChecksum: manifest.region.tiles.checksum,
+    palette: manifest.region.palette ? Object.freeze({
+      sea: manifest.region.palette.sea ? Object.freeze({ ...manifest.region.palette.sea }) : undefined,
+      sky: manifest.region.palette.sky ? Object.freeze({ ...manifest.region.palette.sky }) : undefined,
+    }) : null,
+    buildingOverrides: Object.freeze((manifest.region.buildingOverrides ?? []).map(override =>
+      Object.freeze({ ...override, model: override.model ? Object.freeze({ ...override.model }) : undefined }))),
+    bookmarks: Object.freeze((manifest.region.bookmarks ?? []).map(bookmark => Object.freeze({ ...bookmark }))),
     cacheOptions: {
       urlTemplate,
       maxConcurrent: 4,
