@@ -1,6 +1,6 @@
 import { AIRCRAFT_REGISTRY, DEFAULT_AIRCRAFT_ID, resolveAircraftConfig } from './aircraftConfigs.js';
 import { EXTERNAL_DESTINATION_CODES } from './externalDestinations.js';
-import { DEFAULT_SCENARIO, defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from './scenarioRegistry.js';
+import { defaultScenarioForRegion, isScenarioAvailable, requiredAircraft } from './scenarioRegistry.js';
 
 export const AIRPORT_STORAGE_KEY = 'flight3d.airport';
 export const AIRCRAFT_STORAGE_KEY = 'flight3d.aircraft';
@@ -44,13 +44,14 @@ export function resolveAircraft(aircraft) {
 }
 
 export function resolveScenario(scenario, airport = DEFAULT_AIRPORT, aircraft = DEFAULT_AIRCRAFT) {
-  if (airport === 'valley') return defaultScenarioForRegion(airport);
-  if (!scenario || typeof scenario !== 'string') return DEFAULT_SCENARIO;
-  if (!isScenarioAvailable(airport, scenario)) return DEFAULT_SCENARIO;
-  if (scenario === 'valley' && aircraft !== 'F16') return DEFAULT_SCENARIO;
+  const fallback = defaultScenarioForRegion(airport);
+  if (airport === 'valley') return fallback;
+  if (!scenario || typeof scenario !== 'string') return fallback;
+  if (!isScenarioAvailable(airport, scenario)) return fallback;
+  if (scenario === 'valley' && aircraft !== 'F16') return fallback;
   if (scenario === 'demo') {
-    if (aircraft === 'F16' && !['lukla', 'incheon', 'jeju'].includes(airport)) return DEFAULT_SCENARIO;
-    if (['incheon', 'jeju'].includes(airport) && !['B738', 'C172', 'F16'].includes(aircraft)) return DEFAULT_SCENARIO;
+    if (aircraft === 'F16' && !['lukla', 'incheon', 'jeju'].includes(airport)) return fallback;
+    if (['incheon', 'jeju'].includes(airport) && !['B738', 'C172', 'F16'].includes(aircraft)) return fallback;
   }
   return scenario;
 }

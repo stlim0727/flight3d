@@ -4,6 +4,7 @@ import { applyFarSunShadow } from './FarSunShadow.js';
 const DEG = Math.PI / 180;
 const clamp = THREE.MathUtils.clamp;
 const smoothFade = (distance, width) => {
+  if (!(width > 0)) return distance <= 0 ? 1 : 0;
   const t = clamp(distance / width, 0, 1);
   return 1 - t * t * (3 - 2 * t);
 };
@@ -94,12 +95,13 @@ export class RasterRegionSurface {
       threshold24ElevationM: runway.threshold24ElevationM ?? 2867,
       midElevationM: runway.midElevationM ?? 2836,
     };
+    const hasRunway = this.runway.lengthM > 0 && this.runway.widthM > 0;
     this.grading = {
       runwayFadeM: grading.runwayFadeM ?? 50,
       widthFadeM: grading.widthFadeM ?? 30,
-      apronS: grading.apronS ?? [-15, 135],
-      apronW: grading.apronW ?? [15, 85],
-      apronFadeM: grading.apronFadeM ?? 20,
+      apronS: grading.apronS === null ? null : (grading.apronS ?? (hasRunway ? [-15, 135] : null)),
+      apronW: grading.apronW === null ? null : (grading.apronW ?? (hasRunway ? [15, 85] : null)),
+      apronFadeM: grading.apronFadeM ?? (hasRunway ? 20 : 0),
       apronMinElevationM: grading.apronMinElevationM ?? 2844,
     };
     this.terrace = {
@@ -128,6 +130,10 @@ export class RasterRegionSurface {
       this.isLoaded = false;
     }
     this.onLoaded = null;
+    this._resolveDemReady = null;
+    this.demReady = this.isLoaded
+      ? Promise.resolve()
+      : new Promise(resolve => { this._resolveDemReady = resolve; });
     this.imageryLoaded = false;
     this.openWorld = null;
 
@@ -175,7 +181,13 @@ export class RasterRegionSurface {
       } catch (error) {
         if (!this.isLoaded) this.loadError = error.message ?? String(error);
         console.warn(`Could not load ${this.demUrl}, using fallback:`, error);
+      } finally {
+        this._resolveDemReady?.();
+        this._resolveDemReady = null;
       }
+    } else {
+      this._resolveDemReady?.();
+      this._resolveDemReady = null;
     }
     if (typeof window !== 'undefined' && this.imageryUrl && this.material) {
       try {
@@ -243,13 +255,18 @@ export class RasterRegionSurface {
     const halfLength = this.runway.lengthM / 2;
     const halfWidth = this.runway.widthM / 2;
     const g = this.grading;
+    const hasRunway = this.runway.lengthM > 0 && this.runway.widthM > 0;
     const rwyH = this.runway.midElevationM + s * this.runway.gradient;
-    const runwayWeight = smoothFade(Math.max(0, Math.abs(s) - halfLength), g.runwayFadeM)
-      * smoothFade(Math.max(0, Math.abs(w) - halfWidth), g.widthFadeM);
-    const apronDistanceS = Math.max(g.apronS[0] - s, 0, s - g.apronS[1]);
-    const apronDistanceW = Math.max(g.apronW[0] - w, 0, w - g.apronW[1]);
-    const apronWeight = smoothFade(apronDistanceS, g.apronFadeM)
-      * smoothFade(apronDistanceW, g.apronFadeM);
+    const runwayWeight = hasRunway
+      ? smoothFade(Math.max(0, Math.abs(s) - halfLength), g.runwayFadeM)
+        * smoothFade(Math.max(0, Math.abs(w) - halfWidth), g.widthFadeM)
+      : 0;
+    const hasApron = Array.isArray(g.apronS) && Array.isArray(g.apronW)
+      && g.apronS.length === 2 && g.apronW.length === 2;
+    const apronWeight = hasApron
+      ? smoothFade(Math.max(g.apronS[0] - s, 0, s - g.apronS[1]), g.apronFadeM)
+        * smoothFade(Math.max(g.apronW[0] - w, 0, w - g.apronW[1]), g.apronFadeM)
+      : 0;
     const apronH = Math.max(rwyH, g.apronMinElevationM);
     return THREE.MathUtils.lerp(
       THREE.MathUtils.lerp(natural, apronH, apronWeight),
@@ -295,6 +312,8 @@ export class RasterRegionSurface {
 
   updateGeometryElevations() {
     const t = this.terrace;
+    const hasTerrace = t.lengthM > 0 && t.widthM > 0;
+    const hasRunway = this.runway.lengthM > 0 && this.runway.widthM > 0;
     const pos = this.geometry.attributes.position;
     const uvs = this.geometry.attributes.uv;
     const coarseMargin = (this.size / this.segments) * (this.sin + this.cos);
@@ -304,8 +323,8 @@ export class RasterRegionSurface {
       let h = this.getHeight(x, z);
       const s = x * this.sin - z * this.cos;
       const w = x * this.cos + z * this.sin;
-      if (Math.abs(s) <= t.lengthM / 2 && Math.abs(w) <= t.widthM / 2) h -= t.coarseDepressionM;
-      if (Math.abs(s) <= this.runway.lengthM / 2 + coarseMargin
+      if (hasTerrace && Math.abs(s) <= t.lengthM / 2 && Math.abs(w) <= t.widthM / 2) h -= t.coarseDepressionM;
+      if (hasRunway && Math.abs(s) <= this.runway.lengthM / 2 + coarseMargin
         && Math.abs(w) <= this.runway.widthM / 2 + coarseMargin) {
         h = Math.min(h, this.runway.midElevationM + s * this.runway.gradient - t.coarseDepressionM);
       }
@@ -324,7 +343,7 @@ export class RasterRegionSurface {
       let h = this.getHeight(x, z);
       const s = x * this.sin - z * this.cos;
       const w = x * this.cos + z * this.sin;
-      if (Math.abs(s) <= this.runway.lengthM / 2 + 10
+      if (hasRunway && Math.abs(s) <= this.runway.lengthM / 2 + 10
         && Math.abs(w) <= this.runway.widthM / 2 + 10) {
         h = Math.min(h, this.runway.midElevationM + s * this.runway.gradient - t.depressionM);
       }

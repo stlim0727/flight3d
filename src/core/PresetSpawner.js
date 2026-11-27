@@ -440,6 +440,7 @@ class PresetSpawnerMethods {
       setPresetFlaps(this, 0);
       this.aero.spoilers = 0;
       this.aero.pitchTrim = 0.9;
+      this.controls.pitchTrim = this.aero.pitchTrim;
       this.showToast(() => t('patagonia.fitz.roy'));
     } else if (this.activeAirport === 'valley' || type === 'valley') {
       const ground = this.currentTerrain?.getHeight?.(0, 0) ?? 2100;
@@ -1025,17 +1026,17 @@ class PresetSpawnerMethods {
     if (this.patagoniaTerrain) return this.patagoniaTerrain;
     this._patagoniaLoad ??= import('../environment/RasterRegionSurface.js')
       .then(({ RasterRegionSurface }) => {
+        const patagonia = REGION_SURFACES.patagonia;
         const config = {
+          ...patagonia,
           size: patagoniaGrid.worldSize,
           gridSize: patagoniaGrid.gridSize,
-          segments: 255,
-          demUrl: 'terrain/patagonia/patagonia_dem.bin',
-          imageryUrl: 'terrain/patagonia/patagonia_satellite.jpg',
-          runway: { headingDeg: 215, lengthM: 0, widthM: 0, gradient: 0,
-            threshold06ElevationM: 2492, threshold24ElevationM: 2492, midElevationM: 2492 },
-          grading: { runwayFadeM: 0, widthFadeM: 0 },
-          terrace: { lengthM: 0, widthM: 0, segmentsX: 2, segmentsZ: 2,
-            depressionM: 0, coarseDepressionM: 0 },
+          grading: {
+            ...patagonia.grading,
+            apronS: null,
+            apronW: null,
+            apronFadeM: 0,
+          },
         };
         this.patagoniaTerrain = new RasterRegionSurface(config, {
           castShadow: mesh => castFarSunShadow(mesh),

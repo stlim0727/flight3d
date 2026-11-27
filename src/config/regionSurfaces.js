@@ -82,7 +82,7 @@ export const REGION_SURFACES = Object.freeze({
     imageryUrl: 'terrain/patagonia/patagonia_satellite.jpg',
     runway: Object.freeze({ headingDeg: 215, lengthM: 0, widthM: 0, gradient: 0,
       threshold06ElevationM: 2492, threshold24ElevationM: 2492, midElevationM: 2492 }),
-    grading: Object.freeze({ runwayFadeM: 0, widthFadeM: 0 }),
+    grading: Object.freeze({ runwayFadeM: 0, widthFadeM: 0, apronS: null, apronW: null, apronFadeM: 0 }),
     terrace: Object.freeze({ lengthM: 0, widthM: 0, segmentsX: 2, segmentsZ: 2,
       depressionM: 0, coarseDepressionM: 0 }),
   }),

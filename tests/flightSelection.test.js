@@ -23,7 +23,7 @@ import {
   loadSavedDestination,
   saveSavedDestination,
 } from '../src/config/flightSelection.js';
-import { DEFAULT_SCENARIO } from '../src/config/scenarioRegistry.js';
+import { DEFAULT_SCENARIO, defaultScenarioForRegion } from '../src/config/scenarioRegistry.js';
 
 function createMockStorage(initial = {}) {
   const store = new Map(Object.entries(initial));
@@ -278,4 +278,20 @@ test('destination selection persists and rejects unknown airports', () => {
   assert.equal(loadSavedDestination(storage), 'none');
   assert.equal(resolveDestination('neon'), 'neon');
   assert.equal(resolveDestination('RKSS'), 'RKSS');
+});
+
+test('patagonia defaults to cruise and resolves unavailable runway scenarios to cruise', () => {
+  assert.equal(defaultScenarioForRegion('patagonia'), 'cruise');
+  assert.equal(resolveScenario(undefined, 'patagonia'), 'cruise');
+  assert.equal(resolveScenario('runway', 'patagonia'), 'cruise');
+
+  const storage = createMockStorage({
+    'flight3d.airport': 'patagonia',
+    'flight3d.scenario': 'runway',
+  });
+  assert.deepEqual(loadSavedFlightSelection(storage), {
+    airport: 'patagonia',
+    aircraft: 'B738',
+    scenario: 'cruise',
+  });
 });
