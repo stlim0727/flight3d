@@ -28,6 +28,21 @@ test('every region cruise shares the terrain-relative altitude rule', () => {
   }
 });
 
+test('patagonia setPreset(runway) falls back to airborne cruise with synced pitchTrim', () => {
+  for (const aircraftId of ['B738', 'C172', 'F16']) {
+    const sim = createPilotMissionSimulation({
+      aircraftId,
+      airportId: 'patagonia',
+      terrain: { getHeight: () => 1800 },
+    });
+    sim.setPreset('runway');
+    assert.equal(sim.lastPresetType, 'cruise', aircraftId);
+    assert.equal(sim.lastOnGround, false, aircraftId);
+    assert.equal(sim.controls.pitchTrim, sim.aero.pitchTrim, aircraftId);
+    assert.equal(sim.position.y - sim.currentTerrain.getHeight(sim.position.x, sim.position.z), 750, aircraftId);
+  }
+});
+
 test('fresh ordinary presets clear cached damage even after the global crash flag was cleared', () => {
   for (const aircraftId of ['B738', 'C172', 'F16']) {
     const sim = createPilotMissionSimulation({ aircraftId });

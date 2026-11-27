@@ -571,10 +571,7 @@ class FlightSimulator {
     inputLatency?.mark('startup-airport-start');
     await this.setAirport(savedSelection.airport);
     if (savedSelection.airport === 'patagonia' && !this.patagoniaTerrain?.isLoaded) {
-      await new Promise(resolve => {
-        this.patagoniaTerrain.onLoaded = resolve;
-        if (this.patagoniaTerrain.loadError) resolve();
-      });
+      await this.patagoniaTerrain?.demReady;
     }
     inputLatency?.mark('startup-airport-end');
 

@@ -69,7 +69,11 @@ export const SPAWN_SCENARIOS = {
 };
 
 export const DEFAULT_SCENARIO = 'runway';
-export const defaultScenarioForRegion = region => region === 'valley' ? 'valley' : DEFAULT_SCENARIO;
+export function defaultScenarioForRegion(region) {
+  if (region === 'valley') return 'valley';
+  if (isScenarioAvailable(region, DEFAULT_SCENARIO)) return DEFAULT_SCENARIO;
+  return scenariosForAirport(region)[0] ?? DEFAULT_SCENARIO;
+}
 
 // The aircraft a scenario always flies, or undefined when any may fly it.
 export function requiredAircraft(scenarioType) {
