@@ -25,12 +25,15 @@ export const AircraftSpecs = AIRCRAFT_SPECS;
 
 const addonConfigs = new Map();
 const addonSpecs = new Map();
+const addonBaseAircraftIds = new Map();
 
 export function registerAddonAircraft(descriptors = []) {
   for (const descriptor of descriptors) {
     if (!descriptor?.id || !descriptor.config) continue;
     addonConfigs.set(descriptor.id, descriptor.config);
     addonSpecs.set(descriptor.id, descriptor.spec);
+    if (descriptor.baseAircraftId) addonBaseAircraftIds.set(descriptor.id, descriptor.baseAircraftId);
+    else addonBaseAircraftIds.delete(descriptor.id);
   }
   return addonConfigs.size;
 }
@@ -43,6 +46,10 @@ export function resolveAircraftSpec(aircraftId) {
   return AIRCRAFT_SPECS[aircraftId] ?? addonSpecs.get(aircraftId) ?? null;
 }
 
+export function resolveAddonBaseAircraftId(aircraftId) {
+  return addonBaseAircraftIds.get(aircraftId) ?? null;
+}
+
 export function addonAircraftIds() {
   return [...addonConfigs.keys()];
 }
@@ -50,6 +57,8 @@ export function addonAircraftIds() {
 /** Map any aircraft (including registered addons) to its closest built-in spawn speed profile. */
 export function spawnProfileAircraftId(aircraftId) {
   if (aircraftId === 'B738' || aircraftId === 'C172' || aircraftId === 'F16') return aircraftId;
+  const baseId = addonBaseAircraftIds.get(aircraftId);
+  if (baseId === 'B738' || baseId === 'C172' || baseId === 'F16') return baseId;
   const config = resolveAircraftConfig(aircraftId);
   if (!config) return 'B738';
   const specType = config.specs?.type;

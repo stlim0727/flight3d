@@ -1,5 +1,40 @@
-import { validateAddonManifest } from './addonContract.js';
+import { BUILTIN_AIRCRAFT_IDS, validateAddonManifest } from './addonContract.js';
+import { AIRCRAFT_REGISTRY, AIRCRAFT_SPECS } from '../config/aircraftConfigs.js';
 import { defaultBodySupportPoints, normalizeBodySupportPoints } from '../physics/groundContacts.js';
+
+const FORBIDDEN_MERGE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const MAX_EXTENDS_DEPTH = 16;
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function cloneValue(value) {
+  if (Array.isArray(value)) return value.map(cloneValue);
+  if (isPlainObject(value)) {
+    const copy = {};
+    for (const [key, item] of Object.entries(value)) {
+      if (FORBIDDEN_MERGE_KEYS.has(key)) continue;
+      copy[key] = cloneValue(item);
+    }
+    return copy;
+  }
+  return value;
+}
+
+function deepMerge(base, override) {
+  const result = isPlainObject(base) ? cloneValue(base) : {};
+  if (!isPlainObject(override)) return result;
+  for (const [key, value] of Object.entries(override)) {
+    if (FORBIDDEN_MERGE_KEYS.has(key) || value === undefined) continue;
+    if (isPlainObject(value) && isPlainObject(result[key])) {
+      result[key] = deepMerge(result[key], value);
+    } else {
+      result[key] = cloneValue(value);
+    }
+  }
+  return result;
+}
 
 const DEFAULT_ANIMATION = {
   azimuth: { node: 'azimuth_node', axis: 'x', input: 'rpm', continuous: true, rpmRange: [25, 100] },
@@ -219,7 +254,82 @@ function buildDerivedPhysicsConfig(aircraft, manifest, derivedFuelCapacityKg) {
   };
 }
 
-export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
+function buildExtendedPhysicsConfig(baseConfig, baseSpec, aircraft, manifest, packId) {
+  const physics = aircraft.physics ?? {};
+  const merged = deepMerge(baseConfig, physics);
+  if (physics.massKg !== undefined && physics.massProperties?.currentMassKg === undefined) {
+    merged.massProperties = { ...(merged.massProperties ?? {}), currentMassKg: physics.massKg };
+    if (physics.massProperties?.maxTakeoffWeightKg === undefined
+      && Number.isFinite(merged.massProperties.maxTakeoffWeightKg)
+      && merged.massProperties.maxTakeoffWeightKg < physics.massKg) {
+      merged.massProperties.maxTakeoffWeightKg = physics.massKg;
+    }
+  }
+  if (physics.wingspanM !== undefined && physics.aerodynamics?.wingspanM === undefined) {
+    merged.aerodynamics = { ...(merged.aerodynamics ?? {}), wingspanM: physics.wingspanM };
+  }
+  if (physics.wingAreaM2 !== undefined && physics.aerodynamics?.wingAreaM2 === undefined) {
+    merged.aerodynamics = { ...(merged.aerodynamics ?? {}), wingAreaM2: physics.wingAreaM2 };
+  }
+  if (physics.fuelCapacityKg !== undefined && physics.propulsion?.fuelCapacityKg === undefined) {
+    merged.propulsion = { ...(merged.propulsion ?? {}), fuelCapacityKg: physics.fuelCapacityKg };
+  }
+  if (merged.massProperties
+    && Number.isFinite(merged.massProperties.currentMassKg)
+    && Number.isFinite(merged.massProperties.emptyWeightKg)
+    && merged.massProperties.currentMassKg < merged.massProperties.emptyWeightKg) {
+    throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);
+  }
+  if (merged.propulsion
+    && Number.isFinite(merged.propulsion.fuelCapacityKg)
+    && merged.propulsion.fuelCapacityKg < 0) {
+    throw new Error(`${packId} physics.fuelCapacityKg must be a non-negative number`);
+  }
+  if (physics.massDistribution?.tanks !== undefined) {
+    sumValidatedTankCapacity(physics.massDistribution.tanks, packId);
+  }
+  if (merged.landingGear && physics.landingGear?.bodySupportPoints !== undefined) {
+    const lengthM = merged.lengthM ?? 8;
+    const wingspanM = merged.aerodynamics?.wingspanM ?? merged.wingspanM ?? 11;
+    const cgGroundHeightM = merged.landingGear.cgGroundHeightM ?? 1.3;
+    merged.landingGear = {
+      ...merged.landingGear,
+      bodySupportPoints: normalizeBodySupportPoints(
+        merged.landingGear.bodySupportPoints,
+        defaultBodySupportPoints({ wingspanM, lengthM, cgGroundHeightM }),
+      ),
+    };
+  }
+  const id = physics.id ?? aircraft.id.toUpperCase();
+  const name = physics.name ?? manifest.attribution;
+  const mergedSpecs = deepMerge(
+    baseSpec ?? baseConfig.specs ?? buildDefaultSpecs(id, name),
+    physics.specs ?? {},
+  );
+  mergedSpecs.id = physics.specs?.id ?? id;
+  mergedSpecs.name = physics.specs?.name ?? name;
+  merged.id = id;
+  merged.name = name;
+  merged.specs = mergedSpecs;
+  return merged;
+}
+
+function mergeControls(baseControls, aircraft) {
+  const controls = cloneValue(baseControls ?? DEFAULT_ANIMATION);
+  for (const [control, node] of Object.entries(aircraft.controlBindings ?? {})) {
+    controls[control] = { ...(controls[control] ?? {}), node };
+  }
+  if (aircraft.animation?.controls) {
+    for (const [control, binding] of Object.entries(aircraft.animation.controls)) {
+      controls[control] = { ...(controls[control] ?? {}), ...binding };
+    }
+  }
+  return controls;
+}
+
+function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set() } = {}) {
+  if (visiting.has(packId)) throw new Error(`cyclic aircraft inheritance at ${packId}`);
+  if (visiting.size > MAX_EXTENDS_DEPTH) throw new Error(`aircraft inheritance chain too deep at ${packId}`);
   const pin = profile?.pins?.find(entry => entry.id === packId);
   if (!pin) throw new Error(`profile does not pin ${packId}`);
   const manifest = pin.manifest;
@@ -230,6 +340,65 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   }
   const aircraft = manifest.aircraft;
   if (!aircraft) throw new Error(`${packId} is not an aircraft addon`);
+
+  if (aircraft.extends !== undefined) {
+    visiting.add(packId);
+    try {
+      let baseConfig;
+      let baseSpec;
+      let baseModel = null;
+      let baseCockpit = null;
+      let baseControls = DEFAULT_ANIMATION;
+      let baseAircraftId = null;
+
+      if (BUILTIN_AIRCRAFT_IDS.has(aircraft.extends)) {
+        baseConfig = AIRCRAFT_REGISTRY[aircraft.extends];
+        baseSpec = AIRCRAFT_SPECS[aircraft.extends];
+        baseAircraftId = aircraft.extends;
+      } else {
+        const declaredDep = manifest.dependencies.find(dep => dep.id === aircraft.extends);
+        if (!declaredDep) {
+          throw new Error(`${packId} aircraft.extends ${aircraft.extends} must be declared in dependencies`);
+        }
+        const parentPin = profile?.pins?.find(entry => entry.id === aircraft.extends);
+        if (!parentPin || parentPin.version !== declaredDep.version) {
+          throw new Error(`profile does not pin ${aircraft.extends}@${declaredDep.version}`);
+        }
+        const parent = resolveAircraftPack(profile, aircraft.extends, { coreVersion, visiting });
+        baseConfig = parent.config;
+        baseSpec = parent.spec;
+        baseModel = parent.model;
+        baseCockpit = parent.cockpit;
+        baseControls = parent.controls;
+        baseAircraftId = parent.baseAircraftId;
+      }
+
+      const model = aircraft.model ?? baseModel ?? null;
+      const cockpit = aircraft.cockpit ?? baseCockpit ?? null;
+      for (const resource of [model, cockpit].filter(Boolean)) {
+        if (!/^https?:\/\//.test(resource.url)) throw new Error('aircraft asset URL must be absolute http(s)');
+      }
+      const controls = mergeControls(baseControls, aircraft);
+      const config = buildExtendedPhysicsConfig(baseConfig, baseSpec, aircraft, manifest, packId);
+      return Object.freeze({
+        id: aircraft.id,
+        packId,
+        version: pin.version,
+        sha256: pin.sha256,
+        extends: aircraft.extends,
+        baseAircraftId,
+        config: Object.freeze(config),
+        spec: Object.freeze(config.specs),
+        model: model ? Object.freeze({ ...model }) : null,
+        cockpit: cockpit ? Object.freeze({ ...cockpit }) : null,
+        controls: Object.freeze(controls),
+        title: config.name ?? packId,
+      });
+    } finally {
+      visiting.delete(packId);
+    }
+  }
+
   const physics = aircraft.physics ?? {};
   const derived = !physics.id;
   let derivedFuelCapacityKg = 0;
@@ -282,15 +451,7 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
   for (const resource of [aircraft.model, aircraft.cockpit].filter(Boolean)) {
     if (!/^https?:\/\//.test(resource.url)) throw new Error('aircraft asset URL must be absolute http(s)');
   }
-  const controls = { ...DEFAULT_ANIMATION };
-  for (const [control, node] of Object.entries(aircraft.controlBindings ?? {})) {
-    controls[control] = { ...(controls[control] ?? {}), node };
-  }
-  if (aircraft.animation?.controls) {
-    for (const [control, binding] of Object.entries(aircraft.animation.controls)) {
-      controls[control] = { ...(controls[control] ?? {}), ...binding };
-    }
-  }
+  const controls = mergeControls(DEFAULT_ANIMATION, aircraft);
   const config = aircraft.physics?.id
     ? normalizeFullPhysicsConfig(aircraft, manifest)
     : buildDerivedPhysicsConfig(aircraft, manifest, derivedFuelCapacityKg);
@@ -299,6 +460,8 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     packId,
     version: pin.version,
     sha256: pin.sha256,
+    extends: null,
+    baseAircraftId: null,
     config: Object.freeze(config),
     spec: Object.freeze(config.specs ?? { id: aircraft.id, name: config.name }),
     model: Object.freeze(aircraft.model),
@@ -306,4 +469,8 @@ export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
     controls: Object.freeze(controls),
     title: config.name ?? packId,
   });
+}
+
+export function aircraftPackFromProfile(profile, packId, { coreVersion } = {}) {
+  return resolveAircraftPack(profile, packId, { coreVersion });
 }

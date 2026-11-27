@@ -1182,11 +1182,13 @@ class FlightSimulator {
    */
   buildAircraftInstance(aircraftId) {
     const addon = pinnedAddonAircraftList(this.pinnedAddonPack).find(item => item.id === aircraftId) ?? null;
-    const instance = addon
+    const useAddonVisuals = Boolean(addon && (addon.model || addon.cockpit || !addon.baseAircraftId));
+    const visualId = addon && !useAddonVisuals ? addon.baseAircraftId : aircraftId;
+    const instance = useAddonVisuals
       ? new AddonAircraft(addon, { pfdCanvas: this.pfdCanvas, ndCanvas: this.ndCanvas })
-      : aircraftId === 'F16'
+      : visualId === 'F16'
       ? new F16()
-      : aircraftId === 'C172'
+      : visualId === 'C172'
         ? new Cessna172(this.pfdCanvas, this.ndCanvas)
         : new Boeing737(
           this.pfdCanvas,

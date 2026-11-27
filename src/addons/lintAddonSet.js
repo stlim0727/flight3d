@@ -97,6 +97,13 @@ export function lintAddonSet(manifests, { coreVersion, allowedAssetHosts } = {})
       }
     }
 
+    if (manifest.aircraft?.extends && ADDON_ID.test(manifest.aircraft.extends)) {
+      const parent = byId.get(manifest.aircraft.extends);
+      if (parent && !parent.aircraft) {
+        errors.push(`${manifest.id}: aircraft.extends ${manifest.aircraft.extends} is not an aircraft addon`);
+      }
+    }
+
     const overrides = manifest.region?.buildingOverrides ?? [];
     const paletteRegions = manifests.filter(item => item.region?.palette);
     for (const override of overrides) {

@@ -2,8 +2,11 @@ export const ADDON_SCHEMA_VERSION = 1;
 export const CATALOG_SCHEMA_VERSION = 1;
 export const PROFILE_SCHEMA_VERSION = 1;
 
+export const BUILTIN_AIRCRAFT_IDS = new Set(['B738', 'F16', 'C172']);
+
 const ADDON_TYPES = new Set(['region', 'aircraft', 'scenario']);
 const ADDON_ID = /^([a-z0-9][a-z0-9._-]*)\/(region|aircraft|scenario)\/([a-z0-9][a-z0-9._-]*)$/;
+const AIRCRAFT_ADDON_ID = /^[a-z0-9][a-z0-9._-]*\/aircraft\/[a-z0-9][a-z0-9._-]*$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 const IDENTIFIER = /^[a-z0-9][a-z0-9._-]*$/;
 const SHA256 = /^[0-9a-f]{64}$/;
@@ -112,32 +115,65 @@ function validateRegionPalette(palette, errors) {
   }
 }
 
-function validateAircraftBinding(aircraft, errors) {
+function validateAircraftBinding(aircraft, errors, manifest) {
   if (!aircraft || typeof aircraft !== 'object') {
     errors.push('aircraft declaration is required');
     return;
   }
+  const hasExtends = aircraft.extends !== undefined;
+  if (hasExtends) {
+    if (typeof aircraft.extends !== 'string'
+      || (!BUILTIN_AIRCRAFT_IDS.has(aircraft.extends) && !AIRCRAFT_ADDON_ID.test(aircraft.extends))) {
+      errors.push('aircraft.extends must be a built-in aircraft ID (B738, F16, C172) or an aircraft addon ID');
+    } else if (AIRCRAFT_ADDON_ID.test(aircraft.extends)) {
+      if (aircraft.extends === manifest?.id) {
+        errors.push('aircraft.extends cannot reference itself');
+      } else if (Array.isArray(manifest?.dependencies)
+        && !manifest.dependencies.some(dep => dep?.id === aircraft.extends)) {
+        errors.push(`aircraft.extends ${aircraft.extends} must be declared in dependencies`);
+      }
+    }
+  }
   if (!IDENTIFIER.test(aircraft.id ?? '') || aircraft.id.length > 24) {
     errors.push('aircraft.id must be a short lowercase identifier');
   }
-  if (!aircraft.physics || !['rigid-body-v1', 'flight-model-v1'].includes(aircraft.physics.profile)) {
-    errors.push('aircraft.physics.profile must be a supported physics profile');
-  }
-  for (const field of ['massKg', 'wingAreaM2', 'wingspanM', 'lengthM']) {
-    if (!Number.isFinite(aircraft.physics?.[field]) || aircraft.physics[field] <= 0) {
-      errors.push(`aircraft.physics.${field} must be positive`);
+  if (!hasExtends) {
+    if (!aircraft.physics || !['rigid-body-v1', 'flight-model-v1'].includes(aircraft.physics.profile)) {
+      errors.push('aircraft.physics.profile must be a supported physics profile');
+    }
+    for (const field of ['massKg', 'wingAreaM2', 'wingspanM', 'lengthM']) {
+      if (!Number.isFinite(aircraft.physics?.[field]) || aircraft.physics[field] <= 0) {
+        errors.push(`aircraft.physics.${field} must be positive`);
+      }
+    }
+  } else if (aircraft.physics !== undefined) {
+    if (!aircraft.physics || typeof aircraft.physics !== 'object' || Array.isArray(aircraft.physics)) {
+      errors.push('aircraft.physics must be an object');
+    } else {
+      if (aircraft.physics.profile !== undefined
+        && !['rigid-body-v1', 'flight-model-v1'].includes(aircraft.physics.profile)) {
+        errors.push('aircraft.physics.profile must be a supported physics profile');
+      }
+      for (const field of ['massKg', 'wingAreaM2', 'wingspanM', 'lengthM']) {
+        if (aircraft.physics[field] !== undefined
+          && (!Number.isFinite(aircraft.physics[field]) || aircraft.physics[field] <= 0)) {
+          errors.push(`aircraft.physics.${field} must be positive`);
+        }
+      }
     }
   }
-  if (aircraft.model) validResource(aircraft.model, errors, 'aircraft.model');
-  else errors.push('aircraft.model is required');
-  if (aircraft.cockpit) validResource(aircraft.cockpit, errors, 'aircraft.cockpit');
+  if (aircraft.model !== undefined) validResource(aircraft.model, errors, 'aircraft.model');
+  else if (!hasExtends) errors.push('aircraft.model is required');
+  if (aircraft.cockpit !== undefined) validResource(aircraft.cockpit, errors, 'aircraft.cockpit');
   const bindings = aircraft.controlBindings;
-  if (!bindings || typeof bindings !== 'object' || Array.isArray(bindings)) {
-    errors.push('aircraft.controlBindings must map controls to node names');
-  } else {
-    for (const [control, node] of Object.entries(bindings)) {
-      if (!['azimuth', 'elevator', 'rudder', 'flaps', 'gear'].includes(control) || typeof node !== 'string' || !node) {
-        errors.push(`invalid control binding for ${control}`);
+  if (!hasExtends || bindings !== undefined) {
+    if (!bindings || typeof bindings !== 'object' || Array.isArray(bindings)) {
+      errors.push('aircraft.controlBindings must map controls to node names');
+    } else {
+      for (const [control, node] of Object.entries(bindings)) {
+        if (!['azimuth', 'elevator', 'rudder', 'flaps', 'gear'].includes(control) || typeof node !== 'string' || !node) {
+          errors.push(`invalid control binding for ${control}`);
+        }
       }
     }
   }
@@ -338,8 +374,12 @@ export function validateAddonManifest(manifest, { coreVersion } = {}) {
     validateRegionPalette(manifest.region?.palette, errors);
   }
   if (type === 'aircraft') {
-    validateAircraftBinding(manifest.aircraft, errors);
-    validAssetSet(manifest.assets, errors, 'assets');
+    validateAircraftBinding(manifest.aircraft, errors, manifest);
+    if (manifest.aircraft?.extends !== undefined) {
+      if (manifest.assets !== undefined) validAssetSet(manifest.assets, errors, 'assets');
+    } else {
+      validAssetSet(manifest.assets, errors, 'assets');
+    }
   }
   if (type === 'scenario') {
     validateScenarioDeclaration(manifest.scenario, errors);
