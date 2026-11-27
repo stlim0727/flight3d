@@ -464,12 +464,10 @@ export class Airport {
       // Only evaluate when aircraft is approaching from the west (dx > 40m)
       if (dx > 40) {
         const gsDeg = THREE.MathUtils.radToDeg(Math.atan2(dy, dx));
-        // Real-world PAPI calibration for standard 3.0° Glideslope:
-        // Unit 0 (outermost, left): 3.5°
-        // Unit 1: 3.2°
-        // Unit 2: 2.8°
-        // Unit 3 (innermost, right): 2.5°
-        const thresholds = [3.5, 3.2, 2.8, 2.5];
+        // Real-world PAPI calibration for standard 3.0° Glideslope.
+        // Unit 0 is nearest the runway (shallowest angle) and unit 3 is
+        // farthest away (steepest angle), matching the common airport path.
+        const thresholds = [2.5, 2.8, 3.2, 3.5];
         this.papiLights.forEach((papi, idx) => {
           const isWhite = gsDeg >= thresholds[idx];
           const colorHex = isWhite ? 0xffffff : 0xff1a1a;
