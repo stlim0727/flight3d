@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "studio/aircraft/korean-airliners-skin",
+  "publisher": "studio",
+  "version": "1.0.0",
+  "coreRange": { "min": "1.8.0", "maxExclusive": "2.0.0" },
+  "dependencies": [],
+  "license": "CC-BY-4.0",
+  "attribution": "Korean Airliners Skin by studio",
+  "aircraft": {
+    "id": "korean-airliners-b738",
+    "extends": "B738",
+    "physics": {
+      "name": "Korean Airliners Skin"
+    },
+    "livery": {
+      "airline": "Korean Airliners",
+      "scheme": {
+        "topColor": "#4a91b3",
+        "bellyColor": "#d1d9de",
+        "stripeColor": "#8c060e",
+        "tailColor": "#4a91b3",
+        "splitY": -0.32,
+        "stripeHalfHeight": 0.035
+      },
+      "title": {
+        "text": "KOREAN AIRLINERS",
+        "color": "#063b70"
+      },
+      "tailEmblem": {
+        "kind": "taegeuk",
+        "primaryColor": "#d51d44",
+        "secondaryColor": "#084884",
+        "accentColor": "#ffffff"
+      }
+    }
+  }
+}

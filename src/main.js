@@ -15,6 +15,7 @@ import { AircraftBreakup } from './effects/AircraftBreakup.js';
 import { t, bindText, initLocalization } from './i18n/index.js';
 import * as THREE from 'three';
 import { cockpitCasterState } from './aircraft/CockpitLighting.js';
+import { applyAircraftLivery } from './aircraft/applyAircraftLivery.js';
 import { CockpitShadowDemo } from './director/CockpitShadowDemo.js';
 import { ReplayDirector } from './director/ReplayDirector.js';
 import { CockpitOcclusion } from './aircraft/CockpitOcclusion.js';
@@ -1221,11 +1222,13 @@ class FlightSimulator {
     const addon = this.addonAircraftDescriptors?.get(aircraftId)
       ?? pinnedAddonAircraftList(this.pinnedAddonPack).find(item => item.id === aircraftId)
       ?? null;
-    const instance = addon
+    const useAddonVisuals = Boolean(addon && (addon.model || addon.cockpit || !addon.baseAircraftId));
+    const visualId = addon && !useAddonVisuals ? addon.baseAircraftId : aircraftId;
+    const instance = useAddonVisuals
       ? new AddonAircraft(addon, { pfdCanvas: this.pfdCanvas, ndCanvas: this.ndCanvas })
-      : aircraftId === 'F16'
+      : visualId === 'F16'
       ? new F16()
-      : aircraftId === 'C172'
+      : visualId === 'C172'
         ? new Cessna172(this.pfdCanvas, this.ndCanvas)
         : new Boeing737(
           this.pfdCanvas,
@@ -1233,8 +1236,15 @@ class FlightSimulator {
           this.eicasCanvas,
           this.mcpCanvas,
           this.isfdCanvas,
-          this.cduCanvas
+          this.cduCanvas,
+          addon?.livery ? { customLivery: addon.livery } : {}
         );
+    if (!useAddonVisuals && addon?.livery && visualId !== 'B738' && instance.ready) {
+      instance.ready.then(() => {
+        const model = instance.gltfModel ?? instance.gltfGroup;
+        if (model) applyAircraftLivery(model, instance.group, instance.gltfGroup ?? instance.group, addon.livery);
+      });
+    }
     const preset = RENDER_QUALITY[this.renderQuality];
     if (preset?.flatShading) {
       instance.setFlatShading?.(true);

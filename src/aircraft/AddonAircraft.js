@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { applyAircraftLivery } from './applyAircraftLivery.js';
 
 const DEG_TO_RAD = Math.PI / 180;
 
@@ -96,6 +97,9 @@ export class AddonAircraft {
         node.receiveShadow = true;
       });
       this.gltfGroup.add(gltf.scene);
+      if (this.descriptor.livery) {
+        applyAircraftLivery(gltf.scene, this.group, this.gltfGroup, this.descriptor.livery);
+      }
       this.modelLoaded = true;
       this.gltfGroup.visible = !this.cockpitMode || !this.descriptor.cockpit;
       this.proceduralGroup.visible = false;

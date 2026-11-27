@@ -6,6 +6,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { bindGltfControlSurfaces, updateGltfControlSurfaces } from './GltfControlSurfaces.js';
 import { applyKoreanAirLivery } from './KoreanAirLivery.js';
 import { applyJejuAirLivery } from './JejuAirLivery.js';
+import { applyAircraftLivery } from './applyAircraftLivery.js';
 import { applyFlatShading } from '../config/renderQuality.js';
 import { CockpitHudCanvas, createB737HudCombiner } from './CockpitHudCanvas.js';
 import { clampGearExtension, calculateGearFold, isGearCollapsed } from './common/GearKinematicsRig.js';
@@ -23,6 +24,7 @@ export class Boeing737 {
   constructor(pfdCanvas, ndCanvas, eicasCanvas, mcpCanvas = null, isfdCanvas = null, cduCanvas = null, options = {}) {
     this.group = new THREE.Group();
     this.livery = options.livery ?? 'jeju';
+    this.customLivery = options.customLivery ?? null;
     this.exteriorOnly = options.exteriorOnly === true;
 
     // Internal cockpit
@@ -750,8 +752,12 @@ export class Boeing737 {
     if (existingKorean) this.gltfGroup.remove(existingKorean);
     const existingJeju = this.gltfGroup.getObjectByName('JejuAirLivery');
     if (existingJeju) this.gltfGroup.remove(existingJeju);
+    const existingAddon = this.gltfGroup.getObjectByName('AddonAircraftLivery');
+    if (existingAddon) this.gltfGroup.remove(existingAddon);
 
-    if (this.livery === 'korean') {
+    if (this.customLivery) {
+      applyAircraftLivery(this.gltfModel, this.group, this.gltfGroup, this.customLivery);
+    } else if (this.livery === 'korean') {
       applyKoreanAirLivery(this.gltfModel, this.group, this.gltfGroup);
     } else {
       applyJejuAirLivery(this.gltfModel, this.group, this.gltfGroup);
@@ -759,7 +765,13 @@ export class Boeing737 {
   }
 
   setLivery(liveryName) {
+    this.customLivery = null;
     this.livery = liveryName;
+    this.applyCurrentLivery();
+  }
+
+  setCustomLivery(livery) {
+    this.customLivery = livery ?? null;
     this.applyCurrentLivery();
   }
 }

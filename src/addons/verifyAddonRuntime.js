@@ -78,6 +78,12 @@ function collectDeclaredResources(manifest) {
   if (manifest.aircraft?.cockpit) {
     push('aircraft.cockpit', manifest.aircraft.cockpit);
   }
+  if (manifest.aircraft?.livery?.tailEmblem?.map) {
+    push('aircraft.livery.tailEmblem.map', manifest.aircraft.livery.tailEmblem.map);
+  }
+  for (const [target, spec] of Object.entries(manifest.aircraft?.livery?.materials ?? {})) {
+    if (spec?.map) push(`aircraft.livery.materials.${target}.map`, spec.map);
+  }
   (manifest.region?.buildingOverrides ?? []).forEach((override, index) => {
     if (override?.model) push(`region.buildingOverrides[${index}].model`, override.model);
   });
