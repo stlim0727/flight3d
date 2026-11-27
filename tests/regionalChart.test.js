@@ -169,7 +169,7 @@ test('Busan keeps the Southeast atlas in the Incheon plane', () => {
 test('paper scale, re-centring and water tiles cover the unfolded view', () => {
   for (const [width, height] of [[1100, 720], [544, 272], [360, 300]]) {
     const m = chartMetersPerPixel(width, height);
-    assert.ok(width * m >= 40000 - 1e-6 && height * m >= 28000 - 1e-6, `${width}x${height}`);
+    near(m, Math.max(40000 / width, 28000 / height), 1e-9, `${width}x${height}`);
     const projection = chartProjection(RUNWAY_THRESHOLDS.jeju);
     const tiles = chartWaterTiles(projection, width, height, m);
     assert.ok(tiles.length > 0 && tiles.length <= 30, `${tiles.length} tiles`);
