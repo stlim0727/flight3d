@@ -95,9 +95,11 @@ function pointMatch(point, query) {
       kind: 'point',
       id,
       label,
-      detail: 'cruise',
+      detail: typeof point.detail === 'string' && point.detail ? point.detail : 'cruise',
       latitude: point.latitude,
       longitude: point.longitude,
+      ...(Number.isFinite(point.altitudeM) ? { altitudeM: point.altitudeM } : {}),
+      ...(Number.isFinite(point.headingDeg) ? { headingDeg: point.headingDeg } : {}),
     },
   };
 }
@@ -190,6 +192,29 @@ export function searchAirportIndexScored(index, query, limit = DEFAULT_LIMIT) {
  */
 export function searchAirportIndex(index, query, limit = DEFAULT_LIMIT) {
   return searchAirportIndexScored(index, query, limit).map(({ score, ...result }) => result);
+}
+
+/** Default cruise altitude above MSL for a GeoNames place. */
+export function placeCruiseAltitude(entry) {
+  const elevation = Number.isFinite(entry?.elevationM) ? entry.elevationM : 0;
+  return Math.max(600, Math.round((elevation + 700) / 50) * 50);
+}
+
+/** Ranked matches from the offline GeoNames place index, using the local point rules. */
+export function searchPlaceIndexScored(index, query, limit = DEFAULT_LIMIT) {
+  const places = Array.isArray(index) ? index : index?.places;
+  if (!Array.isArray(places)) return [];
+  const points = places.map(entry => ({
+    ...entry,
+    altitudeM: placeCruiseAltitude(entry),
+    headingDeg: 90,
+  }));
+  return searchMapPlacesScored({ points }, query, limit);
+}
+
+/** Plain (unscored) results from the offline place index. */
+export function searchPlaceIndex(index, query, limit = DEFAULT_LIMIT) {
+  return searchPlaceIndexScored(index, query, limit).map(({ score, ...result }) => result);
 }
 
 /** Merge scored local and global matches; exact global codes outrank weak local text hits. */

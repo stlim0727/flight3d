@@ -7,11 +7,12 @@ import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { SPAWN_SCENARIOS, isScenarioAvailable, requiredAircraft, scenarioLabelKey } from '../config/scenarioRegistry.js';
 import { REGION_NAME_KEYS } from '../world/UnifiedWorld.js';
 import { DEFAULT_AIRPORT, DESTINATION_CHOICES, resolveDestination, saveSavedDestination } from '../config/flightSelection.js';
-import { mergeScoredResults, searchAirportIndexScored, searchMapPlacesScored } from '../config/airportSearch.js';
+import { mergeScoredResults, searchAirportIndexScored, searchMapPlacesScored, searchPlaceIndexScored } from '../config/airportSearch.js';
 import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
+import { loadPlaceManifest, loadPlaceSearchIndex } from '../geospatial/placeIndex.js';
 import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, unwrapMapX } from './mapBrowser.js';
 import { tilesForViewBox } from './lobbyMapTiles.js';
 import { airportDisplayName, airportProfile } from '../config/airportProfile.js';
@@ -143,6 +144,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   // state is separate from the local catalog so a load failure cannot hide
   // Korean places or bookmarks.
   const airportIndexState = { status: 'idle', entries: [], error: null, selectionError: null, pending: null };
+  const placeIndexState = { status: 'idle', entries: [], error: null, pending: null };
   const mapStateLabel = state => state === 'none'
     ? t('lobby.map.none')
     : t({ runway: 'incheon.runway', cruise: 'incheon.cruise', approach: 'incheon.approach' }[state] ?? state);
@@ -235,13 +237,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   function renderMapSearchStatus(query, count) {
     if (!mapStatus) return;
-    const indexFailed = airportIndexState.status === 'error';
+    const indexFailed = airportIndexState.status === 'error' || placeIndexState.status === 'error';
     if (mapSearchRetry) mapSearchRetry.hidden = !indexFailed;
     if (indexFailed) {
       mapStatus.textContent = `${t('lobby.map.search.error')} · ${t('lobby.map.search.retry')}`;
     } else if (airportIndexState.selectionError) {
       mapStatus.textContent = t('lobby.map.search.tileError');
-    } else if (airportIndexState.status === 'loading') {
+    } else if (airportIndexState.status === 'loading' || placeIndexState.status === 'loading') {
       mapStatus.textContent = t('lobby.map.search.loading');
     } else {
       mapStatus.textContent = query
@@ -273,6 +275,34 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   function requestAirportSearchIndex() {
     const pending = ensureAirportSearchIndex();
+    pending.catch(() => {}); // The status element reports the failure; the next input or click retries.
+    return pending;
+  }
+
+  function ensurePlaceSearchIndex() {
+    if (placeIndexState.status === 'ready' || placeIndexState.status === 'loading') {
+      return placeIndexState.pending ?? Promise.resolve();
+    }
+    placeIndexState.status = 'loading';
+    placeIndexState.error = null;
+    renderMapBrowser();
+    const pending = (async () => {
+      const manifest = await loadPlaceManifest();
+      placeIndexState.entries = await loadPlaceSearchIndex(manifest);
+      placeIndexState.status = 'ready';
+    })().catch(error => {
+      placeIndexState.error = error;
+      placeIndexState.status = 'error';
+      throw error;
+    }).finally(() => {
+      placeIndexState.pending = null;
+      renderMapBrowser();
+    });
+    placeIndexState.pending = pending;
+    return pending;
+  }
+  function requestPlaceSearchIndex() {
+    const pending = ensurePlaceSearchIndex();
     pending.catch(() => {}); // The status element reports the failure; the next input or click retries.
     return pending;
   }
@@ -545,12 +575,16 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (!mapSearchInput && !mapDefaultBookmarks && !mapBookmarksEl && !mapMarkers) return;
     if (mapSearchInput) mapSearchInput.placeholder = t('lobby.map.search.placeholder');
     const query = mapSearchInput?.value ?? '';
+    const airportResults = query && airportIndexState.status === 'ready'
+      ? searchAirportIndexScored(globalSearchEntries(), query) : [];
+    const placeResults = query && placeIndexState.status === 'ready'
+      ? searchPlaceIndexScored(placeIndexState.entries, query) : [];
     const results = mergeScoredResults(
       searchMapPlacesScored(mapCatalog, query),
-      query && airportIndexState.status === 'ready'
-        ? searchAirportIndexScored(globalSearchEntries(), query) : [],
+      [...airportResults, ...placeResults],
       MAP_SEARCH_LIMIT,
-    );
+    ).map(result => typeof result.id === 'string' && result.id.startsWith('geonames:')
+      ? { ...result, source: 'place-index' } : result);
     const active = currentMapPlace();
     const activeKey = mapActiveKey();
     if (mapSvg && active && activeKey !== mapCenteredKey) setMapView(active, 6);
@@ -686,16 +720,26 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       await selectGlobalAirport(id);
       return;
     }
+    if (target.dataset.placeSource === 'place-index') {
+      const place = placeIndexState.entries.find(entry => entry.id === id);
+      if (place) selectMapPlace({ ...place, kind: 'point' });
+      return;
+    }
     selectMapPlace(findMapPlace(kind, id));
   }
   mapSearchInput?.addEventListener('input', () => {
-    // An unavailable index is retried explicitly, not on every keystroke.
+    // Unavailable indexes are retried explicitly, not on every keystroke.
     if (airportIndexState.status !== 'error') requestAirportSearchIndex();
+    if (placeIndexState.status !== 'error') requestPlaceSearchIndex();
     renderMapBrowser();
   });
-  mapSearchInput?.addEventListener('focus', () => requestAirportSearchIndex());
+  mapSearchInput?.addEventListener('focus', () => {
+    requestAirportSearchIndex();
+    requestPlaceSearchIndex();
+  });
   mapSearchRetry?.addEventListener('click', () => {
     if (airportIndexState.status === 'error') requestAirportSearchIndex();
+    if (placeIndexState.status === 'error') requestPlaceSearchIndex();
   });
   mapResults?.addEventListener('click', onMapPlaceClick);
   mapBookmarksEl?.addEventListener('click', onMapPlaceClick);
@@ -1443,5 +1487,5 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
 
   refresh();
-  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded, setMapPlaces, setMapSearchState, requestAirportSearchIndex, enableMapTiles };
+  return { refresh, setWaitingForTerrain, setSelectionBusy, setFolded: setLobbyFolded, setMapPlaces, setMapSearchState, requestAirportSearchIndex, requestPlaceSearchIndex, enableMapTiles };
 }

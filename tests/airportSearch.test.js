@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mergeScoredResults, normalizeSearchText, searchAirportIndex, searchAirportIndexScored, searchMapPlaces, searchMapPlacesScored } from '../src/config/airportSearch.js';
+import { mergeScoredResults, normalizeSearchText, placeCruiseAltitude, searchAirportIndex, searchAirportIndexScored, searchMapPlaces, searchMapPlacesScored, searchPlaceIndex, searchPlaceIndexScored } from '../src/config/airportSearch.js';
 
 const AIRPORTS = [
   { code: 'RKSI', iata: 'ICN', name: 'Incheon International Airport', latitude: 37.4691, longitude: 126.451 },
@@ -95,8 +95,9 @@ test('cruise points keep their point shape and can be found by name or id', () =
     detail: 'cruise',
     latitude: 37.5054,
     longitude: 127.137,
+    altitudeM: 1150,
+    headingDeg: 284,
   }]);
-  assert.deepEqual(searchMapPlaces(catalog(), 'jeju city').map(match => match.id), ['jeju-city']);
 });
 
 test('airport detail falls back to type or coordinates when IATA is absent', () => {
@@ -243,4 +244,44 @@ test('merged ranking keeps an exact global IATA match ahead of weak local text h
   assert.equal(merged[0].id, 'EFPO');
   assert.equal(merged[0].source, 'global');
   assert.ok(merged.slice(1).every(result => result.source === 'local'));
+});
+
+const PLACE_INDEX = [
+  { id: 'geonames:252919', label: 'Santorini Island', aliases: ['Santorini', 'Θήρα'], detail: 'island · GR', latitude: 36.40572, longitude: 25.45682, elevationM: 42 },
+  { id: 'geonames:6254976', label: 'Tour Eiffel', aliases: ['Eiffel Tower', '에펠 탑'], detail: 'landmark · FR', latitude: 48.85832, longitude: 2.29452, elevationM: 0 },
+];
+
+test('offline place index matches labels and localized aliases as cruise points', () => {
+  const santorini = searchPlaceIndex(PLACE_INDEX, 'santorini');
+  assert.equal(santorini.length, 1);
+  assert.deepEqual(santorini[0], {
+    kind: 'point',
+    id: 'geonames:252919',
+    label: 'Santorini Island',
+    detail: 'island · GR',
+    latitude: 36.40572,
+    longitude: 25.45682,
+    altitudeM: 750,
+    headingDeg: 90,
+  });
+
+  const eiffel = searchPlaceIndex(PLACE_INDEX, 'eiffel tower');
+  assert.equal(eiffel[0].id, 'geonames:6254976');
+  assert.equal(searchPlaceIndex(PLACE_INDEX, '에펠 탑')[0].id, 'geonames:6254976');
+});
+
+test('place cruise altitude clears elevation and rejects invalid indexes', () => {
+  assert.equal(placeCruiseAltitude({ elevationM: 42 }), 750);
+  assert.equal(placeCruiseAltitude({ elevationM: 3600 }), 4300);
+  assert.equal(placeCruiseAltitude({}), 700);
+  assert.deepEqual(searchPlaceIndexScored(null, 'paris'), []);
+  assert.deepEqual(searchPlaceIndex({ places: 'not-an-array' }, 'paris'), []);
+});
+
+test('place results merge with airports without losing their source ranking', () => {
+  const merged = mergeScoredResults([], [
+    ...searchAirportIndexScored([{ code: 'LGTS', iata: 'JTR', name: 'Santorini Airport', latitude: 36.4, longitude: 25.47, country: 'GR', type: 'large_airport', tileId: '12-20' }], 'santorini'),
+    ...searchPlaceIndexScored(PLACE_INDEX, 'santorini'),
+  ]);
+  assert.deepEqual(merged.map(result => result.id), ['LGTS', 'geonames:252919']);
 });

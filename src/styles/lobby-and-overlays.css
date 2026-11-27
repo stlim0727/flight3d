@@ -598,6 +598,8 @@ dialog.lobby-map-dialog::backdrop {
   gap: calc(8px * var(--ui-scale, 1));
   min-height: calc(20px * var(--ui-scale, 1));
 }
+.lobby-map-credit { color: #64748b; text-decoration: none; white-space: nowrap; }
+.lobby-map-credit:hover { color: #38bdf8; text-decoration: underline; }
 .lobby-map-status { margin: 0; color: #94a3b8; font-size: calc(10px * var(--ui-scale, 1)); }
 .lobby-map-dialog #lobby-map-search-retry {
   min-height: 32px;
