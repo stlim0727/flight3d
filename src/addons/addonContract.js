@@ -241,6 +241,47 @@ function validateLandingGear(gear, errors) {
   }
 }
 
+function validatePerformanceEnvelope(envelope, errors) {
+  if (envelope === undefined) return;
+  const where = 'aircraft.physics.specs.performanceEnvelope';
+  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
+    errors.push(`${where} must be an object`);
+    return;
+  }
+  if (!Number.isFinite(envelope.cruiseAltitudeM) || envelope.cruiseAltitudeM < 0) {
+    errors.push(`${where}.cruiseAltitudeM must be a non-negative number`);
+  }
+  if (!Number.isFinite(envelope.startTasKnots) || envelope.startTasKnots <= 0) {
+    errors.push(`${where}.startTasKnots must be positive`);
+  }
+  const hasMach = envelope.maxMach !== undefined;
+  const hasVne = envelope.vneKnots !== undefined;
+  if (!hasMach && !hasVne) {
+    errors.push(`${where} requires maxMach or vneKnots`);
+  }
+  if (hasMach && (!Number.isFinite(envelope.maxMach) || envelope.maxMach <= 0)) {
+    errors.push(`${where}.maxMach must be positive`);
+  }
+  if (hasVne && (!Number.isFinite(envelope.vneKnots) || envelope.vneKnots <= 0)) {
+    errors.push(`${where}.vneKnots must be positive`);
+  }
+  if (envelope.useReheat !== undefined && typeof envelope.useReheat !== 'boolean') {
+    errors.push(`${where}.useReheat must be a boolean`);
+  }
+  if (envelope.durationSec !== undefined
+    && (!Number.isFinite(envelope.durationSec) || envelope.durationSec <= 0 || envelope.durationSec > 600)) {
+    errors.push(`${where}.durationSec must be in (0, 600]`);
+  }
+  if (envelope.minSpecFraction !== undefined
+    && (!Number.isFinite(envelope.minSpecFraction) || envelope.minSpecFraction <= 0 || envelope.minSpecFraction > 1)) {
+    errors.push(`${where}.minSpecFraction must be in (0, 1]`);
+  }
+  if (envelope.maxSpecFraction !== undefined
+    && (!Number.isFinite(envelope.maxSpecFraction) || envelope.maxSpecFraction <= 1)) {
+    errors.push(`${where}.maxSpecFraction must be greater than 1`);
+  }
+}
+
 function validateAircraftBinding(aircraft, errors, manifest) {
   if (!aircraft || typeof aircraft !== 'object') {
     errors.push('aircraft declaration is required');
@@ -293,6 +334,7 @@ function validateAircraftBinding(aircraft, errors, manifest) {
     validateAerodynamics(aircraft.physics.aerodynamics, errors);
     validatePropulsion(aircraft.physics.propulsion, errors);
     validateLandingGear(aircraft.physics.landingGear, errors);
+    validatePerformanceEnvelope(aircraft.physics.specs?.performanceEnvelope, errors);
   }
   if (aircraft.model !== undefined) validResource(aircraft.model, errors, 'aircraft.model');
   else if (!hasExtends) errors.push('aircraft.model is required');

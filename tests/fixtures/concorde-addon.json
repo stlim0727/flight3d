@@ -314,7 +314,13 @@
         "oleoStrokeM": 0.45,
         "hardLandingGThreshold": 1.8,
         "crashGThreshold": 2.8,
-        "landingRatings": []
+        "landingRatings": [],
+        "performanceEnvelope": {
+          "cruiseAltitudeM": 18300,
+          "startTasKnots": 520,
+          "maxMach": 2.0,
+          "useReheat": true
+        }
       }
     },
     "model": {

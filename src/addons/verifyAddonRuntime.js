@@ -9,6 +9,7 @@ import { registerAddonAircraft, unregisterAddonAircraft } from '../config/aircra
 import { createHeadlessSimulation } from '../core/HeadlessSimulation.js';
 import { stepPhysics } from '../core/physicsTiming.js';
 import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
+import { verifyAircraftPerformanceEnvelope } from './verifyAircraftEnvelope.js';
 
 export const DEFAULT_MAX_ASSET_BYTES = 25 * 1024 * 1024;
 export const DEFAULT_MAX_TOTAL_BYTES = 64 * 1024 * 1024;
@@ -215,7 +216,7 @@ function verifyStrictBodySupportPoints(raw, errors) {
   }
 }
 
-function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings }) {
+function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings, stats }) {
   if (strict) {
     verifyStrictBodySupportPoints(manifest.aircraft.physics?.landingGear?.bodySupportPoints, errors);
   }
@@ -323,6 +324,23 @@ function verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, w
         }
       }
     }
+
+    const performanceEnvelope = descriptor.config.specs?.performanceEnvelope;
+    if (performanceEnvelope) {
+      const envelopeResult = verifyAircraftPerformanceEnvelope(descriptor.id, performanceEnvelope);
+      if (stats) {
+        stats.performanceEnvelope = {
+          metric: envelopeResult.metric,
+          spec: envelopeResult.spec,
+          peak: envelopeResult.peak,
+          ratio: envelopeResult.ratio,
+          durationSec: envelopeResult.durationSec,
+        };
+      }
+      if (!envelopeResult.ok) {
+        errors.push(...envelopeResult.errors);
+      }
+    }
   } catch (error) {
     errors.push(`aircraft headless simulation threw: ${error.message}`);
   } finally {
@@ -357,7 +375,7 @@ export async function verifyAddonRuntime(manifest, {
   }
 
   if (manifest.aircraft) {
-    verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings });
+    verifyAircraftPhysicsRuntime(manifest, { coreVersion, strict, errors, warnings, stats });
   }
 
   const resources = collectDeclaredResources(manifest);
