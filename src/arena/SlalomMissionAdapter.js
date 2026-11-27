@@ -59,6 +59,7 @@ export class SlalomMissionAdapter extends SimulatorMissionAdapter {
               sim.terrain?.mesh && [sim.terrain.mesh, sim.terrain.mesh.visible],
               sim.luklaTerrain?.mesh && [sim.luklaTerrain.mesh, sim.luklaTerrain.mesh.visible],
               sim.incheonAirport?.terrain?.mesh && [sim.incheonAirport.terrain.mesh, sim.incheonAirport.terrain.mesh.visible],
+              sim.incheonSurface?.mesh && [sim.incheonSurface.mesh, sim.incheonSurface.mesh.visible],
               sim.neonCity?.group && [sim.neonCity.group, sim.neonCity.group.visible],
               sim.airport?.group && [sim.airport.group, sim.airport.group.visible],
               sim.jejuSurface?.mesh && [sim.jejuSurface.mesh, sim.jejuSurface.mesh.visible],

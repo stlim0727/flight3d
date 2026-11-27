@@ -1589,7 +1589,11 @@ export class OpenWorldTerrain {
 
 const frames = {
   lukla: { origin: luklaGrid.origin },
-  incheon: { origin: INCHEON_PATCH.origin, protectedAreas: [[-25000, -25000, 25000, 25000]] },
+  incheon: {
+    origin: INCHEON_PATCH.origin,
+    protectedAreas: [[-6000, -6000, 6000, 6000]],
+    insets: getInsetsForRegion('incheon'),
+  },
   jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
 };
 
@@ -1639,7 +1643,10 @@ export function updateOpenWorldTerrain(sim) {
       } else if (!customOrigin && airportMesh?.geometry) {
         localSurface = {
           geometry: airportMesh.geometry,
-          extent: { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
+          extent: surface.localImageryExtent
+            ? { minX: surface.localImageryExtent[0], minZ: surface.localImageryExtent[1],
+              maxX: surface.localImageryExtent[2], maxZ: surface.localImageryExtent[3] }
+            : { minX: -3200, maxX: 3200, minZ: -1500, maxZ: 1500 },
         };
       }
       surface.openWorld = new OpenWorldTerrain({

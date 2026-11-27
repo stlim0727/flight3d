@@ -17,6 +17,15 @@
 
 export const TERRAIN_INSETS = Object.freeze([
   Object.freeze({
+    id: 'rksi',
+    region: 'incheon',
+    name: 'Incheon International Airport (RKSI) Inset',
+    bounds: Object.freeze([-3200, -2500, 3200, 2500]),
+    minDetailLevel: 13,
+    maxDetailLevel: 14,
+    approachDistanceM: 8000,
+  }),
+  Object.freeze({
     id: 'rkpc',
     region: 'jeju',
     name: 'Jeju International Airport (RKPC) Inset',

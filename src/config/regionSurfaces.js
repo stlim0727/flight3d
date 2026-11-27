@@ -3,7 +3,9 @@ import {
   JEJU_ORIGIN,
   wgs84ToJejuLocal,
 } from '../geospatial/CorridorCoordinateSystem.js';
+import { INCHEON_PATCH } from '../geospatial/incheon.js';
 import luklaGrid from './luklaTerrainGrid.json' with { type: 'json' };
+import incheonAirfield from './incheonAirfield.json' with { type: 'json' };
 
 const [chujaX, chujaZ] = wgs84ToJejuLocal(
   CHUJA_EMERGENCY_STRIP.center.latitude,
@@ -12,6 +14,11 @@ const [chujaX, chujaZ] = wgs84ToJejuLocal(
 
 /** Anchor-surface data for regions rendered by the common open-world engine. */
 export const REGION_SURFACES = Object.freeze({
+  incheon: Object.freeze({
+    origin: INCHEON_PATCH.origin,
+    elevationM: incheonAirfield.elevationM,
+    precinctExtent: Object.freeze([-6000, -6000, 6000, 6000]),
+  }),
   jeju: Object.freeze({
     origin: JEJU_ORIGIN,
     elevationM: 36.0,

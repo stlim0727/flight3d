@@ -1,7 +1,7 @@
 import { buildSihwaBridges } from '../geospatial/sihwaBridges.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { colourIncheonGround, createIncheonGroundTexture } from './IncheonGround.js';
+import { createRasterSurfaceMaterial } from './RasterRegionSurface.js';
 import { SihwaRegion } from '../geospatial/SihwaRegion.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
 
@@ -12,8 +12,7 @@ export function createSihwaScenery(region) {
   const uv=new Float32Array(region.positions.length/3*2);
   for(let i=0;i<uv.length/2;i++){uv[i*2]=(region.positions[i*3]+25000)/50000;uv[i*2+1]=1-(region.positions[i*3+2]+25000)/50000;}
   land.setAttribute('uv',new THREE.BufferAttribute(uv,2));
-  colourIncheonGround(land);
-  group.add(new THREE.Mesh(land,new THREE.MeshLambertMaterial({vertexColors:true,map:createIncheonGroundTexture(50000)})));
+  group.add(new THREE.Mesh(land,createRasterSurfaceMaterial()));
   const batches=new Map(),colliders=[];
   const features=region.features.features;
   const feature=kind=>features.find(f=>f.kind===kind);

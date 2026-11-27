@@ -11,6 +11,13 @@ Discussion: https://github.com/stlim0727/flight3d/discussions/216
 5단계는 [근거리 차량과 전체 비행 성능 비교](incheon-traffic.md)를 추가합니다.
 아래의 1단계 실행·한계는 최초 배치 검토 기록입니다.
 
+메인 시뮬레이터의 인천 지면은 제주·루클라·파타고니아와 같은 공통 오픈월드
+타일 경로(`OpenWorldTerrain`)로 렌더링합니다. `OpenWorldRegionSurface`가
+지형 호스트와 저해상도/타일 실패 시 높이 fallback을 제공하고, RKSI 고해상도
+inset은 `terrainInsets.js`의 선언적 설정으로 활성화됩니다. Copernicus DSM은
+fallback 및 충돌 샘플러용으로 유지합니다. 기존 1~3단계 미리보기는 독립
+진입점으로 유지됩니다.
+
 ## 진행 순서와 완료 기준
 
 | 단계 | 범위 | 완료 기준 |
