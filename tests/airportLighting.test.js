@@ -27,7 +27,7 @@ test('rabbit preserves every station, wrap, brightness and a constant light coun
       assert.equal(count(), 5);
     }
   }
-  assert.deepEqual(airport.papiLights.map(p => p.pointLight.color.getHex()), [0xff1a1a, 0xff1a1a, 0xffffff, 0xffffff]);
+  assert.deepEqual(airport.papiLights.map(p => p.pointLight.color.getHex()), [0xffffff, 0xffffff, 0xff1a1a, 0xff1a1a]);
   airport.update(0, new THREE.Vector3(-2250, 12, 0));
   assert.ok(airport.papiLights.every(p => p.pointLight.color.getHex() === 0xff1a1a));
   airport.update(0, new THREE.Vector3(-2250, 200, 0));
