@@ -65,7 +65,8 @@ Hardware GPU acceleration is enabled for user accounts in the `render` (991) and
 
 ## Autonomous demo acceptance
 
-`npm run test:demo-sweep` claims its own free ports, starts `vite preview` on `dist/` and a private headless Chrome, then drives every route through deterministic 120 Hz physics with `sim.stepSimulation(0.25)` while the wall-clock loop is frozen with `gameFlow.pause()`.
+`npm run test:demo-sweep` claims its own free ports, starts `vite preview` on `dist/` and a private headless Chrome, then drives every route through deterministic 120 Hz physics with `sim.stepSimulation(0.5)` (half-second batches of the same 120 Hz substeps) while the wall-clock loop is frozen with `gameFlow.pause()`.
+`SLICE` defaults to `0.5` s; raising it further coarsens warning duration and rate-of-change sampling, so the baseline and the gate should be revalidated before changing it.
 
 | Command | Runs |
 | --- | --- |

@@ -63,7 +63,10 @@ if (argv.length) {
   console.error('Usage: node scripts/demo-sweep.mjs [--tier core|full|all] [--only id,id] [--shots] [--strict] [--retries N] [--update-baseline]');
   process.exit(2);
 }
-const SLICE = Number(process.env.SLICE || 0.25);
+// One CDP round trip per batch; stepSimulation still runs the same 120 Hz substeps.
+// Half a second amortizes per-call simulator work without averaging rates and warnings
+// over a whole second, which would hide short stage-local faults.
+const SLICE = Number(process.env.SLICE || 0.5);
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR || path.join(ROOT, '.cache', 'demo-sweep');
 /** `KEEP_SAMPLES=1` writes every slice into the report, for reading a finding in context. */
 const KEEP_SAMPLES = process.env.KEEP_SAMPLES === '1';
