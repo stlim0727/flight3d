@@ -61,6 +61,8 @@ export function createScreenSky() {
     uSunColor: { value: new THREE.Color(0xffeedd) },
     uDeepColor: { value: new THREE.Color(0x0a284a) },
     uShallowColor: { value: new THREE.Color(0x136a8a) },
+    uRoughness: { value: 0.252 },
+    uDaylightScale: { value: 1.0 },
   });
   material.fragmentShader = replaceOnce(material.fragmentShader, MAIN, `
 		uniform vec3 uHazeColor;
@@ -71,6 +73,8 @@ export function createScreenSky() {
 		uniform vec3 uSunColor;
 		uniform vec3 uDeepColor;
 		uniform vec3 uShallowColor;
+		uniform float uRoughness;
+		uniform float uDaylightScale;
 		${OCEAN_SURFACE_GLSL}
 
 		void main() {`, 'main entry');
@@ -102,7 +106,7 @@ export function createScreenSky() {
 				vec3 haze = mix( hazeColor, gl_FragColor.rgb,
 					smoothstep( rimDistance, max( horizonDistance, rimDistance + 1.0 ), seaDistance ) );
 				vec3 land = uLandColor * mix( 0.08, 0.7, smoothstep( -0.04, 0.15, vSunDirection.y ) );
-				vec3 ocean = oceanFarColor( direction, grazing2, vSunDirection, uSunColor, uHazeColor, uDeepColor, uShallowColor );
+				vec3 ocean = oceanFarColor( direction, grazing2, vSunDirection, uSunColor, uHazeColor, uDeepColor, uShallowColor, uRoughness, uDaylightScale );
 				vec4 surface = vec4( mix( land, ocean, uSeaBelow ), 1.0 );
 				#if defined( TONE_MAPPING )
 					surface.rgb = toneMapping( surface.rgb );

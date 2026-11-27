@@ -140,6 +140,26 @@ export function geographicBuildingHeight({ height, num_floors: floors }) {
   return 9;
 }
 
+function matchesBuildingOverride(override, feature, latitude, longitude) {
+  if (override.overtureId && override.overtureId !== String(feature.id ?? '')) return false;
+  if (override.nameContains) {
+    const name = String(feature.properties?.name ?? feature.properties?.name_en ?? '');
+    if (!name.toLowerCase().includes(String(override.nameContains).toLowerCase())) return false;
+  }
+  const bounds = override.bounds;
+  if (!bounds) return true;
+  return Number.isFinite(bounds.west) && Number.isFinite(bounds.east)
+    && Number.isFinite(bounds.south) && Number.isFinite(bounds.north)
+    && longitude >= bounds.west && longitude <= bounds.east
+    && latitude >= bounds.south && latitude <= bounds.north;
+}
+
+function findBuildingOverride(overrides, feature, center, tile) {
+  if (!overrides?.length) return null;
+  const { latitude, longitude } = tileToWgs84(tile.x + center.x / feature.extent, tile.y + center.y / feature.extent, zoom);
+  return overrides.find(override => matchesBuildingOverride(override, feature, latitude, longitude)) ?? null;
+}
+
 function ringArea(ring) {
   return ring.reduce((area, [x, y], i) => {
     const [nextX, nextY] = ring[(i + 1) % ring.length];
@@ -162,11 +182,13 @@ function tilePolygons(feature) {
     ? [polygon] : polygonClipping.intersection(polygon, tile));
 }
 
-export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false, colliders = null) {
+export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false, colliders = null,
+  overrides = []) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   if (!layer?.length) return null;
   const positions = [];
   const facadeUvs = [];
+  const tint = [];
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
@@ -179,6 +201,8 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const [outer, ...holes] = rings;
       if (outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 3) continue;
       const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
+      const override = findBuildingOverride(overrides, feature, center, tile);
+      if (override?.collision === 'suppress') continue;
       if (exclude(center.x, center.y, outer) || terrain.isWater?.(center.x, center.y)
         || (Number.isFinite(terrain.size) && Math.max(Math.abs(center.x), Math.abs(center.y)) > terrain.size / 2)) continue;
       const samples = outer.map(point => terrain.getHeight(point.x, point.y));
@@ -190,6 +214,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       if (!roofTriangles.length) continue;
       if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
       const points = rings.flat();
+      const color = override?.material?.baseColor ? new THREE.Color(override.material.baseColor) : null;
       const facadeTile = Math.floor(Math.abs(center.x) / 83 + Math.abs(center.y) / 47) % 3;
       const facadeUv = [(facadeTile % 2 + 0.5) / 2, (Math.floor(facadeTile / 2) + 0.5) / 2];
       for (const triangle of roofTriangles) {
@@ -197,6 +222,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
           const point = points[index];
           positions.push(point.x, roof, point.y);
           facadeUvs.push(...roofAtlasUv(point.x, point.y));
+          tint.push(color ? color.r : 1, color ? color.g : 1, color ? color.b : 1);
         }
       }
       for (const ring of rings) {
@@ -207,6 +233,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
             b.x, low, b.y, b.x, roof, b.y, a.x, roof, a.y);
           facadeUvs.push(...facadeUv, ...facadeUv, ...facadeUv,
             ...facadeUv, ...facadeUv, ...facadeUv);
+          for (let v = 0; v < 6; v++) tint.push(color ? color.r : 1, color ? color.g : 1, color ? color.b : 1);
         }
       }
     }
@@ -215,6 +242,8 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(facadeUvs, 2));
+  const colors = tint.length === positions.length ? tint : new Array(positions.length).fill(1);
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   geometry.computeVertexNormals();
   return geometry;
 }
@@ -261,7 +290,7 @@ function nearBuildingTile(mesh, position, distance) {
 }
 
 export class GeographicBuildings {
-  constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source }) {
+  constructor({ origin, project, terrain, exclude, isRunwaySafetyArea, archive = source, buildingOverrides = [] }) {
     this.origin = origin;
     this.project = project;
     this.terrain = terrain;
@@ -270,13 +299,14 @@ export class GeographicBuildings {
       || isRunwaySafetyArea?.(x, z)
       || footprint.some(point => isRunwaySafetyArea?.(point.x, point.y));
     this.archive = archive;
+    this.buildingOverrides = buildingOverrides;
     this.group = new THREE.Group();
     this.group.name = 'Geographic buildings';
     const atlas = createCityFacadeAtlas([255, 218, 141]);
     this.atlas = atlas;
     this.material = new THREE.MeshLambertMaterial({
       map: atlas.map, emissiveMap: atlas.emissiveMap,
-      emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide,
+      emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true,
     });
     this.material.onBeforeCompile = cityFacadeUvShader;
     this.material.customProgramCacheKey = () => 'geo-city-metric-facade-v1';
@@ -470,7 +500,8 @@ export class GeographicBuildings {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
       const colliders = [];
-      const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain, this.exclude, colliders);
+      const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain,
+        this.exclude, colliders, this.buildingOverrides);
       const collisionCells = indexColliders(colliders);
       geometry?.computeBoundingBox();
       const mesh = geometry ? new THREE.Mesh(geometry, this.material) : null;
@@ -560,6 +591,7 @@ export function updateGeographicBuildings(sim, elapsed) {
     const airport = sim.currentAirport;
     sim.geographicBuildingLayer = new GeographicBuildings({
       origin, project, terrain,
+      buildingOverrides: sim.pinnedAddonPack?.buildingOverrides ?? [],
       exclude: (x, z, corners) => airport?.hasModeledBuilding?.(x, z)
         || sim.parisShowcase?.excludes?.(x, z)
         || (corners?.some(({ x: cx, y: cz }) => sim.parisShowcase?.excludes?.(cx, cz)) ?? false),

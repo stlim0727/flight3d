@@ -69,7 +69,7 @@ function formatFlightTime(hours, deviceTime = false) {
  * spawn scenarios and airports are chosen. All dynamic labels go through
  * bindText so a language switch re-renders them.
  */
-export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, getAircraftOptions = () => [], onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {}, getHeldFlight }) {
+export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime = () => false, getAircraft, getAircraftOptions = () => [], onAirport, onPreset, onTime, onDeviceTime = () => {}, onAircraft, onFly, onRestart, canResume = () => false, canEnd = canResume, onResume, getDemoProfile, onDemoProfile, getPilotMode = () => 'human', onPilotMode = () => {}, onToggleGyro = () => {}, isGyroActive = () => false, onTabChange = () => {}, getDestination = () => 'none', onDestination = () => {}, getMapPlan = () => null, onMapPlan = () => {}, onMapPlacesAdded = () => {}, getAddonBookmarks = () => [], getHeldFlight }) {
   const briefingEl = document.getElementById('lobby-briefing');
   const loadingEl = document.getElementById('lobby-loading');
   const selectionEl = document.getElementById('lobby-selection');
@@ -569,7 +569,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       detail: bookmark.iata || bookmark.code || '',
     });
     renderPlaceList(mapBookmarksEl, mapBookmarks.map(withBookmarkLabels), 'lobby.map.bookmarks.empty', activeKey);
-    renderPlaceList(mapDefaultBookmarks, defaultMapBookmarks(mapCatalog).map(withBookmarkLabels),
+    renderPlaceList(mapDefaultBookmarks, [...defaultMapBookmarks(mapCatalog), ...(getAddonBookmarks() ?? [])].map(withBookmarkLabels),
       'lobby.map.search.empty', activeKey);
 
     renderMapMarkers(activeKey);

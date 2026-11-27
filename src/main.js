@@ -88,6 +88,7 @@ import {
 } from './addons/baseAddonRegistry.js';
 import { AddonAircraft } from './aircraft/AddonAircraft.js';
 import { hasExplicitAddonParams, resolveAddonSearch, savedAddonSearchParams } from './addons/savedAddonProfile.js';
+import { applyRegionPalette } from './addons/regionVisuals.js';
 import { applyDeviceTimeOfDay, forgetSimulatorPreference, loadSimulatorPreferences,
   restoreSimulatorPreferences, saveSimulatorPreferences } from './config/simulatorPreferences.js';
 import { TouchFlightControls } from './controls/TouchFlightControls.js';
@@ -353,6 +354,7 @@ class FlightSimulator {
       this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }
     this.water.syncWithAtmosphere(this.sky);
+    applyRegionPalette(this.pinnedAddonPack, { water: this.water, sky: this.sky });
 
     await startupStage(3, 'startup.controls');
 

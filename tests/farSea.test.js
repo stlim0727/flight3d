@@ -94,7 +94,7 @@ test('inland regions, which hide the sea mesh, get land beyond their terrain', (
 test('sky pass draws the far sea below the horizon and leaves the sky above it alone', () => {
   const { fragmentShader } = new SkyAtmosphere(new THREE.Scene()).sky.material;
   assert.ok(fragmentShader.includes('vec3 oceanFarColor('));
-  assert.ok(fragmentShader.includes('oceanFarColor( direction, grazing2, vSunDirection, uSunColor, uHazeColor, uDeepColor, uShallowColor )'));
+  assert.ok(fragmentShader.includes('oceanFarColor( direction, grazing2, vSunDirection, uSunColor, uHazeColor, uDeepColor, uShallowColor, uRoughness, uDaylightScale )'));
   assert.ok(fragmentShader.includes('uHazeDensity * aerialSeaReach( eyeY, direction.y, grazing2 )'));
   assert.ok(fragmentShader.includes('float eyeY = max( cameraPosition.y, 0.5 );'));
   assert.ok(fragmentShader.includes('surface.rgb = toneMapping( surface.rgb );'), 'the far surface is tone mapped as the sea mesh is');
@@ -116,7 +116,7 @@ test('sea mesh becomes that same far sea at its rim and paints no fog-coloured r
   assert.ok(fragmentShader.includes('float grazing2 = viewDir.y * viewDir.y - 2.0 * eyeY / AERIAL_EARTH_RADIUS;'));
   assert.ok(fragmentShader.includes('float strikes = viewDir.y > 0.0 ? clamp(grazing2 / max(fwidth(grazing2), 1e-12), 0.0, 1.0) : 0.0;'));
   assert.ok(fragmentShader.indexOf('fwidth(grazing2)') < fragmentShader.indexOf('if (rim > 0.0) {'));
-  assert.ok(fragmentShader.includes('oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor)'));
+  assert.ok(fragmentShader.includes('oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor, uRoughness, uDaylightScale)'));
   assert.ok(fragmentShader.includes('uBaseFogDensity * aerialSeaReach(eyeY, -viewDir.y, grazing2)'));
   assert.ok(fragmentShader.includes('float eyeY = max(cameraPosition.y, 0.5);'));
   assert.ok(fragmentShader.includes('if (length(vLocalPos) > uEdgeFadeEnd) discard;'), 'the sky pass owns everything past the rim');

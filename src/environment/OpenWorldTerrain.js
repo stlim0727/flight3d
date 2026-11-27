@@ -144,7 +144,7 @@ export function applyTerrainMaterialQuality(material, quality) {
   }
 }
 
-function terrainMaterial(detail, distanceFade, quality = 'balanced') {
+function terrainMaterial(detail, distanceFade, quality = 'balanced', seaPalette = null) {
   const isUltraLow = quality === 'ultraLow';
   const isPerformance = quality === 'performance';
   const material = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -156,7 +156,7 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     material.defines?.QUALITY_ULTRALOW === 1 ? 'open-world-terrain-ultralow'
       : material.defines?.QUALITY_PERFORMANCE === 1 ? 'open-world-terrain-performance'
         : 'open-world-terrain-standard'
-  );
+  ) + (seaPalette ? '-sea-palette' : '');
   material.onBeforeCompile = shader => {
     shader.uniforms.terrainBaseMap = detail.base;
     shader.uniforms.terrainDetailEdges = detail.edges;
@@ -164,18 +164,22 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
     shader.uniforms.terrainDetailMap = detail.map;
     shader.uniforms.terrainDetailBlend = detail.blend;
     shader.uniforms.terrainDistanceFade = distanceFade;
+    shader.uniforms.terrainSeaColor = { value: new THREE.Color(seaPalette?.shallowColor ?? 0x426982) };
     shader.vertexShader = `
       #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
       #else
         varying vec3 vTerrainViewPosition;
       #endif
+      attribute float terrainWet;
+      varying float vTerrainWet;
     ` + shader.vertexShader.replace(
       '#include <project_vertex>',
       `#include <project_vertex>
       #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
       #else
         vTerrainViewPosition = mvPosition.xyz;
-      #endif`,
+      #endif
+      vTerrainWet = terrainWet;`,
     );
     shader.fragmentShader = shader.fragmentShader.replace('#include <clipping_planes_fragment>', `
       #include <clipping_planes_fragment>
@@ -192,8 +196,20 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced') {
         }
       #endif
     `);
+    shader.fragmentShader = `varying float vTerrainWet;
+uniform vec3 terrainSeaColor;
+` + shader.fragmentShader;
+    shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', `
+      if (vTerrainWet > 0.5) {
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, terrainSeaColor.rgb, 0.82);
+      }
+      #include <dithering_fragment>
+    `);
     shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `
       #include <map_fragment>
+      if (vTerrainWet > 0.5) {
+        diffuseColor.rgb = mix(diffuseColor.rgb, terrainSeaColor.rgb, 0.82);
+      }
       #ifdef USE_MAP
         #if defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1
           if (terrainDetailBlend > 0.0) {
@@ -513,6 +529,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
     ? new Uint32Array(segments ** 2 + 1) : null;
   const mapCoordinates = [];
   const colors = [];
+  const wetness = [];
   const groundColor = new THREE.Color();
   const rawHeights = [];
   const appendVertex = ([localX, height, localZ, u, v, wet, sourceHeight], rawHeight = sourceHeight ?? height) => {
@@ -522,6 +539,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
     mapCoordinates.push(u, 1 - v);
     groundColor.set(wet >= 0.5 ? 0x426982 : height > 550 ? 0x637153 : 0x78816a);
     colors.push(groundColor.r, groundColor.g, groundColor.b);
+    wetness.push(wet >= 0.5 ? 1 : 0);
     return index;
   };
   const data = [raster, east, south, southeast];
@@ -599,6 +617,7 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
   geometry.setAttribute('rawHeight', new THREE.Float32BufferAttribute(rawHeights, 1));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mapCoordinates, 2));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.setAttribute('terrainWet', new THREE.Float32BufferAttribute(wetness, 1));
   geometry.computeVertexNormals();
   if (cellOffsets) cellOffsets[cellOffsets.length - 1] = indices.length;
   return { geometry, water, cellOffsets };
@@ -652,7 +671,7 @@ function heightOnTriangle(positions, x, z, a, b, c, heights) {
 }
 
 export class OpenWorldTerrain {
-  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced' }) {
+  constructor({ origin, protectedAreas = [], insets = [], elevationCache, imageryCache, waterSource = waterArchive, localSurface, imageryBudget, world, quality = 'balanced', seaPalette = null }) {
     this.origin = origin;
     this.renderQuality = resolveRenderQuality(quality);
     this.protectedAreas = protectedAreas;
@@ -663,7 +682,11 @@ export class OpenWorldTerrain {
     this._runwayVisibilityKey = '';
     this.elevationCache = elevationCache ?? new TileCacheManager({ urlTemplate: elevationUrl });
     this.imageryCache = imageryCache ?? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 });
+    this.fallbackImageryCache = imageryCache
+      ? new TileCacheManager({ enableBrowserCache: false, maxMemoryTiles: 128, maxConcurrent: 6 })
+      : null;
     this.waterSource = waterSource;
+    this.seaPalette = seaPalette;
     this.imageryBudget = {
       detailTileLimit: imageryBudget?.detailTileLimit ?? detailTileLimit,
       highDetailTileLimit: imageryBudget?.highDetailTileLimit ?? highDetailTileLimit,
@@ -1019,7 +1042,7 @@ export class OpenWorldTerrain {
       const [raster, east, south, southeast, image] = await Promise.all([
         this.raster(x, y, farZoom), this.raster(nextX, y, farZoom),
         this.raster(x, y + 1, farZoom), this.raster(nextX, y + 1, farZoom),
-        this.imageryCache.getTileImage(farZoom, x, y),
+        this.getImagery(farZoom, x, y),
       ]);
       if (!this.farWanted.has(key)) return;
       if (!image) throw new Error('Far terrain imagery unavailable');
@@ -1085,10 +1108,16 @@ export class OpenWorldTerrain {
   async loadBaseImagery({ x, y, key }, entry) {
     let image = await this.imageryCache.getTileImage(zoom, x, y);
     let fromParent = false;
+    if (!image && this.fallbackImageryCache) {
+      image = await this.fallbackImageryCache.getTileImage(zoom, x, y);
+    }
     if (!image) {
       // Cold-cache partial outage: use the z10 parent quadrant until the
       // preferred z11 tile succeeds on retry.
-      const parent = await this.imageryCache.getTileImage(zoom - 1, Math.floor(x / 2), Math.floor(y / 2));
+      let parent = await this.imageryCache.getTileImage(zoom - 1, Math.floor(x / 2), Math.floor(y / 2));
+      if (!parent && this.fallbackImageryCache) {
+        parent = await this.fallbackImageryCache.getTileImage(zoom - 1, Math.floor(x / 2), Math.floor(y / 2));
+      }
       if (parent) {
         image = parent;
         fromParent = true;
@@ -1324,11 +1353,17 @@ export class OpenWorldTerrain {
     if (entry.localMesh) entry.localMesh.visible = Boolean(map);
   }
 
+  async getImagery(level, x, y) {
+    const image = await this.imageryCache.getTileImage(level, x, y);
+    if (image || !this.fallbackImageryCache) return image;
+    return this.fallbackImageryCache.getTileImage(level, x, y);
+  }
+
   async loadImageryDetail(key, entry, level) {
     const [x, y] = key.split('/').map(Number);
     const count = 2 ** (level - zoom);
     const images = await Promise.all(Array.from({ length: count * count }, (_, i) =>
-      this.imageryCache.getTileImage(level, x * count + i % count, y * count + Math.floor(i / count))));
+      this.getImagery(level, x * count + i % count, y * count + Math.floor(i / count))));
     if (this.tiles.get(key) !== entry || this.detailWanted.get(key) !== level) return;
     if (images.some(image => !image || image.width !== samples || image.height !== samples)) {
       entry.detailRetryAt = performance.now() + 15000;
@@ -1429,7 +1464,7 @@ export class OpenWorldTerrain {
         edges: { value: new THREE.Vector4(1, 1, 1, 1) },
         corners: { value: new THREE.Vector4(1, 1, 1, 1) },
       };
-      const material = terrainMaterial(detail, this.distanceFade, this.renderQuality);
+      const material = terrainMaterial(detail, this.distanceFade, this.renderQuality, this.seaPalette);
       if (local) applyFarSunShadow(material);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.receiveShadow = this.renderQuality !== 'ultraLow';
@@ -1539,6 +1574,7 @@ export class OpenWorldTerrain {
     for (const key of this.farTiles.keys()) this.releaseFarTile(key);
     this.elevationCache.dispose();
     this.imageryCache.dispose();
+    this.fallbackImageryCache?.dispose();
     this.rasters.clear();
     this.group.removeFromParent();
   }
@@ -1606,6 +1642,13 @@ export function updateOpenWorldTerrain(sim) {
         localSurface,
         world: sim.world,
         quality: sim.renderQuality,
+        ...(sim.pinnedAddonPack?.cacheOptions ? { imageryCache: new TileCacheManager({
+          ...sim.pinnedAddonPack.cacheOptions,
+          enableBrowserCache: false,
+          maxMemoryTiles: 128,
+          maxConcurrent: 6,
+        }) } : {}),
+        ...(sim.pinnedAddonPack?.palette?.sea ? { seaPalette: sim.pinnedAddonPack.palette.sea } : {}),
       });
       surface.mesh.add(surface.openWorld.group);
     }

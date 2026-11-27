@@ -132,3 +132,38 @@ live raw manifest URL. `resolveProfile()` fetched it successfully and returned
 the exact pinned ID, version, checksum `882e0e41…`, and tile URL. This confirms
 the intended flow: an external maintainer publishes and validates in their own
 repository, while Flight3d reads only pinned, checksum-verified releases.
+
+## Santorini region addon (runtime visual integration)
+
+![Santorini addon over satellite terrain](../images/santorini-addon.png)
+
+`examples/packs/santorini/addon.json` is a pinned `med/region/santorini@1.0.0`
+pack with an Aegean sea palette, pastel haze and a whitewashed building override.
+The previously declaration-only `region.palette` and `region.buildingOverrides`
+sections now reach the renderer through `src/addons/regionVisuals.js`:
+
+- sea `deepColor`, `shallowColor`, `roughness` and `daylightScale` configure both
+  the water mesh and the far-sea pass in the screen sky;
+- sky `hazeColor` is kept as a time-of-day base colour so updates do not erase it;
+- building overrides select Overture features by bounds, `overtureId` or
+  `nameContains` and apply `material.baseColor` as a vertex tint; `suppress`
+  removes matching building polygons;
+- the pinned versioned tile URL is injected into `OpenWorldTerrain`'s imagery
+  cache, with the default Esri satellite cache as a fallback when a tile is
+  unavailable;
+- the satellite terrain shader tints only Overture water-mask pixels with the
+  palette's shallow sea colour, so the Aegean colour appears over the satellite
+  image without recolouring land.
+
+The example tile and GLB URLs use `packs.example` and do not publish assets:
+the pack proves the contract and shader/override wiring, not a hosted Santorini
+imagery set. GLB replacement meshes from `override.model` are validated by the
+addon runtime verifier but are not yet instantiated by the streamed building
+layer; only their declared material colour and collision policy are consumed.
+
+Verification: `node --test tests/santoriniAddon.test.js` plus the related addon,
+far-sea, water and city focused tests pass. Hardware Chrome 158 with an Intel
+Vulkan renderer passed `scripts/verify-browser-gpu.mjs` (WebGL2, shader draw,
+`readPixels [255,0,0,255]`, GL error 0) and booted the pinned Santorini pack in
+both lobby and flight. `flight-persona` reported no anomalies on a four-tick
+C172/Neon sortie; that sortie does not exercise Santorini-specific terrain.

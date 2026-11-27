@@ -85,6 +85,7 @@ export class SkyAtmosphere {
     // Atmospheric Exponential Height Fog parameters
     installHeightFog();
     this.fogColor = new THREE.Color(0xc8def4);
+    this.hazePalette = null;
     this.baseDensity = 0.00016;
     this.heightFalloff = HAZE_HEIGHT_FALLOFF;
     this.currentDensity = 0.00016;
@@ -301,7 +302,8 @@ export class SkyAtmosphere {
       this.ambientLight.intensity = 0.85 + t * 0.45;
 
       this.baseDensity = 0.00016 - t * 0.00004; // 0.00012 at noon
-      this.fogColor.setRGB(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03); // Crisp Rayleigh sky-blue haze
+      if (this.hazePalette) this.fogColor.copy(this.hazePalette).lerp(new THREE.Color(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03), 0.15);
+      else this.fogColor.setRGB(0.70 + t * 0.02, 0.82 + t * 0.04, 0.93 + t * 0.03); // Crisp Rayleigh sky-blue haze
       exposure = 1.04 - t * 0.06; // 0.98 at noon to eliminate white fuselage highlight blowout
     } else if (elevation > -4.0) {
       // Twilight / Golden Hour: Dawn/Sunrise (06:00) vs Sunset (18:00)
@@ -398,6 +400,8 @@ export class SkyAtmosphere {
       uniforms.uSeaRim.value = sea.uEdgeFadeEnd.value;
       uniforms.uDeepColor.value.copy(sea.uDeepColor.value);
       uniforms.uShallowColor.value.copy(sea.uShallowColor.value);
+      if (sea.uRoughness) uniforms.uRoughness.value = sea.uRoughness.value;
+      if (sea.uDaylightScale) uniforms.uDaylightScale.value = sea.uDaylightScale.value;
     }
   }
 
@@ -412,6 +416,14 @@ export class SkyAtmosphere {
     }
     if (this.cloudLayer) {
       this.cloudLayer.visible = visible;
+    }
+  }
+
+  setRegionPalette({ hazeColor } = {}) {
+    if (hazeColor) {
+      this.hazePalette = new THREE.Color(hazeColor);
+      this.fogColor.copy(this.hazePalette);
+      this.sky.material.uniforms.uHazeColor.value.copy(this.hazePalette);
     }
   }
 

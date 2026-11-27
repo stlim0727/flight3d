@@ -1,11 +1,6 @@
 import * as THREE from 'three';
 import { AERIAL_SEA_GLSL } from './AerialPerspective.js';
 
-// Roughness of the sea once every ripple is below a pixel: the slope variance the
-// fragment shader's eight waves fold into the BRDF when none of them is resolved.
-// Recompute when those waves change, or the rim blend below shows as a ring.
-export const OCEAN_FAR_ROUGHNESS = 0.252;
-
 /**
  * Sea colour, shared with the sky pass, which carries the same sea from the mesh rim to
  * the horizon (#751). `skyColor` is the haze colour the reflection is built on.
@@ -14,7 +9,7 @@ export const OCEAN_SURFACE_GLSL = /* glsl */`
   ${AERIAL_SEA_GLSL}
 
   vec3 oceanSurfaceColor(vec3 viewDir, vec3 normal, float roughness, float sunVisibility,
-      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor) {
+      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor, float daylightScale) {
     // Water is a dielectric (F0 ~ 0.02), with stronger sky reflection at grazing angles.
     float cosTheta = clamp(dot(viewDir, normal), 0.0, 1.0);
     float fresnel = 0.02 + 0.98 * pow(1.0 - cosTheta, 5.0);
@@ -27,7 +22,7 @@ export const OCEAN_SURFACE_GLSL = /* glsl */`
     float sunGlint = min(8.0, distribution * 0.02) * daylight * sunVisibility;
     float skyHeight = clamp(reflect(-viewDir, normal).y, 0.0, 1.0);
     vec3 skyReflection = mix(skyColor, skyColor * vec3(0.42, 0.62, 0.85), sqrt(skyHeight));
-    vec3 waterColor = mix(deepColor, shallowColor, 0.12) * mix(0.08, 0.7, daylight);
+    vec3 waterColor = mix(deepColor, shallowColor, 0.12) * mix(0.08, 0.7 * daylightScale, daylight);
     // Shadowed water loses the sun glint and the sunlight scattered back out of the
     // water body and unresolved ripples. The sky reflection dims with them: it is most
     // of what a chase camera sees, and left alone it would hide the height cue (#648).
@@ -37,11 +32,11 @@ export const OCEAN_SURFACE_GLSL = /* glsl */`
   // The sea where a sight line leaving the eye along "direction" strikes the sphere, every
   // ripple unresolved. grazing2 is aerialSeaReach's, clamped to the horizon.
   vec3 oceanFarColor(vec3 direction, float grazing2,
-      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor) {
+      vec3 sunDir, vec3 sunColor, vec3 skyColor, vec3 deepColor, vec3 shallowColor, float roughness, float daylightScale) {
     float curve = - direction.y - sqrt(grazing2); // distance to the sea over the earth's radius
     vec3 seaNormal = normalize(vec3(direction.x * curve, 1.0, direction.z * curve));
-    return oceanSurfaceColor(-direction, seaNormal, ${OCEAN_FAR_ROUGHNESS}, 1.0,
-      sunDir, sunColor, skyColor, deepColor, shallowColor);
+    return oceanSurfaceColor(-direction, seaNormal, roughness, 1.0,
+      sunDir, sunColor, skyColor, deepColor, shallowColor, daylightScale);
   }
 `;
 
@@ -84,6 +79,8 @@ export class WaterOcean {
         uSunDir: { value: this.sunDirection },
         uDeepColor: { value: new THREE.Color(0x0a284a) },   // Deep ocean navy
         uShallowColor: { value: new THREE.Color(0x136a8a) },// Shallow coastal turquoise
+        uRoughness: { value: 0.252 },
+        uDaylightScale: { value: 1.0 },
         uSunColor: { value: new THREE.Color(0xffeedd) },
         uFogColor: { value: new THREE.Color(0xc8def4) },
         uFogDensity: { value: 0.00020 },
@@ -155,6 +152,8 @@ export class WaterOcean {
         uniform vec3 uSunDir;
         uniform vec3 uDeepColor;
         uniform vec3 uShallowColor;
+        uniform float uRoughness;
+        uniform float uDaylightScale;
         uniform vec3 uSunColor;
         uniform vec3 uFogColor;
         uniform float uFogDensity;
@@ -227,11 +226,11 @@ export class WaterOcean {
             vec3 normal = normalize(vec3(-waves.x, 1.0, -waves.y));
           #endif
 
-          float roughness = pow(pow(0.18, 4.0) + waves.z, 0.25);
+          float roughness = pow(pow(uRoughness * 0.714, 4.0) + waves.z, 0.25);
           vec3 lightDir = normalize(uSunDir);
           float sunVisibility = mix(1.0, getShadowMask(), smoothstep(-0.04, 0.15, lightDir.y));
           vec3 finalColor = oceanSurfaceColor(viewDir, normal, roughness, sunVisibility,
-            lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor);
+            lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor, uDaylightScale);
 
           // Synchronized atmospheric aerial perspective fog
           float dist = length(cameraPosition - vWorldPos);
@@ -264,7 +263,7 @@ export class WaterOcean {
           if (rim > 0.0) {
             grazing2 = max(grazing2, 0.0);
             float farReach = uBaseFogDensity * aerialSeaReach(eyeY, -viewDir.y, grazing2);
-            finalColor = mix(finalColor, oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor), rim);
+            finalColor = mix(finalColor, oceanFarColor(-viewDir, grazing2, lightDir, uSunColor, uFogColor, uDeepColor, uShallowColor, uRoughness, uDaylightScale), rim);
             fogFactor = mix(fogFactor, 1.0 - exp(-farReach * farReach), rim);
           }
 
@@ -326,6 +325,14 @@ export class WaterOcean {
     if (this.material && this.material.uniforms && this.material.uniforms.uSunDir) {
       this.material.uniforms.uSunDir.value.copy(this.sunDirection);
     }
+  }
+
+  setPalette({ deepColor, shallowColor, roughness, daylightScale } = {}) {
+    if (!this.material?.uniforms) return;
+    if (deepColor) this.material.uniforms.uDeepColor.value.set(deepColor);
+    if (shallowColor) this.material.uniforms.uShallowColor.value.set(shallowColor);
+    if (Number.isFinite(roughness)) this.material.uniforms.uRoughness.value = roughness;
+    if (Number.isFinite(daylightScale)) this.material.uniforms.uDaylightScale.value = daylightScale;
   }
 
   syncWithAtmosphere(sky) {

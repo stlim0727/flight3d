@@ -11,6 +11,7 @@ import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
 import { DebriefOverlay } from './DebriefOverlay.js';
 import { initLobbyScreen } from './LobbyScreen.js';
+import { addonMapBookmarks } from '../addons/regionVisuals.js';
 import { loadMapFlightPlaces, mapPlanRegion } from '../config/mapFlightPlaces.js';
 import { registerExternalDestinations } from '../config/externalDestinations.js';
 import { DeveloperPanel } from './DeveloperPanel.js';
@@ -704,6 +705,7 @@ class SimulatorHudAndBindingsMethods {
       isDeviceTime: () => this.demoDirector?.userTimeOfDayOverridden === false,
       getAircraft: () => this.lobby.aircraft || this.currentAircraftId || 'B738',
       getAircraftOptions: () => addonAircraftIds(),
+      getAddonBookmarks: () => addonMapBookmarks(this.pinnedAddonPack),
       getDemoProfile: () => this.lobby.demoProfile,
       onDemoProfile: id => { this.lobby.demoProfile = id; },
       getDestination: () => this.lobby.destination || 'none',
