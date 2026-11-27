@@ -2,7 +2,7 @@ import { validateAddonManifest } from './addonContract.js';
 
 const ADDON_ID = /^[a-z0-9][a-z0-9._-]*\/(?:region|aircraft|scenario)\/[a-z0-9][a-z0-9._-]*$/;
 
-const ALLOWED_ASSET_HOSTS = new Set(['packs.example']);
+const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1']);
 const SUPPORTED_SCENARIO_OBJECTIVES = new Set([
   'reach-waypoint', 'maintain-altitude-band', 'land-at', 'photograph-landmark',
 ]);
@@ -22,7 +22,33 @@ function assetHosts(manifest) {
   return urls;
 }
 
-export function lintAddonSet(manifests, { coreVersion } = {}) {
+function validateAssetUrl(manifestId, url, allowedHosts, errors) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    errors.push(`${manifestId}: invalid asset URL ${url}`);
+    return;
+  }
+  const isHttps = parsed.protocol === 'https:';
+  const isLocalHttp = parsed.protocol === 'http:' && LOCAL_HTTP_HOSTS.has(parsed.hostname);
+  if (!isHttps && !isLocalHttp) {
+    errors.push(`${manifestId}: asset URL protocol not allowed: ${parsed.protocol}`);
+    return;
+  }
+  if (!parsed.hostname) {
+    errors.push(`${manifestId}: invalid asset URL ${url}`);
+    return;
+  }
+  if (allowedHosts && !allowedHosts.has(parsed.hostname)) {
+    errors.push(`${manifestId}: asset host not allowed: ${parsed.hostname}`);
+  }
+}
+
+export function lintAddonSet(manifests, { coreVersion, allowedAssetHosts } = {}) {
+  const allowedHosts = allowedAssetHosts == null
+    ? null
+    : (typeof allowedAssetHosts.has === 'function' ? allowedAssetHosts : new Set(allowedAssetHosts));
   const byId = new Map();
   const addonType = manifest => String(manifest?.id ?? '').split('/')[1];
   const errors = [];
@@ -38,13 +64,7 @@ export function lintAddonSet(manifests, { coreVersion } = {}) {
     }
     byId.set(manifest.id, manifest);
     for (const url of assetHosts(manifest)) {
-      try {
-        if (!ALLOWED_ASSET_HOSTS.has(new URL(url).hostname)) {
-          errors.push(`${manifest.id}: asset host not allowed: ${new URL(url).hostname}`);
-        }
-      } catch {
-        errors.push(`${manifest.id}: invalid asset URL ${url}`);
-      }
+      validateAssetUrl(manifest.id, url, allowedHosts, errors);
     }
     if (manifest.aircraft?.script || manifest.scenario?.script
       || manifest.scenario?.events?.some(event => event?.script)) {

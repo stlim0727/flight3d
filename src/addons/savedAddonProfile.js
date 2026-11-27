@@ -10,6 +10,26 @@ function safeStorage(storage) {
   catch { return null; }
 }
 
+function buildCatalogPins(catalog, selectedIds) {
+  if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
+    throw new Error('select at least one addon');
+  }
+  const byId = new Map((catalog?.addons ?? []).map(entry => [entry.id, entry]));
+  return selectedIds.map(id => {
+    const entry = byId.get(id);
+    if (!entry) throw new Error(`unknown addon ${id}`);
+    return { id: entry.id, version: entry.version, url: entry.url, sha256: entry.sha256 };
+  });
+}
+
+function writeSavedAddonProfile(profile, storage) {
+  const validated = parseProfile(serializeProfile(profile));
+  const target = safeStorage(storage);
+  if (!target) throw new Error('local storage unavailable');
+  target.setItem(SAVED_ADDON_PROFILE_KEY, serializeProfile(validated));
+  return validated;
+}
+
 export function loadSavedAddonProfile(storage) {
   try {
     const saved = safeStorage(storage)?.getItem(SAVED_ADDON_PROFILE_KEY);
@@ -22,20 +42,35 @@ export function loadSavedAddonProfile(storage) {
 }
 
 export function saveSelectedAddons(catalog, selectedIds, { coreVersion = null, storage } = {}) {
-  if (!Array.isArray(selectedIds) || selectedIds.length === 0) {
-    throw new Error('select at least one addon');
+  const pins = buildCatalogPins(catalog, selectedIds);
+  return writeSavedAddonProfile({ schemaVersion: 1, coreVersion, pins }, storage);
+}
+
+export function mergeSelectedAddons(catalog, selectedIds, { coreVersion = null, storage } = {}) {
+  const selectedPins = buildCatalogPins(catalog, selectedIds);
+  const catalogIds = new Set((catalog?.addons ?? []).map(entry => entry.id));
+  const saved = loadSavedAddonProfile(storage);
+  const keptPins = (saved?.pins ?? []).filter(pin => !catalogIds.has(pin.id));
+  return writeSavedAddonProfile({
+    schemaVersion: 1,
+    coreVersion: coreVersion ?? saved?.coreVersion ?? null,
+    pins: [...selectedPins, ...keptPins],
+  }, storage);
+}
+
+export function removeSavedAddonPin(id, version, { storage } = {}) {
+  const saved = loadSavedAddonProfile(storage);
+  const pins = saved?.pins?.filter(pin => pin.id !== id || pin.version !== version) ?? [];
+  if (pins.length === 0) {
+    clearSavedAddonProfile(storage);
+    return null;
   }
-  const byId = new Map((catalog?.addons ?? []).map(entry => [entry.id, entry]));
-  const pins = selectedIds.map(id => {
-    const entry = byId.get(id);
-    if (!entry) throw new Error(`unknown addon ${id}`);
-    return { id: entry.id, version: entry.version, url: entry.url, sha256: entry.sha256 };
-  });
-  const profile = parseProfile(serializeProfile({ schemaVersion: 1, coreVersion, pins }));
-  const target = safeStorage(storage);
-  if (!target) throw new Error('local storage unavailable');
-  target.setItem(SAVED_ADDON_PROFILE_KEY, serializeProfile(profile));
-  return profile;
+  const profile = writeSavedAddonProfile({
+    schemaVersion: 1,
+    coreVersion: saved.coreVersion,
+    pins,
+  }, storage);
+  return profile.pins;
 }
 
 export function clearSavedAddonProfile(storage) {

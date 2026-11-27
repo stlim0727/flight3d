@@ -13,7 +13,8 @@ import { listAddons, buildAddonProfileUrl, resolveSharedAddonPack, resolveCatalo
 import { AddonPicker } from '../src/ui/AddonPicker.js';
 import {
   SAVED_ADDON_PROFILE_KEY, clearSavedAddonProfile, loadSavedAddonProfile,
-  hasExplicitAddonParams, resolveAddonSearch, saveSelectedAddons,
+  hasExplicitAddonParams, mergeSelectedAddons, removeSavedAddonPin,
+  resolveAddonSearch, saveSelectedAddons,
   SAVED_ADDON_CATALOG_KEY, loadSavedAddonCatalogUrl, saveAddonCatalogUrl,
 } from '../src/addons/savedAddonProfile.js';
 import { installAddonPicker } from '../src/ui/installAddonPicker.js';
@@ -674,4 +675,231 @@ test('saved catalog URL restores selected addons in the picker after reload', as
   assert.equal(loadSavedAddonCatalogUrl(blocked), null);
   assert.doesNotThrow(() => saveAddonCatalogUrl(catalogUrl, { storage: blocked }));
   assert.doesNotThrow(() => saveAddonCatalogUrl('', { storage: blocked }));
+});
+
+test('AddonPicker.removePin uses globalThis.localStorage when storage option is omitted', async () => {
+  const prevDesc = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  const ls = memoryStorage();
+  Object.defineProperty(globalThis, 'localStorage', { configurable: true, writable: true, value: ls });
+  try {
+    const catalog = {
+      schemaVersion: 1,
+      addons: [
+        { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+        { id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+      ],
+    };
+    saveSelectedAddons(catalog, ['demo/region/sky', 'demo/aircraft/jet'], { coreVersion: '1.8.0' });
+    await withFakeDocument(async ({ parent, slots }) => {
+      slots['.addon-saved-list'] = createFakeElement('div');
+      const picker = installAddonPicker(parent, {
+        fetchImpl: async () => ({ ok: true, json: async () => catalog }),
+      });
+      await picker.load('https://packs.example/catalog.json');
+      assert.equal(slots['.addon-saved-list'].children.length, 2);
+
+      const firstRemove = slots['.addon-saved-list'].children[0].children[1];
+      firstRemove.dispatch('click');
+      assert.deepEqual(loadSavedAddonProfile()?.pins.map(pin => pin.id), ['demo/aircraft/jet']);
+      assert.deepEqual([...picker.selected], ['demo/aircraft/jet']);
+
+      assert.equal(picker.removePin('demo/aircraft/jet', '2.0.0'), true);
+      assert.equal(loadSavedAddonProfile(), null);
+      assert.equal(picker.selected.size, 0);
+      assert.equal(slots['.addon-remove'].hidden, true);
+    });
+
+    saveSelectedAddons(catalog, ['demo/region/sky', 'demo/aircraft/jet']);
+    const remaining = removeSavedAddonPin('demo/region/sky', '1.0.0');
+    assert.deepEqual(remaining.map(pin => pin.id), ['demo/aircraft/jet']);
+    assert.equal(removeSavedAddonPin('demo/aircraft/jet', '2.0.0'), null);
+    assert.equal(loadSavedAddonProfile(), null);
+  } finally {
+    if (prevDesc) Object.defineProperty(globalThis, 'localStorage', prevDesc);
+    else delete globalThis.localStorage;
+  }
+});
+
+test('AddonPicker ignores stale load responses after clearUrl or a newer load', async () => {
+  const catalogA = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) }],
+  };
+  const catalogB = {
+    schemaVersion: 1,
+    addons: [{ id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) }],
+  };
+  const deferred = new Map();
+  const fetchImpl = url => new Promise((resolve, reject) => deferred.set(url, { resolve, reject }));
+
+  await withFakeDocument(async ({ parent, slots }) => {
+    const picker = new AddonPicker({ fetchImpl, validateCatalog, storage: memoryStorage() });
+    picker.mount(parent);
+
+    const pendingCleared = picker.load('https://packs.example/slow-clear.json');
+    picker.clearUrl();
+    deferred.get('https://packs.example/slow-clear.json').resolve({ ok: true, json: async () => catalogA });
+    await pendingCleared;
+    assert.equal(picker.catalog, null);
+    assert.equal(picker.selected.size, 0);
+    assert.equal(slots['.addon-picker-filters'].hidden, true);
+    assert.equal(slots['.addon-picker-status'].textContent, picker.labels.urlCleared);
+
+    const slowLoad = picker.load('https://packs.example/slow.json');
+    const fastLoad = picker.load('https://packs.example/fast.json');
+    deferred.get('https://packs.example/fast.json').resolve({ ok: true, json: async () => catalogB });
+    await fastLoad;
+    deferred.get('https://packs.example/slow.json').reject(new Error('network timeout'));
+    await slowLoad;
+    assert.equal(picker.catalog, catalogB);
+    assert.equal(picker.catalogUrl, 'https://packs.example/fast.json');
+    assert.equal(slots['.addon-picker-filters'].hidden, false);
+    assert.equal(slots['.addon-picker-status'].textContent, '');
+  });
+});
+
+test('AddonPicker.apply keeps saved pins from another catalog while updating current catalog pins', async () => {
+  const catalogA = {
+    schemaVersion: 1,
+    addons: [
+      { id: 'demo/region/sky', version: '1.0.0', url: 'https://packs.example/sky.json', sha256: 'a'.repeat(64) },
+      { id: 'demo/region/bay', version: '1.0.0', url: 'https://packs.example/bay.json', sha256: 'c'.repeat(64) },
+    ],
+  };
+  const catalogB = {
+    schemaVersion: 1,
+    addons: [
+      { id: 'demo/aircraft/jet', version: '2.0.0', url: 'https://packs.example/jet.json', sha256: 'b'.repeat(64) },
+    ],
+  };
+  const urlA = 'https://packs.example/a/catalog.json';
+  const urlB = 'https://packs.example/b/catalog.json';
+  const storage = memoryStorage();
+  const fetchImpl = async url => {
+    if (url === urlA) return { ok: true, json: async () => catalogA };
+    if (url === urlB) return { ok: true, json: async () => catalogB };
+    return { ok: false, status: 404 };
+  };
+
+  await withFakeDocument(async ({ parent, slots }) => {
+    slots['.addon-saved-list'] = createFakeElement('div');
+    const picker = new AddonPicker({ fetchImpl, validateCatalog, storage, coreVersion: '1.8.0' });
+    picker.mount(parent);
+
+    await picker.load(urlA);
+    picker.selected.add('demo/region/sky');
+    picker.selected.add('demo/region/bay');
+    assert.equal(picker.apply(), true);
+
+    await picker.load(urlB);
+    picker.selected.add('demo/aircraft/jet');
+    assert.equal(picker.apply(), true);
+    assert.deepEqual(
+      loadSavedAddonProfile(storage)?.pins.map(pin => pin.id).sort(),
+      ['demo/aircraft/jet', 'demo/region/bay', 'demo/region/sky'],
+    );
+    assert.equal(slots['.addon-saved-list'].children.length, 3);
+
+    await picker.load(urlA);
+    picker.selected.delete('demo/region/bay');
+    assert.equal(picker.apply(), true);
+    assert.deepEqual(
+      loadSavedAddonProfile(storage)?.pins.map(pin => pin.id).sort(),
+      ['demo/aircraft/jet', 'demo/region/sky'],
+    );
+  });
+
+  const merged = mergeSelectedAddons(catalogB, ['demo/aircraft/jet'], { storage });
+  assert.deepEqual(merged.pins.map(pin => pin.id).sort(), ['demo/aircraft/jet', 'demo/region/sky']);
+});
+
+test('resolveSharedAddonPack preserves region and aircraft pins together and supports aircraft and scenario addonManifest links', async () => {
+  globalThis.btoa ??= binary => Buffer.from(binary, 'binary').toString('base64');
+  globalThis.atob ??= b64 => Buffer.from(b64, 'base64').toString('binary');
+  const regionManifest = buildAddonStarter({
+    publisher: 'demo', name: 'sky', kind: 'region',
+    version: '1.0.0', coreVersion: '1.8.0', title: 'Sky',
+  }).files['addon.json'];
+  const aircraftManifest = buildAddonStarter({
+    publisher: 'demo', name: 'jet', kind: 'aircraft',
+    version: '2.0.0', coreVersion: '1.8.0', title: 'Jet',
+  }).files['addon.json'];
+  const scenarioManifest = buildAddonStarter({
+    publisher: 'demo', name: 'tour', kind: 'scenario',
+    version: '1.1.0', coreVersion: '1.8.0', title: 'Tour',
+  }).files['addon.json'];
+
+  const regionBytes = Buffer.from(JSON.stringify(regionManifest), 'utf8');
+  const regionSha = createHash('sha256').update(regionBytes).digest('hex');
+  const aircraftBytes = Buffer.from(JSON.stringify(aircraftManifest), 'utf8');
+  const aircraftSha = createHash('sha256').update(aircraftBytes).digest('hex');
+  const scenarioBytes = Buffer.from(JSON.stringify(scenarioManifest), 'utf8');
+  const scenarioSha = createHash('sha256').update(scenarioBytes).digest('hex');
+
+  const catalog = {
+    schemaVersion: 1,
+    addons: [
+      { id: regionManifest.id, version: regionManifest.version, url: 'https://packs.example/sky.json', sha256: regionSha },
+      { id: aircraftManifest.id, version: aircraftManifest.version, url: 'https://packs.example/jet.json', sha256: aircraftSha },
+    ],
+  };
+  const fetchImpl = async url => {
+    if (url === 'https://packs.example/sky.json') return { ok: true, arrayBuffer: async () => regionBytes };
+    if (url === 'https://packs.example/jet.json') return { ok: true, arrayBuffer: async () => aircraftBytes };
+    return { ok: false, status: 404 };
+  };
+
+  const combinedUrl = buildAddonProfileUrl(catalog, [regionManifest.id, aircraftManifest.id], {
+    baseUrl: 'https://flight.example/?',
+    coreVersion: '1.8.0',
+  });
+  const combined = await resolveSharedAddonPack(new URL(combinedUrl).search, { fetchImpl });
+  assert.equal(combined.id, regionManifest.id);
+  assert.match(combined.urlTemplate, /https:\/\/packs\.example\/demo\/sky\/1\.0\.0\/\{z\}\/\{y\}\/\{x\}\.png/);
+  assert.equal(combined.profile.pins.length, 2);
+  assert.equal(combined.aircraft.packId, aircraftManifest.id);
+  assert.equal(combined.aircrafts.length, 1);
+  assert.equal(combined.aircrafts[0].id, aircraftManifest.aircraft.id);
+
+  const encodeManifest = bytes => bytes.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  const aircraftLegacy = await resolveSharedAddonPack(
+    `?addonManifest=${encodeManifest(aircraftBytes)}&addonSha256=${aircraftSha}`,
+    { coreVersion: '1.8.0' },
+  );
+  assert.equal(aircraftLegacy.id, aircraftManifest.id);
+  assert.equal(aircraftLegacy.version, aircraftManifest.version);
+  assert.equal(aircraftLegacy.sha256, aircraftSha);
+  assert.equal(aircraftLegacy.aircraft.packId, aircraftManifest.id);
+  assert.equal(aircraftLegacy.aircrafts.length, 1);
+
+  const scenarioLegacy = await resolveSharedAddonPack(
+    `?addonManifest=${encodeManifest(scenarioBytes)}&addonSha256=${scenarioSha}`,
+    { coreVersion: '1.8.0' },
+  );
+  assert.equal(scenarioLegacy.id, scenarioManifest.id);
+  assert.equal(scenarioLegacy.version, scenarioManifest.version);
+  assert.equal(scenarioLegacy.sha256, scenarioSha);
+});
+
+test('resolveCatalogUrl handles .git suffix and leaves non-catalog GitHub paths unchanged', () => {
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo.git'),
+    'https://raw.githubusercontent.com/owner/repo/main/catalog.json',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo.git/tree/main'),
+    'https://raw.githubusercontent.com/owner/repo/main/catalog.json',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/issues/1'),
+    'https://github.com/owner/repo/issues/1',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/pull/2'),
+    'https://github.com/owner/repo/pull/2',
+  );
+  assert.equal(
+    resolveCatalogUrl('https://github.com/owner/repo/blob/main/addon.json'),
+    'https://github.com/owner/repo/blob/main/addon.json',
+  );
 });

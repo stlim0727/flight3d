@@ -66,3 +66,53 @@ test('lint requires scenario addons to be reachable through dependencies', async
   assert.equal(result.ok, false);
   assert.ok(result.errors.some(message => message.includes('is not reachable')));
 });
+
+test('lintAddonSet allows HTTPS and localhost asset URLs by default, rejects unsafe protocols, and honors allowedAssetHosts', async () => {
+  const [aircraft] = await readPacks();
+  const withUrls = url => ({
+    ...aircraft,
+    aircraft: {
+      ...aircraft.aircraft,
+      model: { ...aircraft.aircraft.model, url },
+      cockpit: { ...aircraft.aircraft.cockpit, url },
+    },
+    assets: [{ ...aircraft.assets[0], url }],
+  });
+
+  assert.equal(
+    lintAddonSet([withUrls('https://raw.githubusercontent.com/owner/repo/main/islander.glb')], { coreVersion: '1.8.0' }).ok,
+    true,
+  );
+  assert.equal(
+    lintAddonSet([withUrls('http://localhost:8080/islander.glb')], { coreVersion: '1.8.0' }).ok,
+    true,
+  );
+  assert.equal(
+    lintAddonSet([withUrls('http://127.0.0.1:8080/islander.glb')], { coreVersion: '1.8.0' }).ok,
+    true,
+  );
+
+  for (const badUrl of [
+    'http://cdn.example.com/islander.glb',
+    'javascript:alert(1)',
+    'data:text/plain,evil',
+    'file:///etc/passwd',
+    'not-a-valid-url',
+  ]) {
+    const result = lintAddonSet([withUrls(badUrl)], { coreVersion: '1.8.0' });
+    assert.equal(result.ok, false, `expected ${badUrl} to fail lintAddonSet`);
+  }
+
+  const restrictedPass = lintAddonSet(
+    [withUrls('https://packs.example/islander.glb')],
+    { coreVersion: '1.8.0', allowedAssetHosts: new Set(['packs.example']) },
+  );
+  assert.equal(restrictedPass.ok, true);
+
+  const restrictedFail = lintAddonSet(
+    [withUrls('https://raw.githubusercontent.com/owner/repo/main/islander.glb')],
+    { coreVersion: '1.8.0', allowedAssetHosts: new Set(['packs.example']) },
+  );
+  assert.equal(restrictedFail.ok, false);
+  assert.ok(restrictedFail.errors.some(message => message.includes('asset host not allowed: raw.githubusercontent.com')));
+});
