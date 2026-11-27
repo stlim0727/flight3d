@@ -840,3 +840,115 @@ test('UI State Contract: lobby map tiles stay deferred until enableMapTiles is c
     globalThis.document = originalDoc;
   }
 });
+
+test('UI State Contract: held flight card without airportLabel does not leak pending map place', () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'coastal',
+      getPreset: () => 'runway',
+      getTime: () => 12,
+      getAircraft: () => 'B738',
+      getMapPlan: () => plan,
+      onMapPlan: value => { plan = value; },
+      canResume: () => true,
+      canEnd: () => true,
+      getHeldFlight: () => ({
+        airport: 'lukla',
+        aircraft: 'C172',
+        scenario: 'approach',
+        timeOfDay: 9.5,
+        deviceTime: false,
+      }),
+    });
+    const runway = { id: '1', lengthM: 3750, surface: 'ASP', ends: [{ ident: '09', headingDegT: 90 }] };
+    screen.setMapPlaces({
+      airports: [{ code: 'KJFK', iata: 'JFK', name: 'John F. Kennedy International Airport', latitude: 40.6394, longitude: -73.7793, runways: [runway] }],
+      points: [],
+    });
+    elements.get('lobby-map-search').value = 'jfk';
+    screen.setMapSearchState('ready');
+    const jfkBtn = elements.get('lobby-map-results').children.find(child => child.dataset.placeId === 'KJFK');
+    assert.ok(jfkBtn, 'map search exposes KJFK');
+    elements.get('lobby-map-results').listeners.click[0]({ target: { closest: () => jfkBtn } });
+    assert.equal(plan?.airportCode, 'KJFK');
+
+    assert.equal(
+      elements.get('lobby-managed-airport').textContent,
+      t('lukla.vnlk'),
+      'held flight card must keep the active flight airport rather than leaking pending map place',
+    );
+  } finally {
+    globalThis.document = originalDoc;
+  }
+});
+
+test('UI State Contract: addon aircraft button tracks active state and scenario lock in LobbyScreen', () => {
+  const { elements, mockDoc } = setupMockDOM();
+  const addonId = 'demo-addon-ui';
+  const picker = new MockElement('lobby-aircraft-picker', 'details');
+  const buttonsGroup = new MockElement('', 'div');
+  const summary = new MockElement('', 'summary');
+  picker.appendChild(summary);
+  picker.appendChild(buttonsGroup);
+  picker.querySelector = sel => {
+    if (sel === '.lobby-buttons') return buttonsGroup;
+    if (sel === 'summary') return summary;
+    return null;
+  };
+  elements.set('lobby-aircraft-picker', picker);
+  elements.set('lobby-aircraft-reason', new MockElement('lobby-aircraft-reason', 'p'));
+  const baseGetById = mockDoc.getElementById;
+  mockDoc.getElementById = id => baseGetById(id) || buttonsGroup.children.find(child => child.id === id) || null;
+
+  const originalDoc = globalThis.document;
+  globalThis.document = mockDoc;
+  try {
+    let aircraft = 'B738';
+    let airport = 'coastal';
+    let preset = 'runway';
+    const screen = initLobbyScreen({
+      getAirport: () => airport,
+      getPreset: () => preset,
+      getTime: () => 12,
+      getAircraft: () => aircraft,
+      getAircraftOptions: () => ['B738', 'C172', 'F16', addonId],
+      onAirport: value => { airport = value; },
+      onPreset: value => { preset = value; },
+      onTime: () => {},
+      onAircraft: value => { aircraft = value; },
+      onFly: () => {},
+    });
+
+    const addonBtn = mockDoc.getElementById(`lobby-aircraft-${addonId}`);
+    assert.ok(addonBtn, 'addon aircraft button should be created in the picker');
+    assert.equal(addonBtn.classList.contains('active'), false);
+    assert.equal(addonBtn.disabled, false);
+
+    picker.open = true;
+    addonBtn.click();
+    assert.equal(aircraft, addonId);
+    assert.equal(picker.open, false, 'clicking addon aircraft closes the picker');
+    screen.refresh();
+    assert.equal(addonBtn.classList.contains('active'), true, 'selected addon button gets .active');
+    assert.equal(elements.get('lobby-aircraft-b738').classList.contains('active'), false);
+    assert.equal(addonBtn.disabled, false);
+
+    airport = 'valley';
+    preset = 'valley';
+    screen.refresh();
+    assert.equal(addonBtn.disabled, true, 'addon aircraft button disables when valley locks aircraft');
+    assert.equal(addonBtn.getAttribute('aria-describedby'), 'lobby-aircraft-reason');
+
+    airport = 'neon';
+    preset = 'bridge';
+    screen.refresh();
+    assert.equal(addonBtn.disabled, true, 'addon aircraft button disables when bridge locks aircraft');
+    assert.equal(addonBtn.getAttribute('aria-describedby'), 'lobby-aircraft-reason');
+  } finally {
+    globalThis.document = originalDoc;
+  }
+});

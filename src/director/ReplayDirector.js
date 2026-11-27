@@ -3,7 +3,7 @@ import { sampleTrack, sampleRemote, trackDuration, findSpan, poseIsHeld, STATE_F
 import { RemoteAircraft } from '../multiplayer/RemoteAircraft.js';
 import { ReplayCrashEffects, crashEvents } from '../replay/ReplayCrashEffects.js';
 import { REPLAY_SPEEDS } from '../replay/replayConfig.js';
-import { AIRCRAFT_REGISTRY } from '../config/aircraftConfigs.js';
+import { resolveAircraftConfig } from '../config/aircraftConfigs.js';
 import { isExternalDestination, registerExternalDestinations } from '../config/externalDestinations.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
@@ -67,11 +67,11 @@ export class ReplayDirector {
    */
   async load(track, { entryId = null } = {}) {
     if (!track || !Array.isArray(track.samples) || track.samples.length < 2) return false;
-    if (track.remotes?.some(pilot => !Object.hasOwn(AIRCRAFT_REGISTRY, pilot.aircraft)
+    if (track.remotes?.some(pilot => !resolveAircraftConfig(pilot.aircraft)
       || !Array.isArray(pilot.samples) || pilot.samples.length !== track.samples.length)) return false;
     const { airport, aircraft, scenario, demoProfile, timeOfDay, seed, customOrigin, placeLabel, airportCode, airportTileId } = track.metadata || {};
     const valley = scenario === 'valley';
-    if (!Object.hasOwn(AIRCRAFT_REGISTRY, aircraft) || !isScenarioAvailable(airport, scenario)
+    if (!resolveAircraftConfig(aircraft) || !isScenarioAvailable(airport, scenario)
       || (valley && (!Number.isSafeInteger(seed) || seed < 0))) return false;
     const sim = this.sim;
     if (sim.multiplayer?.active || sim.startingFlight || sim.airportLoading || this.loading) return false;

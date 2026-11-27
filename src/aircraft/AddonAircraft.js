@@ -27,10 +27,11 @@ export class AddonAircraft {
     this.group.add(this.gltfGroup);
     this.proceduralGroup = new THREE.Group();
     this.group.add(this.proceduralGroup);
+    this.cockpitMode = false;
     this.cockpit = {
       group: new THREE.Group(),
       yokesVisible: true,
-      cockpitModelFailed: Boolean(descriptor.cockpit),
+      cockpitModelFailed: false,
       cockpitModelLoading: false,
       gltfCockpitLoaded: false,
       gltfCockpitGroup: null,
@@ -58,20 +59,21 @@ export class AddonAircraft {
     const aero = this.descriptor.config.aerodynamics ?? {};
     const span = aero.wingspanM ?? 11;
     const area = aero.wingAreaM2 ?? 16;
-    const length = this.descriptor.config.massProperties ? undefined : 8;
     const chord = Math.max(1, area / span);
-    const bodyLength = length ?? Math.max(8, chord * 3.6);
+    const bodyLength = Number.isFinite(this.descriptor.config.lengthM) && this.descriptor.config.lengthM > 0
+      ? this.descriptor.config.lengthM
+      : Math.max(8, chord * 3.6);
     const white = new THREE.MeshStandardMaterial({ color: 0xe8ecf2, metalness: 0.05, roughness: 0.5 });
     const blue = new THREE.MeshStandardMaterial({ color: 0x1252a8, metalness: 0.1, roughness: 0.45 });
     const dark = new THREE.MeshStandardMaterial({ color: 0x12151c, metalness: 0.2, roughness: 0.6 });
     box(this.proceduralGroup, 'fuselage_node', [0.95, 0.95, bodyLength], [0, 0, 0], white);
-    box(this.proceduralGroup, 'wing_node', [chord, 0.16, span], [0.4, 0.05, 0], blue);
-    box(this.proceduralGroup, 'tailplane_node', [chord * 0.5, 0.1, span * 0.36], [-bodyLength * 0.42, 0.28, 0], white);
-    box(this.proceduralGroup, 'elevator_node', [chord * 0.24, 0.06, span * 0.32], [-bodyLength * 0.5, 0.28, 0], white);
-    box(this.proceduralGroup, 'rudder_node', [chord * 0.5, 1.3, 0.08], [-bodyLength * 0.43, 0.7, 0], blue);
-    box(this.proceduralGroup, 'flaps_node', [chord * 0.22, 0.05, span * 0.5], [-0.2, 0.05, 0], dark);
-    box(this.proceduralGroup, 'gear_node', [0.4, 0.7, 1.5], [0.2, -0.7, 0], dark);
-    box(this.proceduralGroup, 'azimuth_node', [0.12, 1.6, 0.12], [bodyLength * 0.52, 0, 0], dark);
+    box(this.proceduralGroup, 'wing_node', [span, 0.16, chord], [0, 0.05, -0.4], blue);
+    box(this.proceduralGroup, 'tailplane_node', [span * 0.36, 0.1, chord * 0.5], [0, 0.28, bodyLength * 0.42], white);
+    box(this.proceduralGroup, 'elevator_node', [span * 0.32, 0.06, chord * 0.24], [0, 0.28, bodyLength * 0.5], white);
+    box(this.proceduralGroup, 'rudder_node', [0.08, 1.3, chord * 0.5], [0, 0.7, bodyLength * 0.43], blue);
+    box(this.proceduralGroup, 'flaps_node', [span * 0.5, 0.05, chord * 0.22], [0, 0.05, 0.2], dark);
+    box(this.proceduralGroup, 'gear_node', [1.5, 0.7, 0.4], [0, -0.7, -0.2], dark);
+    box(this.proceduralGroup, 'azimuth_node', [1.6, 0.12, 0.12], [0, 0, -bodyLength * 0.52], dark);
     this.proceduralGroup.visible = true;
     for (const node of this.proceduralGroup.children) this.surfaceNodes.set(node.name, node);
   }
@@ -94,20 +96,22 @@ export class AddonAircraft {
         node.receiveShadow = true;
       });
       this.gltfGroup.add(gltf.scene);
-      this.gltfGroup.visible = true;
-      this.proceduralGroup.visible = false;
       this.modelLoaded = true;
-      this.cockpit.gltfCockpitGroup = gltf.scene;
-      this.cockpit.gltfCockpitLoaded = true;
-      this.cockpit.cockpitModelFailed = false;
+      this.gltfGroup.visible = !this.cockpitMode || !this.descriptor.cockpit;
+      this.proceduralGroup.visible = false;
+      if (!this.descriptor.cockpit) {
+        this.cockpit.gltfCockpitGroup = gltf.scene;
+        this.cockpit.gltfCockpitLoaded = true;
+        this.cockpit.cockpitModelFailed = false;
+        this.cockpit.onModelReady?.();
+      }
       this.loadingGltf = false;
-      this.cockpit.onModelReady?.();
       settle();
     }, undefined, error => {
       console.error('Addon aircraft GLB failed to load:', error);
       this.loadingGltf = false;
       this.modelLoaded = false;
-      this.cockpit.cockpitModelFailed = true;
+      if (!this.descriptor.cockpit) this.cockpit.cockpitModelFailed = true;
       settle();
     });
   }
@@ -136,15 +140,17 @@ export class AddonAircraft {
       ? (clamp(value, -1, 1) + 1) / 2
       : clamp(value, 0, 1);
     if (binding.input === 'flapsIndex') {
-      target = clamp(value / 4, 0, 1);
+      const maxFlap = Math.max(1, (this.descriptor.config?.aerodynamics?.flapAngles?.length ?? 1) - 1);
+      target = clamp(value / maxFlap, 0, 1);
     } else if (binding.input === 'rpm') {
       const [minimum, maximum] = binding.rpmRange ?? [0, 100];
       target = clamp((clamp(value, minimum, maximum) - minimum) / (maximum - minimum || 1), 0, 1);
     }
     let degrees = binding.neutralDeg ?? 0;
     if (binding.continuous) {
-      this.surfaceState.set(control, (this.surfaceState.get(control) ?? 0) + target * dt * 900);
-      degrees += this.surfaceState.get(control);
+      const next = (((this.surfaceState.get(control) ?? 0) + target * dt * 900) % 360 + 360) % 360;
+      this.surfaceState.set(control, next);
+      degrees += next;
     } else {
       degrees += range[0] + (range[1] - range[0]) * target;
     }
@@ -193,8 +199,10 @@ export class AddonAircraft {
   }
 
   setCockpitMode(isCockpit) {
-    this.cockpit.group.visible = isCockpit;
-    this.gltfGroup.visible = true;
+    this.cockpitMode = Boolean(isCockpit);
+    this.cockpit.group.visible = this.cockpitMode;
+    this.gltfGroup.visible = this.modelLoaded && (!this.cockpitMode || !this.descriptor.cockpit);
+    this.proceduralGroup.visible = !this.modelLoaded && !this.cockpitMode;
   }
 
   triggerCrashVisuals() { this.isCrashed = true; }

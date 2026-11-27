@@ -32,6 +32,44 @@ export const F16_COLLISION_PROBES = Object.freeze([
   { id: 'belly', pos: [0, -0.7, 0], radius: 0.4, descKey: 'belly.fuselage' },
 ]);
 
+const BUILTIN_COLLISION_PROBES = Object.freeze({
+  B738: B738_COLLISION_PROBES,
+  C172: C172_COLLISION_PROBES,
+  F16: F16_COLLISION_PROBES,
+});
+
+/**
+ * Derive scaled local collision probe points for non-built-in addon aircraft so
+ * small GA addons do not inherit B738 dimensions or below-runway nacelle offsets.
+ */
+export function buildAddonCollisionProbes(config = {}) {
+  const halfSpan = (config.aerodynamics?.wingspanM ?? config.wingspanM ?? 11) * 0.5;
+  const halfLength = (config.lengthM ?? 8) * 0.5;
+  const clearance = config.landingGear?.cgGroundHeightM ?? 1.3;
+  const bellyY = -Math.max(0.25, Math.min(clearance * 0.45, clearance - 0.55));
+  const probeRadius = Math.max(0.3, Math.min(0.8, halfLength * 0.12));
+  return [
+    { id: 'nose', pos: [0, 0, -halfLength * 0.9], radius: probeRadius, descKey: 'nose.radome' },
+    { id: 'tail', pos: [0, Math.max(0.25, clearance * 0.3), halfLength], radius: probeRadius, descKey: 'tail.empennage' },
+    { id: 'fin', pos: [0, Math.max(1.2, halfSpan * 0.35), halfLength * 0.88], radius: Math.max(0.3, probeRadius * 0.8), descKey: 'vertical.fin' },
+    { id: 'wingL', pos: [-halfSpan, Math.max(0.2, clearance * 0.25), -0.3], radius: probeRadius, descKey: 'left.wingtip' },
+    { id: 'wingR', pos: [halfSpan, Math.max(0.2, clearance * 0.25), -0.3], radius: probeRadius, descKey: 'right.wingtip' },
+    { id: 'engineL', pos: [0, 0.15, -halfLength * 0.75], radius: probeRadius, descKey: 'left.engine' },
+    { id: 'belly', pos: [0, bellyY, 0], radius: Math.max(0.4, probeRadius * 1.2), descKey: 'belly.fuselage' },
+  ];
+}
+
+function classifyCollisionCategory(config = {}) {
+  if (config?.id && Object.hasOwn(BUILTIN_COLLISION_PROBES, config.id)) return config.id;
+  if (config?.specs?.type === 'fighter' || config?.specs?.type === 'military') return 'F16';
+  if (
+    config?.specs?.type === 'generalAviation'
+    || config?.audio?.engineType === 'piston'
+    || (Number.isFinite(config?.massProperties?.currentMassKg) && config.massProperties.currentMassKg < 5000)
+  ) return 'C172';
+  return 'B738';
+}
+
 export const AIRCRAFT_COLLISION_CONFIG = Object.freeze({
   B738: Object.freeze({
     boundingRadius: 26.0,
@@ -224,9 +262,15 @@ export class CollisionDetector {
   }
 
   loadAircraftConfig(config = {}) {
-    const isC172 = config?.id === 'C172';
-    this.aircraftId = config?.id === 'F16' ? 'F16' : isC172 ? 'C172' : 'B738';
-    const probes = config?.id === 'F16' ? F16_COLLISION_PROBES : isC172 ? C172_COLLISION_PROBES : B738_COLLISION_PROBES;
+    const id = config?.id;
+    const isBuiltin = Boolean(id && Object.hasOwn(BUILTIN_COLLISION_PROBES, id));
+    const isAddon = Boolean(config && Object.keys(config).length > 0 && id && !isBuiltin);
+    this.aircraftId = classifyCollisionCategory(config);
+    const probes = isBuiltin
+      ? BUILTIN_COLLISION_PROBES[id]
+      : isAddon
+        ? buildAddonCollisionProbes(config)
+        : B738_COLLISION_PROBES;
     this.probePoints = probes.map(p => ({
       id: p.id,
       pos: new THREE.Vector3(...p.pos),
