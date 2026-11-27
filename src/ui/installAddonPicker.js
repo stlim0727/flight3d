@@ -5,10 +5,13 @@ import { loadSavedAddonCatalogUrl } from '../addons/savedAddonProfile.js';
 
 export function installAddonPicker(parent, options = {}) {
   if (!parent || typeof document === 'undefined') return null;
+  const defaultCatalogUrl = options.defaultCatalogUrl ?? '';
   const picker = new AddonPicker({
-    catalogUrl: options.catalogUrl ?? loadSavedAddonCatalogUrl(options.storage) ?? '',
+    catalogUrl: options.catalogUrl ?? loadSavedAddonCatalogUrl(options.storage) ?? defaultCatalogUrl,
+    defaultCatalogUrl,
     coreVersion: options.coreVersion,
     fetchImpl: options.fetchImpl,
+    prLoader: options.prLoader,
     storage: options.storage,
     profileShareParams,
     validateCatalog,

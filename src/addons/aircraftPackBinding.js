@@ -1,6 +1,10 @@
 import { BUILTIN_AIRCRAFT_IDS, validateAddonManifest } from './addonContract.js';
 import { AIRCRAFT_REGISTRY, AIRCRAFT_SPECS } from '../config/aircraftConfigs.js';
-import { defaultBodySupportPoints, normalizeBodySupportPoints } from '../physics/groundContacts.js';
+import {
+  defaultBodySupportPoints,
+  normalizeBodySupportPoints,
+  resolveBodySupportPoints,
+} from '../physics/groundContacts.js';
 
 const FORBIDDEN_MERGE_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 const MAX_EXTENDS_DEPTH = 16;
@@ -288,15 +292,18 @@ function buildExtendedPhysicsConfig(baseConfig, baseSpec, aircraft, manifest, pa
   if (physics.massDistribution?.tanks !== undefined) {
     sumValidatedTankCapacity(physics.massDistribution.tanks, packId);
   }
-  if (merged.landingGear && physics.landingGear?.bodySupportPoints !== undefined) {
+  if (merged.landingGear && (physics.landingGear?.bodySupportPoints !== undefined || !merged.landingGear.bodySupportPoints)) {
     const lengthM = merged.lengthM ?? 8;
     const wingspanM = merged.aerodynamics?.wingspanM ?? merged.wingspanM ?? 11;
     const cgGroundHeightM = merged.landingGear.cgGroundHeightM ?? 1.3;
+    const fallbackPoints = physics.landingGear?.bodySupportPoints !== undefined
+      ? defaultBodySupportPoints({ wingspanM, lengthM, cgGroundHeightM })
+      : resolveBodySupportPoints(baseConfig);
     merged.landingGear = {
       ...merged.landingGear,
       bodySupportPoints: normalizeBodySupportPoints(
         merged.landingGear.bodySupportPoints,
-        defaultBodySupportPoints({ wingspanM, lengthM, cgGroundHeightM }),
+        fallbackPoints,
       ),
     };
   }

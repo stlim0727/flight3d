@@ -138,7 +138,9 @@ export function buildAddonStarter(options) {
       '      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7',
       '        with:',
       '          node-version: 22',
+      '      - run: npm ci --prefix .flight3d',
       '      - run: node .flight3d/scripts/addon-contract.mjs validate addon.json --core ' + options.coreVersion,
+      '      - run: node .flight3d/scripts/addon-contract.mjs verify-runtime addon.json --core ' + options.coreVersion + ' --addon-dir .',
     ].join('\n') + '\n',
     'README.md': [
       `# ${title}`,

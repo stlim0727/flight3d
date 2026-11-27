@@ -1,6 +1,11 @@
 import { resolveProfile, sha256Hex, validateAddonManifest, validateCatalog } from './addonContract.js';
 import { profileShareParams, readProfileShareParams, regionPackFromProfile } from './regionPackBinding.js';
 import { aircraftPackFromProfile } from './aircraftPackBinding.js';
+import {
+  buildAddonPackFromProfile,
+  loadBaseAddonPrCatalog,
+  resolveCatalogAddons,
+} from './baseAddonRegistry.js';
 
 const KIND_FROM_ID = /^[a-z0-9][a-z0-9._-]*\/(region|aircraft|scenario)\/[a-z0-9][a-z0-9._-]*$/;
 
@@ -48,6 +53,27 @@ export function buildAddonProfileUrl(
 
 export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = globalThis.fetch } = {}) {
   const params = new URLSearchParams(search);
+  const prParam = params.get('addonPr');
+  if (prParam) {
+    const prPreview = await loadBaseAddonPrCatalog(prParam, {
+      fetchImpl,
+      coreVersion,
+    });
+    const pack = await resolveCatalogAddons(prPreview.catalog, {
+      coreVersion,
+      fetchImpl,
+      packId: params.get('pack') || null,
+      metadata: {
+        prNumber: prPreview.prNumber,
+        headSha: prPreview.headSha,
+        ciPassed: prPreview.ciPassed,
+      },
+    });
+    if (!pack) {
+      throw new Error(`PR #${prPreview.prNumber} does not provide any compatible addon packs`);
+    }
+    return pack;
+  }
   const encoded = params.get('addonManifest');
   if (encoded) {
     let manifestBytes;
@@ -102,40 +128,9 @@ export async function resolveSharedAddonPack(search, { coreVersion, fetchImpl = 
     sharedProfile.pins.map(pin => pin.id),
     { coreVersion: effectiveCore, fetchImpl },
   );
-  const requestedPack = params.get('pack');
-  const requestedPin = requestedPack ? resolved.pins.find(pin => pin.id === requestedPack) : null;
-  const regionPin = requestedPin?.manifest?.region
-    ? requestedPin
-    : resolved.pins.find(pin => pin.manifest?.region);
-  const aircraftPins = resolved.pins.filter(pin => pin.manifest?.aircraft);
-  const aircrafts = Object.freeze(aircraftPins.map(pin =>
-    aircraftPackFromProfile(resolved, pin.id, { coreVersion: effectiveCore })));
-  const aircraft = (requestedPin?.manifest?.aircraft
-    ? aircrafts.find(item => item.packId === requestedPin.id)
-    : aircrafts[0]) ?? null;
-  if (regionPin) {
-    return Object.freeze({
-      ...regionPackFromProfile(resolved, regionPin.id, { coreVersion: effectiveCore }),
-      profile: resolved,
-      ...(aircraft ? { aircraft, aircrafts } : {}),
-    });
-  }
-  if (aircraft) {
-    return Object.freeze({
-      id: aircraft.packId,
-      version: aircraft.version,
-      sha256: aircraft.sha256,
-      profile: resolved,
-      aircraft,
-      aircrafts,
-    });
-  }
-  const primaryPin = requestedPin ?? resolved.pins[0];
-  return Object.freeze({
-    id: primaryPin.id,
-    version: primaryPin.version,
-    sha256: primaryPin.sha256,
-    profile: resolved,
+  return buildAddonPackFromProfile(resolved, {
+    requestedPackId: params.get('pack'),
+    coreVersion: effectiveCore,
   });
 }
 

@@ -38,6 +38,12 @@ export function registerAddonAircraft(descriptors = []) {
   return addonConfigs.size;
 }
 
+export function unregisterAddonAircraft(aircraftId) {
+  const removedConfig = addonConfigs.delete(aircraftId);
+  const removedSpec = addonSpecs.delete(aircraftId);
+  return removedConfig || removedSpec;
+}
+
 export function resolveAircraftConfig(aircraftId) {
   return AIRCRAFT_REGISTRY[aircraftId] ?? addonConfigs.get(aircraftId) ?? null;
 }
