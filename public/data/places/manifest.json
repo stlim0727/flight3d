@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "kind": "flight3d-place-index",
+  "version": "20261127T140900Z-ea709603",
+  "generatedAt": "2026-11-27T14:24:49.056Z",
+  "horizontalDatum": "WGS84",
+  "config": {
+    "maxCities": 10000,
+    "maxFeatures": 6000,
+    "minAlternateNames": 12,
+    "maxAliases": 10
+  },
+  "sources": {
+    "cities": {
+      "url": "https://download.geonames.org/export/dump/cities15000.zip",
+      "retrievedAt": "2026-11-27T14:09:00Z",
+      "sha256": "bd80969ac9f2ab23e4211b9b808b5693d1ad23bc2e62c4207a2a99bcd1a6fdc5",
+      "bytes": 3368969
+    },
+    "allCountries": {
+      "url": "https://download.geonames.org/export/dump/allCountries.zip",
+      "retrievedAt": "2026-11-27T14:13:00Z",
+      "sha256": "6a0850259892fa149f51a1ae0204d1654b1db7739886ef88127b986931d9dcd5",
+      "bytes": 422571429
+    }
+  },
+  "counts": {
+    "cities": 10000,
+    "features": 5733,
+    "places": 15733
+  },
+  "searchIndex": {
+    "path": "20261127T140900Z-ea709603/places.json",
+    "schemaVersion": 1,
+    "count": 15733
+  },
+  "attribution": "GeoNames contributors",
+  "license": "Creative Commons Attribution 4.0",
+  "licenseUrl": "https://www.geonames.org/export/LICENSE.txt",
+  "sourceUrl": "https://www.geonames.org/export/"
+}

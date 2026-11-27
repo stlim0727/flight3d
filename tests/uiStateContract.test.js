@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { GameFlowController, FLOW } from '../src/ui/GameFlowController.js';
 import { initLobbyScreen } from '../src/ui/LobbyScreen.js';
 import { clearAirportIndexCache } from '../src/geospatial/airportIndex.js';
+import { clearPlaceIndexCache } from '../src/geospatial/placeIndex.js';
 import { getLanguage, t } from '../src/i18n/index.js';
 import { airportDisplayName } from '../src/config/airportProfile.js';
 import { AIRCRAFT_REGISTRY } from '../src/config/aircraftConfigs.js';
@@ -435,6 +436,18 @@ function globalFixture() {
     [`${base}fixture/search.json`, artifact],
     [`${base}fixture/tiles/13-10.json`, tile],
   ]);
+  const placeBase = 'http://localhost/data/places/';
+  files.set(`${placeBase}manifest.json`, {
+    schemaVersion: 1,
+    kind: 'flight3d-place-index',
+    version: 'fixture',
+    searchIndex: { path: 'fixture/places.json', schemaVersion: 1, count: 1 },
+  });
+  files.set(`${placeBase}fixture/places.json`, {
+    schemaVersion: 1,
+    version: 'fixture',
+    places: [{ id: 'geonames:1', label: 'Testville', aliases: ['Testville'], detail: 'city · XX', latitude: 0, longitude: 0, country: 'XX', kind: 'city', elevationM: 0 }],
+  });
   return { base, files };
 }
 
@@ -446,7 +459,7 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
   const { files } = globalFixture();
   const requested = [];
   let offline = true;
-  clearAirportIndexCache();
+  clearPlaceIndexCache();
   globalThis.document = mockDoc;
   globalThis.fetch = async url => {
     requested.push(String(url));
@@ -494,7 +507,8 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
     assert.equal(retry.hidden, false, 'retry control is visible while the index is unavailable');
     retry.listeners.click[0]();
     await screen.requestAirportSearchIndex();
-    assert.equal(retry.hidden, true, 'retry control hides after a successful load');
+    await screen.requestPlaceSearchIndex();
+    assert.equal(retry.hidden, true, 'retry control hides after both indexes load');
     search.value = 'jfk';
     search.listeners.input[0]();
     const globalButton = results.children.find(child => child.dataset.placeSource === 'global');
@@ -522,6 +536,7 @@ test('UI State Contract: global airport search shows loading, error, retry, coun
     globalThis.fetch = originalFetch;
     globalThis.localStorage = originalStorage;
     clearAirportIndexCache();
+    clearPlaceIndexCache();
   }
 });
 
@@ -531,7 +546,7 @@ test('UI State Contract: a tile failure keeps the loaded global search results',
   const originalFetch = globalThis.fetch;
   const originalStorage = globalThis.localStorage;
   const { files } = globalFixture();
-  clearAirportIndexCache();
+  clearPlaceIndexCache();
   globalThis.document = mockDoc;
   globalThis.fetch = async url => {
     if (String(url).includes('/tiles/')) throw new Error('tile offline');
@@ -566,6 +581,7 @@ test('UI State Contract: a tile failure keeps the loaded global search results',
     globalThis.fetch = originalFetch;
     globalThis.localStorage = originalStorage;
     clearAirportIndexCache();
+    clearPlaceIndexCache();
   }
 });
 
@@ -950,5 +966,69 @@ test('UI State Contract: addon aircraft button tracks active state and scenario 
     assert.equal(addonBtn.getAttribute('aria-describedby'), 'lobby-aircraft-reason');
   } finally {
     globalThis.document = originalDoc;
+  }
+});
+
+test('UI State Contract: offline place search finds landmarks and starts a cruise', async () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.localStorage;
+  clearAirportIndexCache();
+  clearPlaceIndexCache();
+  const base = 'http://localhost/data/places/';
+  const manifest = {
+    schemaVersion: 1,
+    kind: 'flight3d-place-index',
+    version: 'fixture',
+    searchIndex: { path: 'fixture/places.json', schemaVersion: 1, count: 2 },
+  };
+  const artifact = {
+    schemaVersion: 1,
+    version: 'fixture',
+    places: [
+      { id: 'geonames:252919', label: 'Santorini Island', aliases: ['Santorini'], detail: 'island · GR', latitude: 36.40572, longitude: 25.45682, country: 'GR', kind: 'island', elevationM: 42 },
+      { id: 'geonames:6254976', label: 'Tour Eiffel', aliases: ['Eiffel Tower', '에펠 탑'], detail: 'landmark · FR', latitude: 48.85832, longitude: 2.29452, country: 'FR', kind: 'landmark', elevationM: 0 },
+    ],
+  };
+  const files = new Map([
+    [`${base}manifest.json`, manifest],
+    [`${base}fixture/places.json`, artifact],
+  ]);
+  globalThis.document = mockDoc;
+  globalThis.fetch = async url => {
+    const body = files.get(String(url));
+    return body ? new Response(JSON.stringify(body), { status: 200 }) : new Response('missing', { status: 404 });
+  };
+  globalThis.localStorage = { getItem: () => null, setItem() {} };
+  try {
+    let plan = null;
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDestination: () => 'none', getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({ airports: [], points: [] });
+    await screen.requestPlaceSearchIndex();
+    await screen.requestAirportSearchIndex().catch(() => {});
+
+    const search = elements.get('lobby-map-search');
+    const results = elements.get('lobby-map-results');
+    search.value = 'eiffel tower';
+    search.listeners.input[0]();
+    const placeButton = results.children.find(child => child.dataset.placeSource === 'place-index');
+    assert.ok(placeButton, 'place index result appears by alias');
+    assert.equal(placeButton.dataset.placeId, 'geonames:6254976');
+
+    results.listeners.click[0]({ target: { closest: () => placeButton } });
+    assert.equal(elements.get('lobby-map-state').value, 'cruise');
+    assert.equal(elements.get('lobby-map-point').value, 'geonames:6254976');
+    assert.equal(plan?.state, 'cruise');
+    assert.equal(plan?.pointId, 'geonames:6254976');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.fetch = originalFetch;
+    globalThis.localStorage = originalStorage;
+    clearAirportIndexCache();
+    clearPlaceIndexCache();
   }
 });

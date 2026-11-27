@@ -65,6 +65,28 @@ destination exactly as for a local map selection. A record without runways
 still forces the cruise state, so runway/approach starts are never offered
 without real runway geometry.
 
+## Offline place search (GeoNames)
+
+`public/data/places/` contains a precomputed catalog of 10,000 populated
+places and 5,733 notable islands, mountains, lakes, monuments and towers. It
+is generated from GeoNames `cities15000` and `allCountries` snapshots by
+`node scripts/place-index/build.mjs --source-dir DIR`; normal builds read the
+committed snapshots in `scripts/place-index/snapshots/`, so no network is
+needed. `npm run refresh:places` re-downloads the sources and regenerates both
+the snapshots and the versioned artifact. The manifest pins the artifact path,
+schema and count; `loadPlaceSearchIndex()` rejects stale or partial files.
+
+Entries carry English labels plus localized aliases (including Hangul where
+GeoNames supplies one), WGS84 coordinates, country, feature kind and a cruise
+altitude derived from elevation. Search uses the same normalization and
+ranking as airports (`searchPlaceIndexScored`), and results are merged into
+the lobby dropdown with `source: 'place-index'`. Selecting one takes the
+existing cruise-point path; far-away places get `mapPlanCustomOrigin()` just
+like the Paris Eiffel Tower point. GeoNames data is CC BY 4.0 — attribution is
+shown in the map dialog and recorded in the manifest; see
+`https://www.geonames.org/export/`.
+
+
 ## Verification
 
 - `tests/airportSearch.test.js`: ICAO/IATA/name ranking, normalization, limits and immutability.
@@ -79,3 +101,5 @@ untouched.
 - `tests/airportIndexBuilder.test.js`, `tests/airportIndexData.test.js`: artifact contents, version pin and tile consistency.
 - `tests/airportIndex.test.js`: lazy reader caching, validation and propagated failures.
 - `tests/uiStateContract.test.js`: loading/ready/empty/error/retry states, local-result preservation and global-result selection.
+- `tests/placeIndex.test.js`, `tests/placeIndexData.test.js`: place index loader validation, caching, artifact integrity and representative city/island/landmark coverage.
+- `npm run test:places`: focused place search verification.
