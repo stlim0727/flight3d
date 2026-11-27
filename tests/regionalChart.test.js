@@ -15,7 +15,7 @@ import {
   formatChartPosition,
 } from '../src/geospatial/regionalChart.js';
 import { localToWgs84, tileToWgs84, wgs84ToLocal, wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
-import { UnifiedWorld } from '../src/world/UnifiedWorld.js';
+import { BASE_OFFSETS, UnifiedWorld } from '../src/world/UnifiedWorld.js';
 import { projectToLocal } from '../src/geospatial/incheon.js';
 import { PATAGONIA_ORIGIN, patagoniaToWorld } from '../src/geospatial/patagonia.js';
 import { applyAirportOverrides } from '../src/config/airportOverrides.js';
@@ -244,8 +244,17 @@ test('Patagonia chart frame uses Fitz Roy origin, local geodesy, and valid water
   const discrepancyM = Math.hypot(roundTrip.x - 10000, roundTrip.z - (-10000));
   assert.ok(discrepancyM < 50, `14.1 km projection discrepancy ${discrepancyM.toFixed(2)} m`);
 
+  // Streamed airports use the anchor's BASE_OFFSETS placement even when the
+  // anchor has its own geodesy; the chart must draw them where the scene puts them.
   const elCalafate = { latitude: -50.2803, longitude: -72.0531 };
-  assert.deepEqual(frame.placeAirport(elCalafate), elCalafate);
+  const streamed = projectToLocal(elCalafate.latitude, elCalafate.longitude)
+    .map((value, i) => value - BASE_OFFSETS.patagonia[i]);
+  const charted = frame.placeAirport(elCalafate);
+  const sceneWgs = frame.toWgs(...streamed);
+  near(charted.latitude, sceneWgs.latitude, 1e-6, 'streamed airport chart latitude');
+  near(charted.longitude, sceneWgs.longitude, 1e-6, 'streamed airport chart longitude');
+  assert.ok(distanceKm(charted, elCalafate) * 1000 > 100_000,
+    'antipode-plane placement is not the raw WGS84 coordinate');
 
   const m = chartMetersPerPixel(1100, 720);
   const tiles = chartWaterTiles(chartProjection(frame.origin), 1100, 720, m);

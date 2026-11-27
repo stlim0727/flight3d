@@ -128,6 +128,15 @@ export class UnifiedWorld {
   }
 
   /**
+   * World-frame placement offset of the active anchor before rebasing it to
+   * the aircraft's local origin. Streamed airports use this offset, so charts
+   * must invert the same frame.
+   */
+  get anchorPlacementOffset() {
+    return this.customOrigin ? [0, 0] : BASE_OFFSETS[this.anchor];
+  }
+
+  /**
    * Switch to a local WGS84 tangent plane for distant global map starts so
    * tiles and streamed runways stay distortion-free near (0, 0). Pass null to
    * restore the built-in anchor frame.
