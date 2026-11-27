@@ -327,6 +327,23 @@ function mergeControls(baseControls, aircraft) {
   return controls;
 }
 
+function liveryResources(livery) {
+  if (!livery) return [];
+  const resources = [];
+  if (livery.tailEmblem?.map) resources.push(livery.tailEmblem.map);
+  for (const spec of Object.values(livery.materials ?? {})) {
+    if (spec?.map) resources.push(spec.map);
+  }
+  return resources;
+}
+
+function mergeLivery(baseLivery, overrideLivery) {
+  if (!baseLivery && !overrideLivery) return null;
+  if (!baseLivery) return cloneValue(overrideLivery);
+  if (!overrideLivery) return cloneValue(baseLivery);
+  return deepMerge(baseLivery, overrideLivery);
+}
+
 function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set() } = {}) {
   if (visiting.has(packId)) throw new Error(`cyclic aircraft inheritance at ${packId}`);
   if (visiting.size > MAX_EXTENDS_DEPTH) throw new Error(`aircraft inheritance chain too deep at ${packId}`);
@@ -348,6 +365,7 @@ function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set(
       let baseSpec;
       let baseModel = null;
       let baseCockpit = null;
+      let baseLivery = null;
       let baseControls = DEFAULT_ANIMATION;
       let baseAircraftId = null;
 
@@ -369,13 +387,15 @@ function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set(
         baseSpec = parent.spec;
         baseModel = parent.model;
         baseCockpit = parent.cockpit;
+        baseLivery = parent.livery;
         baseControls = parent.controls;
         baseAircraftId = parent.baseAircraftId;
       }
 
       const model = aircraft.model ?? baseModel ?? null;
       const cockpit = aircraft.cockpit ?? baseCockpit ?? null;
-      for (const resource of [model, cockpit].filter(Boolean)) {
+      const livery = mergeLivery(baseLivery, aircraft.livery);
+      for (const resource of [model, cockpit, ...liveryResources(livery)].filter(Boolean)) {
         if (!/^https?:\/\//.test(resource.url)) throw new Error('aircraft asset URL must be absolute http(s)');
       }
       const controls = mergeControls(baseControls, aircraft);
@@ -391,6 +411,7 @@ function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set(
         spec: Object.freeze(config.specs),
         model: model ? Object.freeze({ ...model }) : null,
         cockpit: cockpit ? Object.freeze({ ...cockpit }) : null,
+        livery: livery ? Object.freeze(livery) : null,
         controls: Object.freeze(controls),
         title: config.name ?? packId,
       });
@@ -448,7 +469,8 @@ function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set(
       throw new Error(`${packId} physics.massProperties.currentMassKg is below the empty mass`);
     }
   }
-  for (const resource of [aircraft.model, aircraft.cockpit].filter(Boolean)) {
+  const livery = aircraft.livery ? cloneValue(aircraft.livery) : null;
+  for (const resource of [aircraft.model, aircraft.cockpit, ...liveryResources(livery)].filter(Boolean)) {
     if (!/^https?:\/\//.test(resource.url)) throw new Error('aircraft asset URL must be absolute http(s)');
   }
   const controls = mergeControls(DEFAULT_ANIMATION, aircraft);
@@ -466,6 +488,7 @@ function resolveAircraftPack(profile, packId, { coreVersion, visiting = new Set(
     spec: Object.freeze(config.specs ?? { id: aircraft.id, name: config.name }),
     model: Object.freeze(aircraft.model),
     cockpit: aircraft.cockpit ? Object.freeze(aircraft.cockpit) : null,
+    livery: livery ? Object.freeze(livery) : null,
     controls: Object.freeze(controls),
     title: config.name ?? packId,
   });

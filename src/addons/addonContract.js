@@ -179,6 +179,98 @@ function validateAircraftBinding(aircraft, errors, manifest) {
   }
   if (aircraft.script) errors.push('external scripts are not allowed in v1');
   validateAircraftAnimation(aircraft.animation, errors);
+  validateAircraftLivery(aircraft.livery, errors);
+}
+
+const TAIL_EMBLEM_KINDS = new Set(['taegeuk']);
+
+function validateAircraftLivery(livery, errors) {
+  if (livery === undefined) return;
+  if (!livery || typeof livery !== 'object' || Array.isArray(livery)) {
+    errors.push('aircraft.livery must be an object');
+    return;
+  }
+  if (livery.script) errors.push('aircraft.livery.script is forbidden');
+  if (livery.airline !== undefined && (typeof livery.airline !== 'string' || !livery.airline.trim())) {
+    errors.push('aircraft.livery.airline must be a non-empty string');
+  }
+  if (livery.scheme !== undefined) {
+    const scheme = livery.scheme;
+    if (!scheme || typeof scheme !== 'object' || Array.isArray(scheme)) {
+      errors.push('aircraft.livery.scheme must be an object');
+    } else {
+      if (!HEX_COLOR.test(scheme.topColor ?? '')) errors.push('aircraft.livery.scheme.topColor must be #rrggbb');
+      if (!HEX_COLOR.test(scheme.bellyColor ?? '')) errors.push('aircraft.livery.scheme.bellyColor must be #rrggbb');
+      if (scheme.tailColor !== undefined && !HEX_COLOR.test(scheme.tailColor)) {
+        errors.push('aircraft.livery.scheme.tailColor must be #rrggbb');
+      }
+      if (scheme.stripeColor !== undefined && !HEX_COLOR.test(scheme.stripeColor)) {
+        errors.push('aircraft.livery.scheme.stripeColor must be #rrggbb');
+      }
+      if (scheme.splitY !== undefined && !Number.isFinite(scheme.splitY)) {
+        errors.push('aircraft.livery.scheme.splitY must be finite');
+      }
+      if (scheme.stripeHalfHeight !== undefined
+        && (!Number.isFinite(scheme.stripeHalfHeight) || scheme.stripeHalfHeight < 0)) {
+        errors.push('aircraft.livery.scheme.stripeHalfHeight must be non-negative');
+      }
+    }
+  }
+  if (livery.title !== undefined) {
+    const title = livery.title;
+    if (!title || typeof title !== 'object' || Array.isArray(title)) {
+      errors.push('aircraft.livery.title must be an object');
+    } else {
+      if (typeof title.text !== 'string' || !title.text.trim() || title.text.length > 40) {
+        errors.push('aircraft.livery.title.text must be a non-empty string up to 40 characters');
+      }
+      if (title.color !== undefined && !HEX_COLOR.test(title.color)) {
+        errors.push('aircraft.livery.title.color must be #rrggbb');
+      }
+    }
+  }
+  if (livery.tailEmblem !== undefined) {
+    const emblem = livery.tailEmblem;
+    if (!emblem || typeof emblem !== 'object' || Array.isArray(emblem)) {
+      errors.push('aircraft.livery.tailEmblem must be an object');
+    } else if (emblem.map !== undefined) {
+      validResource(emblem.map, errors, 'aircraft.livery.tailEmblem.map');
+    } else if (!TAIL_EMBLEM_KINDS.has(emblem.kind)) {
+      errors.push('aircraft.livery.tailEmblem needs a supported kind (taegeuk) or map resource');
+    } else {
+      for (const field of ['primaryColor', 'secondaryColor', 'accentColor']) {
+        if (emblem[field] !== undefined && !HEX_COLOR.test(emblem[field])) {
+          errors.push(`aircraft.livery.tailEmblem.${field} must be #rrggbb`);
+        }
+      }
+    }
+  }
+  if (livery.materials !== undefined) {
+    if (!livery.materials || typeof livery.materials !== 'object' || Array.isArray(livery.materials)
+      || Object.keys(livery.materials).length === 0) {
+      errors.push('aircraft.livery.materials must be a non-empty object');
+    } else {
+      for (const [target, spec] of Object.entries(livery.materials)) {
+        const where = `aircraft.livery.materials.${target}`;
+        if (!target || !spec || typeof spec !== 'object' || Array.isArray(spec)) {
+          errors.push(`${where} must be an object`);
+          continue;
+        }
+        if (spec.color !== undefined && !HEX_COLOR.test(spec.color)) {
+          errors.push(`${where}.color must be #rrggbb`);
+        }
+        if (spec.roughness !== undefined
+          && (!Number.isFinite(spec.roughness) || spec.roughness < 0 || spec.roughness > 1)) {
+          errors.push(`${where}.roughness must be between 0 and 1`);
+        }
+        if (spec.metalness !== undefined
+          && (!Number.isFinite(spec.metalness) || spec.metalness < 0 || spec.metalness > 1)) {
+          errors.push(`${where}.metalness must be between 0 and 1`);
+        }
+        if (spec.map !== undefined) validResource(spec.map, errors, `${where}.map`);
+      }
+    }
+  }
 }
 
 const ANIMATION_CONTROLS = new Set(['azimuth', 'elevator', 'rudder', 'flaps', 'gear', 'ailerons']);

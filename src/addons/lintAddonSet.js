@@ -15,6 +15,10 @@ function assetHosts(manifest) {
   const urls = [];
   if (manifest.aircraft?.model?.url) urls.push(manifest.aircraft.model.url);
   if (manifest.aircraft?.cockpit?.url) urls.push(manifest.aircraft.cockpit.url);
+  if (manifest.aircraft?.livery?.tailEmblem?.map?.url) urls.push(manifest.aircraft.livery.tailEmblem.map.url);
+  for (const spec of Object.values(manifest.aircraft?.livery?.materials ?? {})) {
+    if (typeof spec?.map?.url === 'string') urls.push(spec.map.url);
+  }
   for (const asset of manifest.assets ?? []) if (typeof asset.url === 'string') urls.push(asset.url);
   for (const override of manifest.region?.buildingOverrides ?? []) {
     if (typeof override?.model?.url === 'string') urls.push(override.model.url);

@@ -1,10 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import * as THREE from 'three';
 import { validateAddonManifest, resolveProfile } from '../src/addons/addonContract.js';
 import { aircraftPackFromProfile } from '../src/addons/aircraftPackBinding.js';
 import { lintAddonSet } from '../src/addons/lintAddonSet.js';
 import { buildAddonProfileUrl, resolveSharedAddonPack } from '../src/addons/addonCatalogBrowser.js';
+import { applyAircraftLivery } from '../src/aircraft/applyAircraftLivery.js';
 import {
   AIRCRAFT_REGISTRY,
   registerAddonAircraft,
@@ -278,4 +281,114 @@ test('validation rejects invalid extends targets, self-extends, undeclared depen
   const cyclicLint = lintAddonSet([cyclicA, cyclicB], { coreVersion: '1.8.0' });
   assert.equal(cyclicLint.ok, false);
   assert.ok(cyclicLint.errors.some(err => err.includes('cyclic dependency')));
+});
+
+test('Korean Airliners Skin example pack validates, lints, inherits full B738 physics, and applies livery', async () => {
+  const manifest = JSON.parse(
+    await readFile(new URL('../examples/packs/korean-airliners-skin/addon.json', import.meta.url), 'utf8'),
+  );
+  const validation = validateAddonManifest(manifest, { coreVersion: '1.8.0' });
+  assert.equal(validation.ok, true, validation.errors.join('; '));
+
+  const lint = lintAddonSet([manifest], { coreVersion: '1.8.0' });
+  assert.equal(lint.ok, true, lint.errors.join('; '));
+
+  const descriptor = aircraftPackFromProfile(makeProfile([manifest]), manifest.id, { coreVersion: '1.8.0' });
+  assert.equal(descriptor.id, 'korean-airliners-b738');
+  assert.equal(descriptor.title, 'Korean Airliners Skin');
+  assert.equal(descriptor.extends, 'B738');
+  assert.equal(descriptor.baseAircraftId, 'B738');
+  assert.equal(descriptor.model, null);
+  assert.equal(descriptor.cockpit, null);
+  assert.equal(descriptor.livery.airline, 'Korean Airliners');
+  assert.equal(descriptor.livery.scheme.topColor, '#4a91b3');
+  assert.equal(descriptor.livery.title.text, 'KOREAN AIRLINERS');
+  assert.equal(descriptor.livery.tailEmblem.kind, 'taegeuk');
+  assert.equal(
+    descriptor.config.propulsion.maxStaticThrustPerEngineN,
+    AIRCRAFT_REGISTRY.B738.propulsion.maxStaticThrustPerEngineN,
+  );
+  assert.equal(
+    descriptor.config.massProperties.currentMassKg,
+    AIRCRAFT_REGISTRY.B738.massProperties.currentMassKg,
+  );
+
+  // Verify scheme shader and airline metadata apply cleanly without touching turbine fan meshes
+  const root = new THREE.Group();
+  const container = new THREE.Group();
+  const model = new THREE.Group();
+  const fuselageMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+  const fanMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+  const fuselage = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 10), fuselageMat);
+  fuselage.name = 'B737';
+  const fan = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), fanMat);
+  fan.name = 'turbs';
+  model.add(fuselage, fan);
+  container.add(model);
+  root.add(container);
+
+  applyAircraftLivery(model, root, container, descriptor.livery);
+  assert.equal(root.userData.airline, 'Korean Airliners');
+  assert.notEqual(fuselage.material, fuselageMat, 'fuselage material is cloned before shader patch');
+  assert.equal(fuselage.material.customProgramCacheKey(), 'addon-livery-scheme-v1');
+  assert.equal(fan.material, fanMat, 'turbine fan mesh is skipped by fuselage scheme shader');
+});
+
+test('livery material overrides clone materials, apply color/roughness/map, and reject invalid livery schemas', () => {
+  const root = new THREE.Group();
+  const container = new THREE.Group();
+  const model = new THREE.Group();
+  const baseMat = new THREE.MeshStandardMaterial({ name: 'Fuselage', color: 0xffffff, roughness: 0.8 });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), baseMat);
+  mesh.name = 'BodyMesh';
+  model.add(mesh);
+  container.add(model);
+  root.add(container);
+
+  const loadedUrls = [];
+  const fakeTexture = new THREE.Texture();
+  const fakeLoader = {
+    load(url, onLoad) {
+      loadedUrls.push(url);
+      onLoad(fakeTexture);
+    },
+  };
+
+  applyAircraftLivery(model, root, container, {
+    materials: {
+      Fuselage: {
+        color: '#ff4500',
+        roughness: 0.3,
+        metalness: 0.2,
+        map: { url: 'https://packs.example/skin/1.0.0/fuselage.png', sha256: 'c'.repeat(64) },
+      },
+    },
+  }, { textureLoader: fakeLoader });
+
+  assert.notEqual(mesh.material, baseMat);
+  assert.equal(mesh.material.color.getHexString(), 'ff4500');
+  assert.equal(mesh.material.roughness, 0.3);
+  assert.equal(mesh.material.metalness, 0.2);
+  assert.equal(mesh.material.map, fakeTexture);
+  assert.equal(fakeTexture.flipY, false);
+  assert.deepEqual(loadedUrls, ['https://packs.example/skin/1.0.0/fuselage.png']);
+
+  const badColor = c172TurboManifest({ livery: { scheme: { topColor: 'sky-blue', bellyColor: '#ffffff' } } });
+  assert.equal(validateAddonManifest(badColor, { coreVersion: '1.8.0' }).ok, false);
+
+  const scriptLivery = c172TurboManifest({ livery: { script: 'alert(1)' } });
+  const scriptRes = validateAddonManifest(scriptLivery, { coreVersion: '1.8.0' });
+  assert.equal(scriptRes.ok, false);
+  assert.ok(scriptRes.errors.some(err => err.includes('livery.script is forbidden')));
+
+  const badHost = c172TurboManifest({
+    livery: {
+      materials: {
+        Fuselage: { map: { url: 'http://evil.example/skin.png', sha256: 'd'.repeat(64) } },
+      },
+    },
+  });
+  const hostLint = lintAddonSet([badHost], { coreVersion: '1.8.0' });
+  assert.equal(hostLint.ok, false);
+  assert.ok(hostLint.errors.some(err => err.includes('protocol not allowed')));
 });
