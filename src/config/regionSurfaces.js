@@ -82,15 +82,6 @@ export const REGION_SURFACES = Object.freeze({
   patagonia: Object.freeze({
     origin: Object.freeze({ lat: -49.271278, lon: -73.043222 }),
     elevationM: 2492,
-    size: 44000,
-    gridSize: 1025,
-    segments: 255,
-    demUrl: 'terrain/patagonia/patagonia_dem.bin',
-    imageryUrl: 'terrain/patagonia/patagonia_satellite.jpg',
-    runway: Object.freeze({ headingDeg: 215, lengthM: 0, widthM: 0, gradient: 0,
-      threshold06ElevationM: 2492, threshold24ElevationM: 2492, midElevationM: 2492 }),
-    grading: Object.freeze({ runwayFadeM: 0, widthFadeM: 0, apronS: null, apronW: null, apronFadeM: 0 }),
-    terrace: Object.freeze({ lengthM: 0, widthM: 0, segmentsX: 2, segmentsZ: 2,
-      depressionM: 0, coarseDepressionM: 0 }),
+    precinctExtent: Object.freeze([-22000, -22000, 22000, 22000]),
   }),
 });

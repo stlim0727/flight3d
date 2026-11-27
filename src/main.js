@@ -614,9 +614,6 @@ class FlightSimulator {
     await startupDetail('startup.detail.selectedAirport');
     inputLatency?.mark('startup-airport-start');
     await this.setAirport(savedSelection.airport);
-    if (savedSelection.airport === 'patagonia' && !this.patagoniaTerrain?.isLoaded) {
-      await this.patagoniaTerrain?.demReady;
-    }
     inputLatency?.mark('startup-airport-end');
 
     // Resize handler

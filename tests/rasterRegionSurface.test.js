@@ -79,45 +79,14 @@ test('declarative runway endpoints retain the surveyed 2805/2867 m grade', () =>
   surface.dispose();
 });
 
-test('Patagonia non-runway surface retains finite ungraded DEM heights and valid terrace geometry', () => {
+test('Patagonia uses a common anchor surface without raster grading', () => {
   const patagonia = REGION_SURFACES.patagonia;
-  const pElevations = new Float32Array(patagonia.gridSize * patagonia.gridSize);
-  for (let row = 0; row < patagonia.gridSize; row++) {
-    for (let col = 0; col < patagonia.gridSize; col++) {
-      pElevations[row * patagonia.gridSize + col] = 1500 + (row + col) * 0.1;
-    }
-  }
-  const surface = new RasterRegionSurface(patagonia, { elevations: pElevations, load: false });
-  const pHeading = patagonia.runway.headingDeg * Math.PI / 180;
-  const pSin = Math.sin(pHeading);
-  const pCos = Math.cos(pHeading);
-  const atSW = (s, w) => [s * pSin + w * pCos, -s * pCos + w * pSin];
-
-  const points = [
-    [0, 0],
-    atSW(0, 50),
-    atSW(0, -50),
-    atSW(50, 0),
-    atSW(-50, 0),
-    // Coordinates falling inside Lukla's apron box (s in [-15, 135], w in [15, 85])
-    atSW(15, 30),
-    atSW(60, 50),
-    atSW(-15, 15),
-    atSW(135, 85),
-  ];
-  for (const [x, z] of points) {
-    const h = surface.getHeight(x, z);
-    const natural = surface.getNaturalHeight(x, z);
-    assert.ok(Number.isFinite(h), `expected finite height at ${x},${z}`);
-    assert.ok(Math.abs(h - natural) < 1e-6, `expected ungraded DEM height at ${x},${z}, got ${h} vs ${natural}`);
-    assert.ok(h < 2000, `expected no 2844 m apron bump at ${x},${z}, got ${h}`);
-  }
-
-  for (const attrName of ['position', 'normal']) {
-    const arr = surface.localTerraceGeometry.attributes[attrName].array;
-    assert.ok(arr.every(Number.isFinite), `localTerraceGeometry ${attrName} must have no NaN values`);
-  }
-  surface.dispose();
+  assert.equal(patagonia.elevationM, 2492);
+  assert.deepEqual(patagonia.precinctExtent, [-22000, -22000, 22000, 22000]);
+  assert.equal(patagonia.demUrl, undefined);
+  assert.equal(patagonia.runway, undefined);
+  assert.equal(patagonia.grading, undefined);
+  assert.equal(patagonia.terrace, undefined);
 });
 
 test('RasterRegionSurface.demReady resolves with loadError on HTTP 500 or network rejection', async t => {
@@ -134,7 +103,7 @@ test('RasterRegionSurface.demReady resolves with loadError on HTTP 500 or networ
     [async () => { throw new Error('Network unreachable'); }, /Network unreachable/],
   ]) {
     const surface = new RasterRegionSurface(
-      { ...REGION_SURFACES.patagonia, imageryUrl: '' },
+      { ...REGION_SURFACES.lukla, imageryUrl: '', demUrl: 'terrain/missing_dem.bin' },
       { fetchImpl },
     );
     await surface.demReady;

@@ -22,7 +22,6 @@ import { REGION_SURFACES } from '../config/regionSurfaces.js';
 import { getAirportOverride } from '../config/airportOverrides.js';
 import { castFarSunShadow } from '../environment/FarSunShadow.js';
 import { RENDER_QUALITY } from '../config/renderQuality.js';
-import patagoniaGrid from '../config/patagoniaTerrainGrid.json' with { type: 'json' };
 import { APPROACH_DATA } from '../config/approachData.js';
 import { WORLD_REGIONS, REGION_EXTENTS } from '../world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../world/WorldAirportFacade.js';
@@ -758,11 +757,11 @@ class PresetSpawnerMethods {
         },
       });
     }
-    if (this.patagoniaTerrain) world.register('patagonia', {
-      terrain: this.patagoniaTerrain,
+    if (this.patagoniaSurface) world.register('patagonia', {
+      terrain: this.patagoniaSurface,
       airport: null,
       group: null,
-      mesh: this.patagoniaTerrain.mesh,
+      mesh: this.patagoniaSurface.mesh,
       extent: REGION_EXTENTS.patagonia,
     });
     world.syncMeshes();
@@ -1021,32 +1020,22 @@ class PresetSpawnerMethods {
   }
 
   async ensurePatagoniaRegion() {
-    if (this.patagoniaTerrain) return this.patagoniaTerrain;
-    this._patagoniaLoad ??= import('../environment/RasterRegionSurface.js')
-      .then(({ RasterRegionSurface }) => {
-        const patagonia = REGION_SURFACES.patagonia;
-        const config = {
-          ...patagonia,
-          size: patagoniaGrid.worldSize,
-          gridSize: patagoniaGrid.gridSize,
-          grading: {
-            ...patagonia.grading,
-            apronS: null,
-            apronW: null,
-            apronFadeM: 0,
-          },
-        };
-        this.patagoniaTerrain = new RasterRegionSurface(config, {
-          castShadow: mesh => castFarSunShadow(mesh),
-        });
-        this.patagoniaTerrain.mesh.visible = false;
-        this.scene?.add(this.patagoniaTerrain.mesh);
-        return this.patagoniaTerrain;
-      })
-      .catch(error => {
-        this._patagoniaLoad = null;
-        throw error;
+    if (this.patagoniaSurface) return this.patagoniaSurface;
+    this._patagoniaLoad ??= Promise.resolve().then(() => {
+      const config = REGION_SURFACES.patagonia;
+      const fallback = new CorridorFlightSurface({ activeOrigin: config.origin });
+      this.patagoniaSurface = new OpenWorldRegionSurface({
+        ...config,
+        precinctExtent: [-22000, -22000, 22000, 22000],
+        fallback,
       });
+      this.patagoniaSurface.mesh.visible = false;
+      this.scene?.add(this.patagoniaSurface.mesh);
+      return this.patagoniaSurface;
+    }).catch(error => {
+      this._patagoniaLoad = null;
+      throw error;
+    });
     return this._patagoniaLoad;
   }
 
@@ -1129,7 +1118,7 @@ class PresetSpawnerMethods {
     if (id === 'lukla') return Boolean(this.luklaTerrain);
     if (id === 'incheon') return Boolean(this.incheonSurface);
     if (id === 'jeju') return Boolean(this.jejuSurface);
-    if (id === 'patagonia') return Boolean(this.patagoniaTerrain?.isLoaded) && !this.patagoniaTerrain.loadError;
+    if (id === 'patagonia') return Boolean(this.patagoniaSurface);
     if (id === 'neon') return Boolean(this.neonCity);
     if (id === 'valley') return Boolean(this.persistentValley);
     return false;
@@ -1140,7 +1129,7 @@ class PresetSpawnerMethods {
     if (id === 'lukla') return Boolean(this.luklaTerrain || this._luklaLoad);
     if (id === 'incheon') return Boolean(this.incheonSurface || this.incheonLoad);
     if (id === 'jeju') return Boolean(this.jejuSurface);
-    if (id === 'patagonia') return Boolean(this.patagoniaTerrain || this._patagoniaLoad);
+    if (id === 'patagonia') return Boolean(this.patagoniaSurface || this._patagoniaLoad);
     if (id === 'neon') return Boolean(this.neonCity || this._neonLoad);
     if (id === 'valley') return Boolean(this.persistentValley || this._valleyLoad);
     return false;
@@ -1300,7 +1289,7 @@ class PresetSpawnerMethods {
     if (this.foliage?.group) this.foliage.group.visible = isCoastal;
 
     if (this.luklaTerrain?.mesh) this.luklaTerrain.mesh.visible = isLukla;
-    if (this.patagoniaTerrain?.mesh) this.patagoniaTerrain.mesh.visible = isPatagonia;
+    if (this.patagoniaSurface?.mesh) this.patagoniaSurface.mesh.visible = isPatagonia;
 
     if (this.incheonAirport) this.incheonAirport.group.visible = isIncheon;
     if (this.neonCity?.group) this.neonCity.group.visible = isNeon;
@@ -1309,7 +1298,7 @@ class PresetSpawnerMethods {
       : isIncheon ? this.incheonSurface
       : isLukla ? this.luklaTerrain
       : isValley ? this.persistentValley
-      : isPatagonia ? this.patagoniaTerrain
+      : isPatagonia ? this.patagoniaSurface
       : this.terrain;
     this.currentAirport = isNeon ? this.neonCity.airport
       : isIncheon ? (this.incheonAirportFacade ?? this.incheonAirport)
