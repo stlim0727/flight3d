@@ -269,11 +269,12 @@ function buildExtendedPhysicsConfig(baseConfig, baseSpec, aircraft, manifest, pa
   const physics = aircraft.physics ?? {};
   const merged = deepMerge(baseConfig, physics);
   const mergedAero = { ...merged.aerodynamics };
-  if (mergedAero.claPerRad === undefined && mergedAero.clAlpha !== undefined) {
-    mergedAero.claPerRad = mergedAero.clAlpha;
+  const overrideAero = physics.aerodynamics ?? {};
+  if (overrideAero.claPerRad === undefined && overrideAero.clAlpha !== undefined) {
+    mergedAero.claPerRad = overrideAero.clAlpha;
   }
-  if (mergedAero.cd0Clean === undefined && mergedAero.cd0 !== undefined) {
-    mergedAero.cd0Clean = mergedAero.cd0;
+  if (overrideAero.cd0Clean === undefined && overrideAero.cd0 !== undefined) {
+    mergedAero.cd0Clean = overrideAero.cd0;
   }
   merged.aerodynamics = mergedAero;
   if (physics.massKg !== undefined && physics.massProperties?.currentMassKg === undefined) {
