@@ -77,7 +77,7 @@ export function computePovResetEdgePosition({
  * placement pointing toward the default forward POV.
  */
 export function syncPovResetButton(cameraSystem) {
-  if (typeof document === 'undefined') return;
+  if (typeof document === 'undefined' || typeof document.getElementById !== 'function') return;
   const btn = document.getElementById('btn-reset-pov');
   if (!btn) return;
 
