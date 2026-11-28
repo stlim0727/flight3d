@@ -62,7 +62,7 @@ export class CameraSystem {
     if (this.usesOpticalZoom()) this.zoomOpticalBy(Math.exp(deltaDist * 0.0035), true);
   }
   usesOpticalZoom() {
-    return [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER, CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE].includes(this.mode);
+    return [CameraSystem.MODES.HUD, CameraSystem.MODES.COCKPIT, CameraSystem.MODES.TOWER, CameraSystem.MODES.CHASE, CameraSystem.MODES.DRONE].includes(this.mode);
   }
   opticalZoomFloor() {
     return (this.mode === CameraSystem.MODES.CHASE || this.mode === CameraSystem.MODES.DRONE) ? this.exteriorZoomMin : this.opticalZoomMin;
@@ -203,7 +203,7 @@ export class CameraSystem {
     return this.lookPitch + (this.headLookActive ? this.headLookPitch : 0);
   }
   isLookingAwayFromCenter() {
-    if (this.mode !== CameraSystem.MODES.COCKPIT) return false;
+    if (this.mode !== CameraSystem.MODES.HUD && this.mode !== CameraSystem.MODES.COCKPIT) return false;
     const yaw = this._lookYawWithHead();
     const pitch = this._lookPitchWithHead();
     return Math.abs(yaw) > 0.38 || Math.abs(pitch - (this.aircraftLookPitch ?? -0.25)) > 0.42;
@@ -225,7 +225,7 @@ export class CameraSystem {
     this.headLookPitch += (this.targetHeadLookPitch - this.headLookPitch) * factor;
     // Head look belongs to the head views only, and yields to an explicit drag.
     this.headLookActive = this.headTrackingEnabled && !this.userLookOverridden
-      && [CameraSystem.MODES.COCKPIT, CameraSystem.MODES.WING, CameraSystem.MODES.GEAR].includes(this.mode);
+      && [CameraSystem.MODES.HUD, CameraSystem.MODES.COCKPIT, CameraSystem.MODES.WING, CameraSystem.MODES.GEAR].includes(this.mode);
   }
   togglePointerLock() {
     if (typeof document === 'undefined' || !this.domElement) return;

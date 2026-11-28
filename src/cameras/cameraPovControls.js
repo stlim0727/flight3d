@@ -17,6 +17,7 @@ export function isPovModified(cs) {
   }
   const defaultPitch = cs.aircraftLookPitch ?? -0.25;
   switch (cs.mode) {
+    case cs.constructor.MODES.HUD:
     case cs.constructor.MODES.COCKPIT:
       return Math.abs(normalizeAngle(cs.lookYaw)) > 0.001 || Math.abs(cs.lookPitch - defaultPitch) > 0.001;
     case cs.constructor.MODES.CHASE:
@@ -42,6 +43,7 @@ export function getPovIndicatorAngle(cs) {
   const defaultPitch = cs.aircraftLookPitch ?? -0.25;
 
   switch (cs.mode) {
+    case cs.constructor.MODES.HUD:
     case cs.constructor.MODES.COCKPIT:
       deltaYaw = normalizeAngle(cs.lookYaw);
       deltaPitch = cs.lookPitch - defaultPitch;
@@ -129,6 +131,7 @@ export function applyHatLook(cs, dirX, dirY, dt) {
   }
 
   switch (cs.mode) {
+    case cs.constructor.MODES.HUD:
     case cs.constructor.MODES.COCKPIT: {
       const targetYaw = -dirX * (cs.hatGlanceYaw ?? 1.35) * diagScale;
       const pitchDelta = dirY < 0
@@ -172,6 +175,7 @@ export function updatePovReturn(cs, dt) {
   if (cs.isDragging || cs.pointerLocked || cs.isHatLooking || dt <= 0 || !cs.povChangedByDrag || !cs.autoResetGaze) return;
 
   const povModes = [
+    cs.constructor.MODES.HUD,
     cs.constructor.MODES.COCKPIT,
     cs.constructor.MODES.CHASE,
     cs.constructor.MODES.WING,
@@ -203,6 +207,7 @@ export function updatePovReturn(cs, dt) {
   };
 
   switch (cs.mode) {
+    case cs.constructor.MODES.HUD:
     case cs.constructor.MODES.COCKPIT: {
       cs.lookYaw = stepTowardAngle(cs.lookYaw, 0);
       cs.lookPitch = stepToward(cs.lookPitch, defaultPitch);

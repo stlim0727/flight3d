@@ -44,6 +44,7 @@ export function applyMouseDelta(cs, dx, dy, isTouch = (cs.activeTouchId !== null
   }
   const sensitivity = isTouch ? cs.touchGazeSensitivity : cs.gazeSensitivity;
   switch (cs.mode) {
+    case cs.constructor.MODES.HUD:
     case cs.constructor.MODES.COCKPIT:
       cs.lookYaw -= dx * sensitivity;
       cs.lookPitch = Math.max(-cs.constructor.COCKPIT_PITCH_LIMIT, Math.min(cs.constructor.COCKPIT_PITCH_LIMIT, cs.lookPitch - dy * sensitivity));
