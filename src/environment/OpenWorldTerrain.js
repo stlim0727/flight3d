@@ -1443,20 +1443,25 @@ export class OpenWorldTerrain {
           }
         }
         if (world?.regions) {
+          let blended = height;
           for (const [id, reg] of world.regions) {
-            if (!reg.terrain?.runways?.length) continue;
             const offset = world.offsets.get(id);
             if (!offset) continue;
             const lx = px - offset[0];
             const lz = pz - offset[1];
             const e = reg.extent;
             if (e && (lx < e.minX || lx > e.maxX || lz < e.minZ || lz > e.maxZ)) continue;
+            if (typeof reg.terrain?.flattenHeight === 'function') {
+              blended = reg.terrain.flattenHeight(lx, lz, blended);
+            }
+            if (!reg.terrain?.runways?.length) continue;
             const nearest = reg.terrain.nearest(lx, lz);
-            if (nearest && nearest.hit.distance < 240) {
-              const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 40, 240);
-              return THREE.MathUtils.lerp(nearest.hit.elevationM, height, blend);
+            if (nearest && nearest.hit.distance < 260) {
+              const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 80, 260);
+              blended = THREE.MathUtils.lerp(nearest.hit.elevationM, blended, blend);
             }
           }
+          return blended;
         }
         return height;
       };

@@ -85,6 +85,10 @@ export class OpenWorldRegionSurface {
     return best;
   }
 
+  flattenHeight(x, z, height) {
+    return this.fallback?.incheonSurface?.flattenHeight?.(x, z, height) ?? height;
+  }
+
   getHeight(x, z) {
     const contact = this.openWorld?.sampleContact?.(x, z);
     if (Number.isFinite(contact?.height)) return contact.height;
