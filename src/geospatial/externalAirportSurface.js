@@ -373,6 +373,27 @@ export class ExternalAirportSurface {
     return best;
   }
 
+  /** Flatten streamed open-world DEM vertices under runways, taxiways, and facilities. */
+  flattenHeight(x, z, height) {
+    if (!finite(x) || !finite(z) || !finite(height)) return height;
+    const nearestRunway = this.nearest(x, z);
+    const nearestTwy = this.nearestTaxiway(x, z);
+    const nearestFac = this.nearestFacility(x, z);
+
+    let nearest = nearestRunway
+      ? { distance: nearestRunway.hit.distance, elevationM: nearestRunway.hit.elevationM }
+      : null;
+    if (nearestTwy && (!nearest || nearestTwy.hit.distance < nearest.distance)) {
+      nearest = { distance: nearestTwy.hit.distance, elevationM: nearestTwy.hit.elevationM };
+    }
+    if (nearestFac && (!nearest || nearestFac.distance < nearest.distance)) {
+      nearest = nearestFac;
+    }
+    if (!nearest || nearest.distance >= 260) return height;
+    const blend = smoothstep((nearest.distance - 80) / (260 - 80));
+    return nearest.elevationM * (1 - blend) + height * blend;
+  }
+
   getHeight(x, z) {
     if (!finite(x) || !finite(z)) return 0;
     const nearestRunway = this.nearest(x, z);

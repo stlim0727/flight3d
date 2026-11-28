@@ -11,6 +11,7 @@ import { projectToLocal, INCHEON_PATCH } from '../geospatial/incheon.js';
 import { JEJU_ORIGIN } from '../geospatial/CorridorCoordinateSystem.js';
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
+import { OPEN_WORLD_RENDER_MIN_Y } from './OpenWorldTerrain.js';
 
 // Overture's z13 segment tiles carry the major road network; z14 adds footways,
 // steps and service roads that belong to a later, closer detail pass.
@@ -110,9 +111,12 @@ function ribbon(points, width, heights, color, heightAt = null) {
     const leftZ = point.z + miters[i].z * half;
     const rightX = point.x - miters[i].x * half;
     const rightZ = point.z - miters[i].z * half;
+    const centerY = heights[i];
+    const leftY = heightAt ? Math.max(heightAt(leftX, leftZ), centerY) : centerY;
+    const rightY = heightAt ? Math.max(heightAt(rightX, rightZ), centerY) : centerY;
     return {
-      left: new THREE.Vector3(leftX, heightAt ? heightAt(leftX, leftZ) + surfaceOffset : heights[i] + surfaceOffset, leftZ),
-      right: new THREE.Vector3(rightX, heightAt ? heightAt(rightX, rightZ) + surfaceOffset : heights[i] + surfaceOffset, rightZ),
+      left: new THREE.Vector3(leftX, leftY + surfaceOffset, leftZ),
+      right: new THREE.Vector3(rightX, rightY + surfaceOffset, rightZ),
       color,
     };
   });
@@ -180,9 +184,13 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
   const colors = [];
   const indices = [];
   const color = new THREE.Color();
-  const heightAt = (x, z) => terrain.getHeight(x, z);
+  const rawHeightAt = (x, z) => terrain.getHeight(x, z);
+  const heightAt = (x, z) => {
+    const h = rawHeightAt(x, z);
+    return terrain.openWorld && Number.isFinite(h) ? Math.max(OPEN_WORLD_RENDER_MIN_Y, h) : h;
+  };
   const usable = (point, deck) => Number.isFinite(point.x) && Number.isFinite(point.z)
-    && (deck || (point.height > 0 && !terrain.isWater?.(point.x, point.z)))
+    && (deck || ((point.rawHeight ?? point.height) > 0 && !terrain.isWater?.(point.x, point.z)))
     && !exclude(point.x, point.z)
     && !(Number.isFinite(terrain.size) && Math.max(Math.abs(point.x), Math.abs(point.z)) > terrain.size / 2);
 
@@ -199,7 +207,10 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
       const points = ring.map(({ x, y }) => {
         const { latitude, longitude } = tileToWgs84(tile.x + x / extent, tile.y + y / extent, zoom);
         const [localX, localZ] = project(latitude, longitude);
-        return { x: localX, z: localZ, height: heightAt(localX, localZ) };
+        const rawHeight = rawHeightAt(localX, localZ);
+        const height = terrain.openWorld && Number.isFinite(rawHeight)
+          ? Math.max(OPEN_WORLD_RENDER_MIN_Y, rawHeight) : rawHeight;
+        return { x: localX, z: localZ, height, rawHeight };
       });
       let run = [];
       const emit = () => {
@@ -222,8 +233,9 @@ export function buildGeographicRoadTile(data, tile, project, terrain, exclude = 
         if (span.deck && decks) decks.push({ points: run.map(point => ({ x: point.x, z: point.z })), width, height: heights[0], evidenced: span.evidenced });
         if (!span.deck && lamps) {
           for (const lamp of roadLamps(run, width, heightAt, lampSpacing[properties.class])) {
+            const rawHeight = rawHeightAt(lamp.x, lamp.z);
             const height = heightAt(lamp.x, lamp.z);
-            if (usable({ x: lamp.x, z: lamp.z, height }, false)) lamps.push(lamp.setY(height));
+            if (usable({ x: lamp.x, z: lamp.z, height, rawHeight }, false)) lamps.push(lamp.setY(height));
           }
         }
         if (!span.deck && samples) for (const point of run) samples.push({ x: point.x, z: point.z });
