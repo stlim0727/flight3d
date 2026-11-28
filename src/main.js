@@ -39,7 +39,7 @@ import { CDUCanvas } from './aircraft/CDUCanvas.js';
 import { Boeing737 } from './aircraft/Boeing737.js';
 import { Cessna172 } from './aircraft/Cessna172.js';
 import { F16 } from './aircraft/F16.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, initialRenderQuality, renderPixelRatio, applyFlatShading } from './config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, initialRenderQuality, effectiveShadowMapSizes, renderPixelRatio, applyFlatShading } from './config/renderQuality.js';
 import { WaterOcean } from './environment/WaterOcean.js';
 import { SkyAtmosphere } from './environment/SkyAtmosphere.js';
 import { GroundContactShadow, contactShadowSurfaceHeight } from './environment/GroundContactShadow.js';
@@ -111,6 +111,8 @@ import {
   trackFlightEnd,
   trackFlightCrash,
   captureException,
+  trackUncleanExit,
+  trackBrowserReport,
   trackMultiplayerRoomCreated,
   trackMultiplayerRoomJoined,
   trackMultiplayerConnected,
@@ -123,6 +125,7 @@ import {
   trackDebriefAction,
 } from './analytics/posthog.js';
 import { openFeedbackDialog } from './analytics/FeedbackDialog.js';
+import { startUncleanExitTracker } from './analytics/uncleanExitTracker.js';
 
 // Expose THREE globally for test harness and browser console debugging
 if (typeof window !== 'undefined') {
@@ -348,8 +351,12 @@ class FlightSimulator {
       deferCloudDensity: true,
       deferHdr: true,
     });
-    this.sky.setShadowMapSize(initialPreset.shadowMapSize);
-    this.sky.setFarShadowQuality(initialPreset.farShadowMapSize, initialPreset.farShadowRange);
+    const initialShadows = effectiveShadowMapSizes(this.renderQuality, {
+      coarsePointer: window.matchMedia('(pointer: coarse)').matches,
+      deviceMemory: navigator.deviceMemory,
+    });
+    this.sky.setShadowMapSize(initialShadows.shadowMapSize);
+    this.sky.setFarShadowQuality(initialShadows.farShadowMapSize, initialShadows.farShadowRange);
     if (this.sky?.setCloudsVisible) {
       this.sky.setCloudsVisible(initialPreset.clouds ?? true);
     }
@@ -604,6 +611,13 @@ class FlightSimulator {
       trackDebriefAction,
     };
     this._openFeedbackDialog = openFeedbackDialog;
+    if (typeof window !== 'undefined') {
+      this.uncleanExitTracker = startUncleanExitTracker({
+        sim: this,
+        onUncleanExit: trackUncleanExit,
+        onBrowserReport: trackBrowserReport,
+      });
+    }
 
     await startupDetail('startup.detail.ui');
     inputLatency?.mark('startup-ui-start');
@@ -636,6 +650,7 @@ class FlightSimulator {
         setTimeout(initTelemetry, 1000);
       }
       this.renderer?.domElement?.addEventListener('webglcontextlost', () => {
+        this.uncleanExitTracker?.markStage('webglcontextlost');
         captureException(new Error('WebGL context lost'), {
           source: 'canvas.webglcontextlost',
           gpu: this.renderer?.capabilities?.renderVersion,

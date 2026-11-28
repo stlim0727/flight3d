@@ -1,6 +1,6 @@
 export const RENDER_QUALITY_KEY = 'flight3d.renderQuality';
 export const RENDER_QUALITY = Object.freeze({
-  high: { terrain: 'high', maxDpr: 2, maxPixels: 3840 * 2160, shadowMapSize: 4096, farShadowMapSize: 4096, farShadowRange: 4000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 256, waterSegments: 180, terrainDetailTiles: 7, terrainHighDetailTiles: 4, terrainUltraDetailTiles: 1, terrainAnisotropy: 8, antialias: true, flatShading: false, logarithmicDepthBuffer: true },
+  high: { terrain: 'high', maxDpr: 2, maxPixels: 3840 * 2160, shadowMapSize: 4096, farShadowMapSize: 2048, farShadowRange: 4000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 256, waterSegments: 180, terrainDetailTiles: 7, terrainHighDetailTiles: 4, terrainUltraDetailTiles: 1, terrainAnisotropy: 8, antialias: true, flatShading: false, logarithmicDepthBuffer: true },
   balanced: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'low', maxDpr: 1.5, maxPixels: 2560 * 1440, shadowMapSize: 2048, farShadowMapSize: 1024, farShadowRange: 3000, shadows: true, ao: true, clouds: true, greenSpace: true, terrainSegments: 192, waterSegments: 144, terrainDetailTiles: 6, terrainHighDetailTiles: 3, terrainUltraDetailTiles: 1, terrainAnisotropy: 8, antialias: true, flatShading: false, logarithmicDepthBuffer: true },
   performance: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'low', maxDpr: 1, maxPixels: 1280 * 720, shadowMapSize: 1024, farShadowMapSize: 0, farShadowRange: 0, shadows: true, ao: false, clouds: true, greenSpace: false, terrainSegments: 128, waterSegments: 96, terrainDetailTiles: 4, terrainHighDetailTiles: 1, terrainUltraDetailTiles: 0, terrainAnisotropy: 4, antialias: true, flatShading: false, logarithmicDepthBuffer: false },
   ultraLow: { simpleF16Canopy: true, limitF16AirportLights: true, terrain: 'ultraLow', maxDpr: 0.75, maxPixels: 1280 * 720, shadowMapSize: 0, farShadowMapSize: 0, farShadowRange: 0, shadows: false, ao: false, clouds: false, greenSpace: false, terrainSegments: 64, waterSegments: 64, terrainDetailTiles: 2, terrainHighDetailTiles: 0, terrainUltraDetailTiles: 0, terrainAnisotropy: 2, antialias: false, flatShading: true, logarithmicDepthBuffer: false },
@@ -18,6 +18,29 @@ export function initialRenderQuality(saved, { coarsePointer = false, deviceMemor
   if (Object.hasOwn(RENDER_QUALITY, saved)) return saved;
   return coarsePointer || (Number.isFinite(deviceMemory) && deviceMemory > 0 && deviceMemory <= 4)
     ? 'performance' : 'balanced';
+}
+
+/**
+ * Bound shadow-map render targets on touch / low-memory devices so choosing
+ * `high` quality does not allocate multi-hundred-MB 4096px shadow buffers and
+ * trigger a mobile browser OOM kill.
+ */
+export function effectiveShadowMapSizes(quality, { coarsePointer = false, deviceMemory } = {}) {
+  const preset = RENDER_QUALITY[resolveRenderQuality(quality)];
+  const constrained = Boolean(coarsePointer)
+    || (Number.isFinite(deviceMemory) && deviceMemory > 0 && deviceMemory <= 4);
+  if (!constrained) {
+    return {
+      shadowMapSize: preset.shadowMapSize,
+      farShadowMapSize: preset.farShadowMapSize,
+      farShadowRange: preset.farShadowRange,
+    };
+  }
+  return {
+    shadowMapSize: Math.min(preset.shadowMapSize, 2048),
+    farShadowMapSize: Math.min(preset.farShadowMapSize, 1024),
+    farShadowRange: preset.farShadowRange,
+  };
 }
 
 /** Bound physical framebuffer area as well as DPR; CSS/HUD size stays unchanged. */

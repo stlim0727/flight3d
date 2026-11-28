@@ -241,6 +241,18 @@ export function captureException(error, additionalContext = {}) {
   }, { send_instantly: true });
 }
 
+/** Report a previous foreground session that terminated without a clean exit (likely OOM/tab crash). */
+export function trackUncleanExit(report) {
+  if (!report) return;
+  sendEvent('browser_unclean_exit', report, { send_instantly: true });
+}
+
+/** Report a browser crash or intervention delivered via ReportingObserver. */
+export function trackBrowserReport(report) {
+  if (!report) return;
+  sendEvent('browser_intervention', report, { send_instantly: true });
+}
+
 /** Track flight start */
 export function trackFlightStart({ airport, aircraft, scenario, pilotMode, timeOfDay }) {
   trackEvent('flight_started', {
