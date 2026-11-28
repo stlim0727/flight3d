@@ -16,6 +16,8 @@ import { EARTH_RADIUS_M } from './AerialPerspective.js';
 import { RENDER_QUALITY, resolveRenderQuality } from '../config/renderQuality.js';
 import { authorityZonesFromBounds, createAuthorityZones, zoneDistance } from '@stlim0727/flightsim-core/terrain/AuthorityZones.js';
 
+export const OPEN_WORLD_RENDER_MIN_Y = 1.05;
+
 const zoom = 11;
 const farZoom = 8;
 const farSegments = 32;
@@ -182,7 +184,7 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced', seaPalette 
     ` + shader.vertexShader.replace(
       '#include <begin_vertex>',
       `#include <begin_vertex>
-      transformed.y = max(transformed.y, 1.05);`,
+      transformed.y = max(transformed.y, ${OPEN_WORLD_RENDER_MIN_Y.toFixed(2)});`,
     ).replace(
       '#include <project_vertex>',
       `#include <project_vertex>
@@ -1453,12 +1455,12 @@ export class OpenWorldTerrain {
             if (e && (lx < e.minX || lx > e.maxX || lz < e.minZ || lz > e.maxZ)) continue;
             if (typeof reg.terrain?.flattenHeight === 'function') {
               blended = reg.terrain.flattenHeight(lx, lz, blended);
-            }
-            if (!reg.terrain?.runways?.length) continue;
-            const nearest = reg.terrain.nearest(lx, lz);
-            if (nearest && nearest.hit.distance < 260) {
-              const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 80, 260);
-              blended = THREE.MathUtils.lerp(nearest.hit.elevationM, blended, blend);
+            } else if (reg.terrain?.runways?.length) {
+              const nearest = reg.terrain.nearest(lx, lz);
+              if (nearest && nearest.hit.distance < 260) {
+                const blend = THREE.MathUtils.smoothstep(nearest.hit.distance, 80, 260);
+                blended = THREE.MathUtils.lerp(nearest.hit.elevationM, blended, blend);
+              }
             }
           }
           return blended;
@@ -1601,7 +1603,7 @@ const frames = {
     origin: INCHEON_PATCH.origin,
     insets: getInsetsForRegion('incheon'),
   },
-  jeju: { origin: JEJU_ORIGIN, protectedAreas: [[-3200, -1500, 3200, 1500]], insets: getInsetsForRegion('jeju') },
+  jeju: { origin: JEJU_ORIGIN, insets: getInsetsForRegion('jeju') },
   patagonia: { origin: { latitude: PATAGONIA_ORIGIN.lat, longitude: PATAGONIA_ORIGIN.lon } },
 };
 
