@@ -105,6 +105,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapBookmarksEl = document.getElementById('lobby-map-bookmarks');
   const mapDefaultBookmarks = document.getElementById('lobby-map-default-bookmarks');
   const mapBookmarkToggle = document.getElementById('lobby-map-bookmark-toggle');
+  const placeBookmarkToggle = document.getElementById('lobby-place-bookmark');
   const mapSvg = document.getElementById('lobby-map-svg');
   const mapMarkers = document.getElementById('lobby-map-markers');
   const mapOverview = document.getElementById('lobby-map-overview');
@@ -132,7 +133,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const mapDialog = document.getElementById('lobby-map-dialog');
   const mapDialogClose = document.getElementById('lobby-map-dialog-close');
   const placePicker = document.getElementById('lobby-place-picker');
-  const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
+  const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, placeBookmarkToggle, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
   let mapBookmarks = loadBookmarks();
   let mapCenteredKey = '';
   let mapPlanTileId = null;
@@ -316,7 +317,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     airportIndexState.selectionError = selectionError;
     renderMapBrowser();
   }
-  function renderPlaceList(container, items, emptyKey, activeKey) {
+  function renderPlaceList(container, items, emptyKey, activeKey, { allowBookmark = false } = {}) {
     if (!container) return;
     container.replaceChildren();
     if (!items.length) {
@@ -325,15 +326,40 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       container.append(empty);
       return;
     }
+    const savedKeys = allowBookmark ? new Set(mapBookmarks.map(bookmarkKey)) : null;
     for (const item of items) {
+      const itemKey = item.key ?? `${item.kind}:${item.id}`;
       const button = document.createElement('button');
       button.type = 'button';
-      button.className = `btn${item.key === activeKey ? ' active' : ''}`;
+      button.className = `btn${allowBookmark ? ' lobby-map-result-select' : ''}${itemKey === activeKey ? ' active' : ''}`;
       button.dataset.placeKind = item.kind;
       button.dataset.placeId = item.id;
       button.dataset.placeSource = item.source ?? '';
       button.textContent = `${item.label}${item.detail ? ` · ${item.detail}` : ''}`;
-      container.append(button);
+      if (!allowBookmark || (item.kind !== 'airport' && item.kind !== 'point')) {
+        container.append(button);
+        continue;
+      }
+      const row = document.createElement('div');
+      row.className = 'lobby-map-result-row';
+      row.dataset.placeKind = item.kind;
+      row.dataset.placeId = item.id;
+      row.dataset.placeSource = item.source ?? '';
+      const saved = savedKeys.has(itemKey);
+      const bookmarkBtn = document.createElement('button');
+      bookmarkBtn.type = 'button';
+      bookmarkBtn.className = `btn lobby-map-result-bookmark${saved ? ' bookmarked' : ''}`;
+      bookmarkBtn.dataset.bookmarkToggle = 'true';
+      bookmarkBtn.dataset.bookmarkKind = item.kind;
+      bookmarkBtn.dataset.bookmarkId = item.id;
+      bookmarkBtn.dataset.bookmarkSource = item.source ?? '';
+      bookmarkBtn.setAttribute('aria-pressed', String(saved));
+      const bookmarkLabel = t(saved ? 'lobby.bookmark.remove' : 'lobby.bookmark.add');
+      bookmarkBtn.setAttribute('aria-label', `${bookmarkLabel}: ${item.label}`);
+      bookmarkBtn.setAttribute('title', bookmarkLabel);
+      bookmarkBtn.textContent = saved ? '★' : '☆';
+      row.append(button, bookmarkBtn);
+      container.append(row);
     }
   }
   const svgNamespace = 'http://www.w3.org/2000/svg';
@@ -596,7 +622,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       ? { ...item, label: item.nameKey ? t(item.nameKey) : item.label, detail: '' }
       : item;
     if (query.trim()) {
-      renderPlaceList(mapResults, results.map(formatPlaceItem), 'lobby.map.search.empty', activeKey);
+      renderPlaceList(mapResults, results.map(formatPlaceItem), 'lobby.map.search.empty', activeKey, { allowBookmark: true });
     } else {
       mapResults?.replaceChildren();
     }
@@ -611,9 +637,20 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
 
     renderMapMarkers(activeKey);
     renderMapSearchStatus(query, results.length);
+    const activeBookmarked = Boolean(active && isBookmarked(bookmarkFromPlace(active)));
     if (mapBookmarkToggle) {
-      bindText(mapBookmarkToggle, () => t(active && isBookmarked(bookmarkFromPlace(active)) ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
+      bindText(mapBookmarkToggle, () => t(activeBookmarked ? 'lobby.bookmark.remove' : 'lobby.bookmark.add'));
       mapBookmarkToggle.disabled = !active;
+    }
+    if (placeBookmarkToggle) {
+      const bookmarkLabel = t(activeBookmarked ? 'lobby.bookmark.remove' : 'lobby.bookmark.add');
+      placeBookmarkToggle.hidden = !active;
+      placeBookmarkToggle.disabled = !active;
+      placeBookmarkToggle.classList.toggle('bookmarked', activeBookmarked);
+      placeBookmarkToggle.setAttribute('aria-pressed', String(activeBookmarked));
+      placeBookmarkToggle.setAttribute('aria-label', bookmarkLabel);
+      placeBookmarkToggle.setAttribute('title', bookmarkLabel);
+      placeBookmarkToggle.textContent = activeBookmarked ? '★' : '☆';
     }
     renderMapTiles();
   }
@@ -637,7 +674,50 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         }
       } catch { /* fall through to the stored bookmark */ }
     }
+    if (bookmark.kind === 'point' && typeof bookmark.id === 'string' && bookmark.id.startsWith('geonames:')) {
+      try {
+        await ensurePlaceSearchIndex();
+        const entry = placeIndexState.entries.find(item => item.id === bookmark.id);
+        if (entry) {
+          return {
+            ...entry,
+            kind: 'point',
+            altitudeM: placeCruiseAltitude(entry),
+            headingDeg: 90,
+          };
+        }
+      } catch { /* fall through to the stored bookmark */ }
+    }
     return { ...bookmark, kind: bookmark.kind, id: bookmark.id, label: bookmark.label };
+  }
+  function resolveBookmarkCandidate(kind, id, source) {
+    if (source === 'place-index') {
+      const place = placeIndexState.entries.find(entry => entry.id === id);
+      if (place) {
+        return bookmarkFromPlace({
+          ...place,
+          kind: 'point',
+          altitudeM: placeCruiseAltitude(place),
+          headingDeg: 90,
+        });
+      }
+    }
+    if (source === 'global' && kind === 'airport') {
+      const entry = airportIndexState.entries.find(item => item.code === id);
+      if (entry) {
+        return bookmarkFromPlace({ ...entry, kind: 'airport', id: entry.code, label: entry.name });
+      }
+    }
+    const local = findMapPlace(kind, id);
+    if (local) {
+      return bookmarkFromPlace({
+        ...local,
+        kind,
+        id: local.id ?? local.code,
+        label: local.label ?? local.name,
+      });
+    }
+    return mapBookmarks.find(entry => bookmarkKey(entry) === `${kind}:${id}`) ?? null;
   }
   async function selectGlobalAirport(code) {
     setSelectionBusy(true);
@@ -710,6 +790,18 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   }
   async function onMapPlaceClick(event) {
     if (mapSelectionBusy) return;
+    const bookmarkTarget = event.target?.closest?.('[data-bookmark-toggle]');
+    if (bookmarkTarget?.dataset?.bookmarkToggle === 'true') {
+      const candidate = resolveBookmarkCandidate(
+        bookmarkTarget.dataset.bookmarkKind,
+        bookmarkTarget.dataset.bookmarkId,
+        bookmarkTarget.dataset.bookmarkSource,
+      );
+      if (!candidate) return;
+      mapBookmarks = toggleBookmark(candidate);
+      renderMapBrowser();
+      return;
+    }
     const target = event.target?.closest?.('[data-place-kind]');
     if (!target) return;
     const kind = target.dataset.placeKind;
@@ -772,7 +864,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
         key: `${place.kind}:${place.id}`,
         label: place.kind === 'airport' ? airportDisplayName(place, getLanguage()) : place.label,
         detail: place.iata || place.code || '',
-      })), 'lobby.map.search.empty', mapActiveKey());
+      })), 'lobby.map.search.empty', mapActiveKey(), { allowBookmark: true });
       if (mapStatus) mapStatus.textContent = t('lobby.map.cluster.choose');
       return;
     }
@@ -910,12 +1002,14 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   if (mapSvg && typeof ResizeObserver !== 'undefined' && typeof mapSvg.getBoundingClientRect === 'function') {
     new ResizeObserver(() => setMapView(mapFocus, mapZoom)).observe(mapSvg);
   }
-  mapBookmarkToggle?.addEventListener('click', () => {
+  const onActiveBookmarkToggle = () => {
     const active = currentMapPlace();
     if (!active) return;
     mapBookmarks = toggleBookmark(bookmarkFromPlace(active));
     renderMapBrowser();
-  });
+  };
+  mapBookmarkToggle?.addEventListener('click', onActiveBookmarkToggle);
+  placeBookmarkToggle?.addEventListener('click', onActiveBookmarkToggle);
   function setMapPlaces(places = {}) {
     mapCatalog = { airports: places.airports ?? [], points: places.points ?? [], regions: places.regions ?? specialRegionPlaces() };
     if (mapAirportSelect) {

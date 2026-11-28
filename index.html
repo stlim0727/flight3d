@@ -335,11 +335,14 @@
             </div>
             <p id="lobby-start-reason" class="lobby-reason" aria-live="polite" hidden></p>
           </div>
-          <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure lobby-map-launcher">
-            <summary aria-haspopup="dialog" aria-controls="lobby-map-dialog"><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span><span class="lobby-map-launch-glyph" aria-hidden="true">↗</span></summary>
-            <select id="lobby-map-state" hidden aria-hidden="true"></select>
-            <select id="lobby-map-point" hidden aria-hidden="true"></select>
-          </details>
+          <div class="lobby-place-row">
+            <details id="lobby-place-picker" name="lobby-flight-options" class="lobby-disclosure lobby-map-launcher">
+              <summary aria-haspopup="dialog" aria-controls="lobby-map-dialog"><span data-i18n="lobby.placePicker">장소 선택</span><span id="lobby-place-summary" class="lobby-disclosure-value"></span><span class="lobby-map-launch-glyph" aria-hidden="true">↗</span></summary>
+              <select id="lobby-map-state" hidden aria-hidden="true"></select>
+              <select id="lobby-map-point" hidden aria-hidden="true"></select>
+            </details>
+            <button type="button" id="lobby-place-bookmark" class="btn lobby-place-bookmark-btn" hidden aria-pressed="false" data-i18n-aria-label="lobby.bookmark.add" data-i18n-title="lobby.bookmark.add" title="북마크 추가">☆</button>
+          </div>
           <details id="lobby-missions" name="lobby-flight-options" class="lobby-disclosure">
             <summary><span data-i18n="lobby.missions">미션·훈련·데모</span><span id="lobby-mission-summary" class="lobby-disclosure-value"></span></summary>
             <div class="lobby-group lobby-scenarios" role="group">
