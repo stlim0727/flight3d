@@ -39,6 +39,7 @@ export function createSimulatorScenarioStart(sim) {
       }
       sim.gameFlow.setCinematicAvailable(isScenarioAvailable(sim.activeAirport, 'demo'));
       sim.gameFlow.enterFlight();
+      sim.uncleanExitTracker?.markStage(`flight-start:${request.airport}:${request.scenario}:${sim.renderQuality ?? 'unknown'}`);
       return request;
     },
     installers: {
@@ -138,6 +139,7 @@ export function createSimulatorScenarioStart(sim) {
       });
       saveSimulatorPreferences({ demoProfile: request.demoProfile });
       saveFlightSelection(request);
+      sim.uncleanExitTracker?.markStage(`flying:${sim.activeAirport}:${request.scenario}:${sim.renderQuality ?? 'unknown'}`);
 
       if (sim.multiplayer?.active && sim.multiplayer.preparing) sim.gameFlow.pause();
     },

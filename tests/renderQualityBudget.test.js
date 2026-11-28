@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { initialRenderQuality, renderPixelRatio, RENDER_QUALITY } from '../src/config/renderQuality.js';
+import { effectiveShadowMapSizes, initialRenderQuality, renderPixelRatio, RENDER_QUALITY } from '../src/config/renderQuality.js';
 
 test('capability defaults preserve every explicit preset', () => {
   for (const quality of Object.keys(RENDER_QUALITY)) {
@@ -81,4 +81,28 @@ test('F16 framebuffer never grows when dropping quality at a fixed viewport', ()
   }
   assert.equal(renderPixelRatio('performance', 1280, 720, 1, 'F16'), .85);
   assert.equal(renderPixelRatio('ultraLow', 1440, 900, 1, 'F16'), .75);
+});
+
+test('effectiveShadowMapSizes caps high-tier shadow buffers on touch and low-memory devices', () => {
+  assert.equal(RENDER_QUALITY.high.farShadowMapSize, 2048);
+  assert.deepEqual(effectiveShadowMapSizes('high', { coarsePointer: false, deviceMemory: 8 }), {
+    shadowMapSize: 4096,
+    farShadowMapSize: 2048,
+    farShadowRange: 4000,
+  });
+  assert.deepEqual(effectiveShadowMapSizes('high', { coarsePointer: true, deviceMemory: 8 }), {
+    shadowMapSize: 2048,
+    farShadowMapSize: 1024,
+    farShadowRange: 4000,
+  });
+  assert.deepEqual(effectiveShadowMapSizes('high', { coarsePointer: false, deviceMemory: 4 }), {
+    shadowMapSize: 2048,
+    farShadowMapSize: 1024,
+    farShadowRange: 4000,
+  });
+  assert.deepEqual(effectiveShadowMapSizes('ultraLow', { coarsePointer: true, deviceMemory: 2 }), {
+    shadowMapSize: 0,
+    farShadowMapSize: 0,
+    farShadowRange: 0,
+  });
 });

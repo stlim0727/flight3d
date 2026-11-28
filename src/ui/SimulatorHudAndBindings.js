@@ -3,7 +3,7 @@ import { recoverSimulatorFlightStart } from '../core/simulatorFlightStart.js';
 import { t, bindText } from '../i18n/index.js';
 import { SHADOW_VIEWS } from '../director/CockpitShadowDemo.js';
 import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
-import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, renderPixelRatio, applyFlatShading } from '../config/renderQuality.js';
+import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, effectiveShadowMapSizes, renderPixelRatio, applyFlatShading } from '../config/renderQuality.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
 import { setToolbarIcon } from './toolbarIcons.js';
@@ -497,12 +497,17 @@ class SimulatorHudAndBindingsMethods {
     this.renderDiagnosticsPanel?.close();
     const prevPreset = RENDER_QUALITY[this.renderQuality];
     this.renderQuality = resolveRenderQuality(value);
+    this.uncleanExitTracker?.markStage(`quality-change:${this.renderQuality}`);
     const preset = RENDER_QUALITY[this.renderQuality];
+    const shadowBudget = effectiveShadowMapSizes(this.renderQuality, {
+      coarsePointer: typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)')?.matches,
+      deviceMemory: typeof navigator !== 'undefined' ? navigator.deviceMemory : undefined,
+    });
     if (this.renderer?.shadowMap) {
-      this.renderer.shadowMap.enabled = preset.shadows ?? (preset.shadowMapSize > 0);
+      this.renderer.shadowMap.enabled = preset.shadows ?? (shadowBudget.shadowMapSize > 0);
     }
-    this.sky?.setShadowMapSize(preset.shadowMapSize);
-    this.sky?.setFarShadowQuality?.(preset.farShadowMapSize, preset.farShadowRange);
+    this.sky?.setShadowMapSize(shadowBudget.shadowMapSize);
+    this.sky?.setFarShadowQuality?.(shadowBudget.farShadowMapSize, shadowBudget.farShadowRange);
     if (this.sky?.setCloudsVisible) {
       this.sky.setCloudsVisible(preset.clouds ?? true);
     } else {
