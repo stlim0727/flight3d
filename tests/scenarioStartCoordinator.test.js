@@ -361,3 +361,67 @@ test('map approach spawn clears the terrain at the final approach point', async 
     assert.equal(sim.isCrashed, false, `unexpected crash: ${sim.crashResult?.type}`);
   });
 });
+
+test('map approach spawn preserves threshold glide path over lower terrain', async () => {
+  await withStorage(async () => {
+    const groundAtThreshold = 36;
+    const groundAtFinal = 0;
+    const samples = [];
+    const terrain = {
+      getHeight(x, z) {
+        samples.push([x, z]);
+        return z > 0 ? groundAtThreshold : groundAtFinal;
+      },
+      openWorld: { readyAt: () => true },
+    };
+    const sim = createPilotMissionSimulation({ aircraftId: 'C172', airportId: 'incheon', terrain });
+    sim.devRunner = { stop() {} };
+    sim.shadowDemo = { stop() {} };
+    sim.replayDirector = { stop() {} };
+    sim.demoDirector = { userTimeOfDayOverridden: true, stop() {} };
+    sim.gameFlow = new GameFlowController();
+    sim.sky = { timeOfDay: 12 };
+    sim.lobby = {
+      airport: 'jeju',
+      aircraft: 'C172',
+      preset: 'approach',
+      pilotMode: 'human',
+      demoProfile: 'standard',
+      mapPlan: {
+        state: 'approach',
+        airportCode: 'RKPC',
+        tileId: '12-8',
+        runwayKey: '13/31:13',
+      },
+    };
+    sim.mapPlaces = {
+      airports: [{
+        code: 'RKPC', latitude: 33.5069, longitude: 126.4931, elevationM: 36,
+        runways: [{
+          id: '13/31', widthM: 45, lengthM: 3000,
+          ends: [
+            { ident: '13', physical: { latitude: 33.4917, longitude: 126.5153, elevationM: 36 },
+              threshold: { latitude: 33.4917, longitude: 126.5153, elevationM: 36 },
+              displacedThresholdM: 0, headingDegT: 130 },
+            { ident: '31', physical: { latitude: 33.5222, longitude: 126.4706, elevationM: 36 },
+              threshold: { latitude: 33.5222, longitude: 126.4706, elevationM: 36 },
+              displacedThresholdM: 0, headingDegT: 310 },
+          ],
+        }],
+      }],
+      points: [],
+    };
+    sim.ensureGeographicLayers = async () => ({ updateOpenWorldTerrain() {} });
+
+    await createSimulatorScenarioStart(sim).start();
+
+    assert.ok(samples.some(([x, z]) => Math.abs(x - sim.position.x) < 1 && Math.abs(z - sim.position.z) < 1),
+      'spawn alignment should sample terrain beneath the aircraft');
+    assert.ok(sim.position.y > groundAtThreshold + 200,
+      `spawn should retain threshold-based glide path, got ${sim.position.y}`);
+    assert.equal(sim.isCrashed, false);
+
+    for (let index = 0; index < 240; index++) sim.integratePhysics(1 / 120);
+    assert.equal(sim.isCrashed, false, `unexpected crash: ${sim.crashResult?.type}`);
+  });
+});

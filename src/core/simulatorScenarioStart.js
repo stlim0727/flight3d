@@ -254,10 +254,16 @@ async function waitForStreamedAirport(sim, code) {
 function alignMapSpawnToContact(sim, spawn) {
   if (!spawn?.alignToGround) return;
   if (!sim.position) return;
-  const { x: sampleX, z: sampleZ } = sim.position;
-  const ground = sim.currentTerrain?.getHeight?.(sampleX, sampleZ);
-  if (!Number.isFinite(ground)) return;
-  sim.position.y = ground + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
+  const getHeight = sim.currentTerrain?.getHeight;
+  if (typeof getHeight !== 'function') return;
+  const localGround = getHeight.call(sim.currentTerrain, sim.position.x, sim.position.z);
+  if (!Number.isFinite(localGround)) return;
+  let spawnGround = localGround;
+  if (spawn.state === 'approach' && Number.isFinite(spawn.surfaceX) && Number.isFinite(spawn.surfaceZ)) {
+    const thresholdGround = getHeight.call(sim.currentTerrain, spawn.surfaceX, spawn.surfaceZ);
+    if (Number.isFinite(thresholdGround)) spawnGround = Math.max(thresholdGround, localGround);
+  }
+  sim.position.y = spawnGround + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
   sim.aircraft?.group?.position?.copy?.(sim.position);
   sim.aircraft?.group?.updateMatrixWorld?.(true);
   sim.renderPose?.reset?.(sim.position, sim.quaternion);
