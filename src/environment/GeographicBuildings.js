@@ -12,6 +12,7 @@ import { pointInRing, segmentDistance } from '../geospatial/incheonDressing.js';
 import { extractBuildingLandmarks } from '../geospatial/overtureLandmarks.js';
 import { buildingArchiveUrl } from '../geospatial/buildingArchive.js';
 import { resolveBuildingStyle } from '../geospatial/regionalBuildingStyle.js';
+import { buildGeographicGable, intersectsGable } from './geographicGable.js';
 import overviewProperties from '../config/regionalOverviewProperties.json' with { type: 'json' };
 import luklaGrid from '../config/luklaTerrainGrid.json' with { type: 'json' };
 import { setMapAttributionSource } from '../ui/mapAttribution.js';
@@ -211,7 +212,7 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
     const [west, north, east, south] = feature.bbox();
     const location = tileToWgs84(tile.x + (west + east) / (2 * feature.extent),
       tile.y + (north + south) / (2 * feature.extent), zoom);
-    const style = resolveBuildingStyle({ ...location, id: feature.id, properties: feature.properties });
+    const complete = west > 0 && north > 0 && east < feature.extent && south < feature.extent;
     for (const polygon of tilePolygons(feature)) {
       const outerTileRing = polygon[0]?.slice(0, -1) ?? [];
       if (outerTileRing.length < 3) continue;
@@ -228,7 +229,8 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
         return new THREE.Vector2(localX, localZ);
       }));
       const [outer, ...holes] = rings;
-      if (outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 3) continue;
+      const footprintAreaM2 = Math.abs(THREE.ShapeUtils.area(outer));
+      if (outer.length < 3 || footprintAreaM2 < 3) continue;
       const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
       const override = findBuildingOverride(overrides, feature, tileCenter, tile);
       if (override?.collision === 'suppress') continue;
@@ -238,30 +240,48 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const low = Math.min(...samples);
       const high = Math.max(...samples);
       if (!Number.isFinite(low) || !Number.isFinite(high) || high <= 0) continue;
+      const style = resolveBuildingStyle({ ...location, id: feature.id, properties: feature.properties, footprintAreaM2 });
       const roof = high + style.heightM;
-      const roofTriangles = THREE.ShapeUtils.triangulateShape(outer, holes);
-      if (!roofTriangles.length) continue;
-      if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
-      const points = rings.flat();
+      const gable = style.roofShape === 'gabled' && complete && !holes.length
+        ? buildGeographicGable(outer, roof, style.heightM) : null;
+      const eave = gable?.eave ?? roof;
       const overrideColor = override?.material?.baseColor ? new THREE.Color(override.material.baseColor) : null;
       const wallColor = overrideColor ?? white;
       const roofColor = overrideColor ?? (style.roofColor ? roofTint(style.roofColor, roofAtlasColor) : white);
       const facadeTile = Math.floor(Math.abs(center.x) / 83 + Math.abs(center.y) / 47) % 3;
       const facadeUv = [(facadeTile % 2 + 0.5) / 2, (Math.floor(facadeTile / 2) + 0.5) / 2];
-      for (const triangle of roofTriangles) {
-        for (const index of triangle.toReversed()) {
-          const point = points[index];
-          positions.push(point.x, roof, point.y);
-          facadeUvs.push(...roofAtlasUv(point.x, point.y));
-          tint.push(roofColor.r, roofColor.g, roofColor.b);
+      if (gable) {
+        for (const faces of [gable.slopes, gable.ends]) {
+          const isRoof = faces === gable.slopes;
+          const color = isRoof ? roofColor : wallColor;
+          for (const { a, b, c } of faces) {
+            for (const { x, y, z } of [a, b, c]) {
+              positions.push(x, y, z);
+              facadeUvs.push(...(isRoof ? roofAtlasUv(x, z) : facadeUv));
+              tint.push(color.r, color.g, color.b);
+            }
+          }
+        }
+      } else {
+        const roofTriangles = THREE.ShapeUtils.triangulateShape(outer, holes);
+        if (!roofTriangles.length) continue;
+        const points = rings.flat();
+        for (const triangle of roofTriangles) {
+          for (const index of triangle.toReversed()) {
+            const point = points[index];
+            positions.push(point.x, roof, point.y);
+            facadeUvs.push(...roofAtlasUv(point.x, point.y));
+            tint.push(roofColor.r, roofColor.g, roofColor.b);
+          }
         }
       }
+      if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof, gable });
       for (const ring of rings) {
         for (let j = 0; j < ring.length; j++) {
           const a = ring[j];
           const b = ring[(j + 1) % ring.length];
-          positions.push(a.x, low, a.y, b.x, low, b.y, a.x, roof, a.y,
-            b.x, low, b.y, b.x, roof, b.y, a.x, roof, a.y);
+          positions.push(a.x, low, a.y, b.x, low, b.y, a.x, eave, a.y,
+            b.x, low, b.y, b.x, eave, b.y, a.x, eave, a.y);
           facadeUvs.push(...facadeUv, ...facadeUv, ...facadeUv,
             ...facadeUv, ...facadeUv, ...facadeUv);
           for (let v = 0; v < 6; v++) tint.push(wallColor.r, wallColor.g, wallColor.b);
@@ -302,8 +322,11 @@ function indexColliders(colliders) {
   return cells;
 }
 
-function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
-  const vertical = Math.max(low - pos.y, pos.y - roof, 0);
+function intersectsBuilding(probe, { rings, low, roof, gable }) {
+  const { pos, radius } = probe;
+  if (pos.y - radius > roof || pos.y + radius < low) return false;
+  if (gable && pos.y + radius >= gable.eave && intersectsGable(probe, gable)) return true;
+  const vertical = Math.max(low - pos.y, pos.y - (gable?.eave ?? roof), 0);
   if (vertical > radius) return false;
   const [outer, ...holes] = rings;
   if (pointInRing(pos.x, pos.z, outer) && !holes.some(ring => pointInRing(pos.x, pos.z, ring))) return true;

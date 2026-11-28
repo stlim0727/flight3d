@@ -8,7 +8,7 @@ for (const [label, place, properties, min, max, shape] of [
   ['Songdo apartment', songdo, { class: 'apartments' }, 48, 96, 'flat'],
   ['Songdo warehouse', songdo, { class: 'warehouse' }, 5, 12, 'flat'],
   ['Songdo unknown use', songdo, {}, 6, 15, 'flat'],
-  ['Jeju house', jeju, { subtype: 'residential', class: 'house' }, 3.2, 7, 'hipped'],
+  ['Jeju house', jeju, { subtype: 'residential', class: 'house' }, 3.2, 7, 'gabled'],
   ['Jeju unknown use', jeju, {}, 4, 10, 'flat'],
 ]) {
   test(label, () => {
@@ -28,6 +28,16 @@ test('uses each valid map attribute independently', () => {
     { ...fallback, heightM: 6.4, roofColor: '#008000' });
   assert.deepEqual(resolve({ height: 1501, num_floors: -1, roof_shape: 'gabled', roof_color: 'blue' }),
     { ...fallback, roofShape: 'gabled', roofColor: '#0000ff' });
+});
+
+test('Seongsan small low-rise estimate respects known use, parts and explicit roofs', () => {
+  const resolve = (properties, footprintAreaM2 = 100) => style({ ...jeju, properties, footprintAreaM2 });
+  assert.deepEqual(resolve({}), { ...style(jeju), roofShape: 'gabled' });
+  for (const properties of [{ height: 11 }, { roof_shape: 'flat' }, { subtype: 'civic' }, { has_parts: true }]) {
+    assert.equal(resolve(properties).roofShape, 'flat');
+  }
+  assert.equal(resolve({}, 181).roofShape, 'flat');
+  assert.equal(resolve({ roof_shape: 'hipped' }).roofShape, 'hipped');
 });
 
 test('outside either PoC uses the legacy material, 9 m and a flat roof', () => {

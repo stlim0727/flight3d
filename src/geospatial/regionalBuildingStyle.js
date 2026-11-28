@@ -13,9 +13,10 @@ const regions = [
   },
   {
     bounds: [126.919, 33.454, 126.94, 33.476], // Seongsan-ri village, Jeju
+    inferSmallGables: true,
     general: { height: [4, 10], colors: neutral, shape: 'flat' },
     uses: {
-      house: { height: [3.2, 7], colors: [['#427aaf', 4], ['#56835d', 4], ['#bb7049', 2]], shape: 'hipped' },
+      house: { height: [3.2, 7], colors: [['#427aaf', 4], ['#56835d', 4], ['#bb7049', 2]], shape: 'gabled' },
     },
   },
 ];
@@ -51,7 +52,7 @@ function weightedColor(colors, roll) {
 
 // Pass the canonical building location (not a clipped tile centroid).
 // A null roofColor leaves the existing roof material tint intact.
-export function resolveBuildingStyle({ latitude, longitude, id, properties = {} }) {
+export function resolveBuildingStyle({ latitude, longitude, id, properties = {}, footprintAreaM2 }) {
   const region = Number.isFinite(latitude) && Number.isFinite(longitude)
     && regions.find(({ bounds: [west, south, east, north] }) =>
       longitude >= west && longitude <= east && latitude >= south && latitude <= north);
@@ -67,9 +68,13 @@ export function resolveBuildingStyle({ latitude, longitude, id, properties = {} 
     const [min, max] = profile.height;
     heightM = min + fraction(seed + '/height') * (max - min);
   } else heightM = 9;
+  // Most Seongsan footprints lack use tags. Treat a small low-rise footprint
+  // of unknown use as a roof candidate without assigning it a residential color.
+  const smallVillageBuilding = region?.inferSmallGables && !properties.class && !properties.subtype
+    && !properties.has_parts && heightM <= 10 && footprintAreaM2 >= 25 && footprintAreaM2 <= 180;
   return {
     heightM,
     roofColor: mappedColor(properties.roof_color) ?? (profile ? weightedColor(profile.colors, fraction(seed + '/color')) : null),
-    roofShape: shapes.has(shape) ? shape : (profile?.shape ?? 'flat'),
+    roofShape: shapes.has(shape) ? shape : (smallVillageBuilding ? 'gabled' : profile?.shape ?? 'flat'),
   };
 }
