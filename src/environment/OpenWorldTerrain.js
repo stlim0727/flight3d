@@ -1449,6 +1449,7 @@ export class OpenWorldTerrain {
           for (const [id, reg] of world.regions) {
             const offset = world.offsets.get(id);
             if (!offset) continue;
+            if (!this.runwayVisible(reg)) continue;
             const lx = px - offset[0];
             const lz = pz - offset[1];
             const e = reg.extent;

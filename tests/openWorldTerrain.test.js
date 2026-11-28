@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { BoxGeometry, Group, Mesh, PerspectiveCamera, PlaneGeometry, Raycaster, ShaderLib, Texture, UniformsUtils, Vector3, Vector4 } from 'three';
 import { applyTerrainMaterialQuality, buildLocalImageryGeometry, buildOpenTerrainTile, buildReducedTerrainGeometry, decodeTerrarium, OpenWorldTerrain, updateOpenWorldTerrain } from '../src/environment/OpenWorldTerrain.js';
-import { tileToWgs84 } from '../src/geospatial/TileCoordinateSystem.js';
+import { tileToWgs84, wgs84ToLocal } from '../src/geospatial/TileCoordinateSystem.js';
 import { UnifiedWorld, REGION_EXTENTS } from '../src/world/UnifiedWorld.js';
 import { createWorldAirportFacade } from '../src/world/WorldAirportFacade.js';
 
@@ -595,6 +595,49 @@ test('OpenWorldTerrain blends vertices near registered external airport runways'
   assert.ok(sampled.height < 10, `Height at airport centre should be close to runway elevation: got ${sampled.height}`);
   const raw = openWorld.sampleRaw(0, 0);
   assert.equal(Math.round(raw), 25, 'sampleRaw must return the unblended DEM height');
+  openWorld.dispose();
+});
+
+test('ignores hidden regions when flattening streamed terrain for a custom origin', async () => {
+  const customOrigin = { latitude: 27.4032, longitude: 89.424599 };
+  const tile = { x: 1532, y: 861, key: '1532/861' };
+  const extent = { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 };
+  const fakeWorld = {
+    customOrigin,
+    regions: new Map([
+      ['incheon', {
+        mounted: true,
+        group: { visible: false },
+        mesh: { visible: false },
+        extent,
+        terrain: { flattenHeight: () => 7 },
+      }],
+      ['VQPR', {
+        mounted: true,
+        group: { visible: true },
+        mesh: { visible: true },
+        extent,
+        terrain: { flattenHeight: (_x, _z, height) => height },
+      }],
+    ]),
+    offsets: new Map([['incheon', [0, 0]], ['VQPR', [0, 0]]]),
+  };
+  const openWorld = new OpenWorldTerrain({
+    origin: customOrigin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(flat(3000));
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load(tile);
+  const [px, pz] = wgs84ToLocal(customOrigin.latitude, customOrigin.longitude, customOrigin);
+  const sampled = openWorld.sample(px, pz);
+  assert.ok(sampled);
+  assert.ok(sampled.height > 2900, `Hidden Incheon must not flatten Paro terrain: got ${sampled.height}`);
   openWorld.dispose();
 });
 
