@@ -115,7 +115,11 @@ export function createSimulatorScenarioStart(sim) {
         if (request.mapPlan?.airportCode && request.mapPlan.scenario !== 'cruise') {
           sim.airportStreamer?.setHome?.(request.mapPlan.airportCode);
           await waitForStreamedAirport(sim, request.mapPlan.airportCode);
+          if (request.mapPlan.scenario === 'approach') {
+            await waitForRegionalTerrain(sim);
+          }
           alignMapSpawnToContact(sim, request.mapPlan.spawn);
+          if (request.mapPlan.scenario === 'approach') syncSpawnPose(sim);
         }
         const needsRegionalTerrain = Boolean(
           regionalCruise(request.scenario)
@@ -249,11 +253,25 @@ async function waitForStreamedAirport(sim, code) {
 }
 function alignMapSpawnToContact(sim, spawn) {
   if (!spawn?.alignToGround) return;
-  const sampleX = spawn.state === 'approach' && Number.isFinite(spawn.surfaceX) ? spawn.surfaceX : sim.position.x;
-  const sampleZ = spawn.state === 'approach' && Number.isFinite(spawn.surfaceZ) ? spawn.surfaceZ : sim.position.z;
+  if (!sim.position) return;
+  const { x: sampleX, z: sampleZ } = sim.position;
   const ground = sim.currentTerrain?.getHeight?.(sampleX, sampleZ);
   if (!Number.isFinite(ground)) return;
   sim.position.y = ground + spawn.groundClearanceM + (spawn.glideRiseM ?? 0);
+  sim.aircraft?.group?.position?.copy?.(sim.position);
+  sim.aircraft?.group?.updateMatrixWorld?.(true);
+  sim.renderPose?.reset?.(sim.position, sim.quaternion);
+}
+
+function syncSpawnPose(sim) {
+  sim.applyComputedTrim?.();
+  sim.engines?.settleSpool?.();
+  sim.refreshTakeoffPerformance?.();
+  sim.aircraft?.group?.position?.copy?.(sim.position);
+  sim.aircraft?.group?.quaternion?.copy?.(sim.quaternion);
+  sim.aircraft?.group?.updateMatrixWorld?.(true);
+  sim.renderPose?.reset?.(sim.position, sim.quaternion);
+  sim.cameraSystem?.snapToTarget?.(sim.aircraft?.group);
 }
 
 const DEFAULT_CRUISE_CLEARANCE_M = 750;
@@ -306,14 +324,7 @@ export function alignCruiseSpawnToTerrain(sim, { isMapPlan = false } = {}) {
   }
   if (Math.abs(targetY - currentY) < 1e-3) return false;
   sim.position.y = targetY;
-  sim.applyComputedTrim?.();
-  sim.engines?.settleSpool?.();
-  sim.refreshTakeoffPerformance?.();
-  sim.aircraft?.group?.position?.copy?.(sim.position);
-  sim.aircraft?.group?.quaternion?.copy?.(sim.quaternion);
-  sim.aircraft?.group?.updateMatrixWorld?.(true);
-  sim.renderPose?.reset?.(sim.position, sim.quaternion);
-  sim.cameraSystem?.snapToTarget?.(sim.aircraft?.group);
+  syncSpawnPose(sim);
   return true;
 }
 
