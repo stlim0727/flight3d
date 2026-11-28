@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { syncPovResetButton } from '../ui/povResetOverlay.js';
 
 export function normalizeAngle(angle) {
   const twoPi = Math.PI * 2;
@@ -77,18 +78,8 @@ export function updatePovButtonState(cs) {
     if (typeof cs.onPovChange === 'function') {
       cs.onPovChange(modified);
     }
-    if (typeof document !== 'undefined') {
-      const btn = document.getElementById('btn-reset-pov');
-      if (btn) btn.hidden = !modified;
-    }
   }
-  if (modified && typeof document !== 'undefined') {
-    const arrow = document.getElementById('pov-arrow-icon');
-    if (arrow) {
-      const angle = cs.getPovIndicatorAngle();
-      arrow.style.transform = `rotate(${angle.toFixed(1)}deg)`;
-    }
-  }
+  syncPovResetButton(cs);
 }
 
 export function applyHatLook(cs, dirX, dirY, dt) {

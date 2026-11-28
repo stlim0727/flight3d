@@ -3,6 +3,7 @@ import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
 import { gearIconName, setToolbarIcon } from './toolbarIcons.js';
 import { bindPilotageMapFold } from './pilotageMapFold.js';
+import { syncPovResetButton } from './povResetOverlay.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -561,17 +562,7 @@ export function updateControlState(telemetry, camera, options = {}) {
   }
   const toggle = document.getElementById('btn-touch-toggle');
   toggle?.setAttribute('aria-pressed', String(document.body.classList.contains('touch-mode')));
-  const resetPovBtn = document.getElementById('btn-reset-pov');
-  if (resetPovBtn) {
-    const isModified = camera && typeof camera.isPovModified === 'function' ? camera.isPovModified() : false;
-    resetPovBtn.hidden = !isModified;
-    if (isModified && typeof camera.getPovIndicatorAngle === 'function') {
-      const arrow = document.getElementById('pov-arrow-icon');
-      if (arrow) {
-        arrow.style.transform = `rotate(${camera.getPovIndicatorAngle().toFixed(1)}deg)`;
-      }
-    }
-  }
+  syncPovResetButton(camera);
   const gazeExitBtn = document.getElementById('btn-gaze-exit');
   if (gazeExitBtn) {
     const gazeActive = Boolean(camera && typeof camera.isGazeActive === 'function' && camera.isGazeActive());
