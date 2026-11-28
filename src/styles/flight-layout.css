@@ -1,6 +1,7 @@
 /* One layout owner for all camera modes. Header children use flow layout;
    notification positions are measured below both control rows. */
-body { --flight-control-surface: rgba(10, 22, 36, .5); }
+/* Buttons sit on top of the scene, so they use a lighter surface than panels. */
+body { --flight-control-surface: rgba(10, 22, 36, .5); --flight-button-surface: rgba(10, 22, 36, .28); }
 .hud-top-bar {
   position: fixed;
   top: var(--edge-top);
@@ -71,14 +72,14 @@ body { --flight-control-surface: rgba(10, 22, 36, .5); }
   align-items: center;
   justify-content: center;
   transform: none;
-  background: var(--flight-control-surface);
+  background: var(--flight-button-surface);
   border: 1px solid rgba(181, 211, 234, .25);
   border-radius: calc(8px * var(--ui-scale, 1));
   box-shadow: none;
 }
 .hud-top-actions .ap-toggle-btn { flex-direction: column; font: 700 calc(11px * var(--ui-scale, 1)) system-ui; }
 .hud-top-actions .ap-toggle-btn::after { content: attr(data-ap-state); font: 700 calc(9px * var(--ui-scale, 1)) system-ui; }
-.hud-top-actions .ap-toggle-btn.ap-active { background: rgba(16, 185, 129, .5); color: #ecfdf5; }
+.hud-top-actions .ap-toggle-btn.ap-active { background: rgba(16, 185, 129, .35); color: #ecfdf5; }
 .hud-top-actions .quick-mute { font-size: calc(18px * var(--ui-scale, 1)); }
 /* Reserve the AP slot during demo to keep every other control stationary. */
 body.demo-active .hud-top-actions .ap-toggle-btn { opacity: .45; }
@@ -217,7 +218,7 @@ body.demo-active .flight-toolbar #btn-skip-demo {
   padding: 0 calc(12px * var(--ui-scale, 1));
   font-size: calc(12px * var(--ui-scale, 1));
   color: #f0f9ff;
-  background: rgba(21, 117, 152, .5);
+  background: rgba(21, 117, 152, .35);
 }
 body.demo-active .flight-toolbar :is(#btn-gear, #btn-flaps-ret, #btn-flaps-ext, #btn-spoilers, #btn-reverser) { display: none; }
 /* Notifications follow BOTH rows; the expandable guide is informational. */
@@ -326,7 +327,7 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   align-items: center;
   justify-content: center;
   gap: calc(6px * var(--ui-scale, 1));
-  background: rgba(15, 23, 42, 0.85);
+  background: rgba(15, 23, 42, 0.5);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid rgba(56, 189, 248, 0.6);
@@ -355,13 +356,13 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
 .btn-reset-pov:hover,
 .btn-cockpit-pov:hover,
 .btn-cockpit-pov[aria-expanded="true"] {
-  background: rgba(30, 41, 59, 0.95);
+  background: rgba(30, 41, 59, 0.72);
   border-color: #7dd3fc;
   color: #ffffff;
   box-shadow: 0 4px 20px rgba(56, 189, 248, 0.55);
 }
 .btn-gaze-exit:hover {
-  background: rgba(30, 41, 59, 0.95);
+  background: rgba(30, 41, 59, 0.72);
   border-color: #fde68a;
   color: #ffffff;
   box-shadow: 0 4px 20px rgba(251, 191, 36, 0.48);
