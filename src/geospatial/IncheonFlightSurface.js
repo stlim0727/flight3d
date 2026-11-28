@@ -92,6 +92,21 @@ export class IncheonFlightSurface {
     return this.source.getHeight(x,z)*(1-weight)+airfield.elevationM*weight;
   }
 
+  /** Flatten streamed open-world DEM vertices under mapped airfield pavement. */
+  flattenHeight(x, z, height) {
+    const sb = this.surfacesBounds;
+    if (x < sb[0] - 80 || x > sb[2] + 80 || z < sb[1] - 80 || z > sb[3] + 80) return height;
+    let weight = 0;
+    for (const s of this.surfaces) {
+      if (!this.nearby(s, x, z, 180)) continue;
+      const d = this.distance(s, x, z);
+      const u = Math.max(0, Math.min(1, (d - 80) / 100));
+      weight = Math.max(weight, 1 - u * u * (3 - 2 * u));
+      if (weight === 1) return airfield.elevationM;
+    }
+    return height * (1 - weight) + airfield.elevationM * weight;
+  }
+
   getWaterLevel(x, z) {
     const streamed = this.openWorld?.sample(x, z);
     return streamed ? (streamed.water ? streamed.height : -10000) : 0;
