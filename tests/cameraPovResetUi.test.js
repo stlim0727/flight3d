@@ -3,13 +3,18 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { updateControlState } from '../src/ui/FlightPanels.js';
+import { computePovResetEdgePosition } from '../src/ui/povResetOverlay.js';
 
-test('updateControlState synchronizes btn-reset-pov visibility with isPovModified()', () => {
+test('updateControlState synchronizes btn-reset-pov visibility, arrow angle, and edge position with isPovModified()', () => {
   const previousDocument = globalThis.document;
+  const previousWindow = globalThis.window;
   const mockElements = new Map();
   const resetBtn = {
     hidden: true,
     textContent: '',
+    style: { left: '', top: '' },
+    offsetWidth: 36,
+    offsetHeight: 36,
     setAttribute: () => {},
   };
   const arrowIcon = {
@@ -22,6 +27,7 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     getElementById: (id) => mockElements.get(id) || null,
     body: { classList: { contains: () => false } }
   };
+  globalThis.window = { innerWidth: 1280, innerHeight: 720, addEventListener: () => {} };
 
   try {
     const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
@@ -32,8 +38,10 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     // Initially unmodified -> hidden
     updateControlState(telemetry, cam);
     assert.equal(resetBtn.hidden, true);
+    assert.equal(resetBtn.style.left, '');
+    assert.equal(resetBtn.style.top, '');
 
-    // After drag -> modified -> shown with rotated arrow
+    // After drag -> modified -> shown on screen edge with rotated arrow
     cam.isDragging = true;
     cam.applyDragDelta(80, 40, false);
     cam.isDragging = false;
@@ -41,15 +49,56 @@ test('updateControlState synchronizes btn-reset-pov visibility with isPovModifie
     updateControlState(telemetry, cam);
     assert.equal(resetBtn.hidden, false);
     assert.ok(arrowIcon.style.transform.startsWith('rotate('));
+    assert.ok(resetBtn.style.left.endsWith('px'));
+    assert.ok(resetBtn.style.top.endsWith('px'));
 
-    // Reset POV -> hidden again
+    // Active gaze hides POV reset button so controls do not compete
+    cam.setGazeTarget({ kind: 'tower', label: 'Control Tower', position: new THREE.Vector3(0, 10, -100) });
+    updateControlState(telemetry, cam);
+    assert.equal(resetBtn.hidden, true);
+    cam.clearGaze();
+
+    // Reset POV -> hidden again and inline coords cleared
     cam.resetPov();
     updateControlState(telemetry, cam);
     assert.equal(resetBtn.hidden, true);
+    assert.equal(resetBtn.style.left, '');
+    assert.equal(resetBtn.style.top, '');
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
     else globalThis.document = previousDocument;
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
   }
+});
+
+test('computePovResetEdgePosition anchors the arrow button to the edge in the reset direction', () => {
+  const viewport = { left: 0, top: 0, width: 1280, height: 720 };
+
+  // Reset UP (0°) -> top safe edge, horizontally centered
+  const top = computePovResetEdgePosition({ angleDeg: 0, viewport, buttonWidth: 36, buttonHeight: 36 });
+  assert.equal(top.left, 622);
+  assert.equal(top.top, 58);
+
+  // Reset RIGHT (+90°) -> right edge, vertically centered in safe rect
+  const right = computePovResetEdgePosition({ angleDeg: 90, viewport, buttonWidth: 36, buttonHeight: 36 });
+  assert.equal(right.left, 1280 - 14 - 36);
+  assert.equal(right.top, Math.round((58 + (720 - 18)) * 0.5 - 18));
+
+  // Reset LEFT (-90°) -> left edge, vertically centered in safe rect
+  const left = computePovResetEdgePosition({ angleDeg: -90, viewport, buttonWidth: 36, buttonHeight: 36 });
+  assert.equal(left.left, 14);
+  assert.equal(left.top, right.top);
+
+  // Reset DOWN (180°) -> bottom edge, horizontally centered
+  const bottom = computePovResetEdgePosition({ angleDeg: 180, viewport, buttonWidth: 36, buttonHeight: 36 });
+  assert.equal(bottom.left, 622);
+  assert.equal(bottom.top, 720 - 18 - 36);
+
+  // Diagonal (-135°, down-left) -> anchored along bottom-left edge within safe bounds
+  const downLeft = computePovResetEdgePosition({ angleDeg: -135, viewport, buttonWidth: 36, buttonHeight: 36 });
+  assert.ok(downLeft.left < 622 && downLeft.left >= 14);
+  assert.equal(downLeft.top, 720 - 18 - 36);
 });
 
 test('CameraSystem getPovIndicatorAngle accurately computes default direction', () => {

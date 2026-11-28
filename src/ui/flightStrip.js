@@ -83,7 +83,7 @@ export function createFlightStrip({ hud, topBar, topActions, bar, cameraStrip, c
     if (active) {
       topBar.insertBefore(bar, topActions);
       hud.append(cameraStrip);
-      cameraStrip.append(reset, pov);
+      cameraStrip.append(pov);
       topActions.append(settingsToggle);
       bindText(moreButton, () => t('ui.strip.aux'));
       bindText(moreButton, () => t('ui.strip.aux'), 'aria-label');
@@ -93,7 +93,6 @@ export function createFlightStrip({ hud, topBar, topActions, bar, cameraStrip, c
       bar.append(cameraStrip, fullscreen);
       cameraStrip.append(cameraToggle);
       cameraStrip.hidden = !cameraStrip.querySelector('[data-camera-mode]:not([hidden])');
-      povActions.prepend(reset);
       povActions.append(pov);
       settingsToggle.remove();
       topActions.append(mute, hudFold);
@@ -111,7 +110,7 @@ export function createFlightStrip({ hud, topBar, topActions, bar, cameraStrip, c
   desktop.addEventListener('change', syncDisplay);
   singleRow.addEventListener('change', syncDisplay);
   document.addEventListener('pointerdown', event => {
-    if (!open || gaze.contains(event.target)) return;
+    if (!open || gaze.contains(event.target) || reset.contains(event.target)) return;
     if (!groups[open].some(node => node.contains(event.target))) setOpen('');
   });
   document.addEventListener('keydown', event => {

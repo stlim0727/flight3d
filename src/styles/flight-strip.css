@@ -138,7 +138,7 @@ body.flight-strip-v2.demo-active .flight-toolbar > #btn-skip-demo {
 .flight-strip-v2 #camera-strip .btn { width: auto; min-width: 0; }
 .flight-strip-v2 #camera-strip .flight-camera-btn { font-size: 12px; min-height: 44px; }
 .flight-strip-v2 #camera-strip .flight-camera-btn::after { content: none; }
-.flight-strip-v2 #camera-strip :is(#btn-reset-pov, #btn-cockpit-pov) { grid-column: 1 / -1; }
+.flight-strip-v2 #camera-strip #btn-cockpit-pov { grid-column: 1 / -1; }
 .flight-strip-v2 #ap-panel #btn-ap { grid-column: span 2; }
 .flight-strip-v2 #pov-actions-bar {
   right: var(--edge-right);
