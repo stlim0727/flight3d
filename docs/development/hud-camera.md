@@ -22,9 +22,13 @@ The actual terrain continues to use the simulator's existing scenery.
 Select **HUD · 9** in the main menu's camera settings, press **9** (or numpad 9),
 or cycle **C** through chase → drone → flyby → wing → cockpit → HUD.
 Existing 1–8 shortcuts keep their meanings. HUD is excluded from scenic AUTO.
-It follows the active aircraft's configured captain eye point and forward axis,
-without cockpit geometry, head tilt or camera-look orbit. Manual selection keeps
-the existing protection against demo framing and temporary gear-camera cuts.
+It follows the active aircraft's configured captain eye point and uses the same
+look, hat-switch, head-tracking and optical zoom controls as the cockpit view.
+The airframe is hidden only for this camera, so the forward scene stays clear.
+The conformal flight-instrument canvas is drawn only while the view is within
+the cockpit's center-look window; looking away leaves a clear outside view.
+Manual selection keeps the existing protection against demo framing and
+temporary gear-camera cuts.
 
 `src/ui/HudProjection.js` projects world directions through the actual render
 camera quaternion and vertical FOV. The pitch ladder is a set of constant-world-

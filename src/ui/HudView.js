@@ -37,7 +37,8 @@ export class HudView {
   update() {
     const sim = this.sim;
     const hudFolded = typeof document !== 'undefined' && document.body?.classList.contains('hud-folded');
-    const hudActive = sim.cameraSystem.mode === CameraSystem.MODES.HUD && !sim.isCrashed && !hudFolded;
+    const hudActive = sim.cameraSystem.mode === CameraSystem.MODES.HUD
+      && !sim.cameraSystem.isLookingAwayFromCenter() && !sim.isCrashed && !hudFolded;
     // Cockpit and chase views keep a light target/weapon overlay so the player
     // can still see the lock without switching to the full HUD camera.
     const combat = this.combatHudState();
