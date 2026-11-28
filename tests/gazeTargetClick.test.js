@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CameraSystem } from '../src/cameras/CameraSystem.js';
 import { pickGazeTarget } from '../src/cameras/gazeTargetPicker.js';
 import { updateControlState } from '../src/ui/FlightPanels.js';
+import { computeGazeExitScreenPosition } from '../src/ui/gazeExitOverlay.js';
 
 function createCameraLookingAt(origin, lookAt) {
   const camera = new THREE.PerspectiveCamera(60, 16 / 9, 0.1, 10000);
@@ -178,11 +179,12 @@ test('CameraSystem triggers onGazeClick on click without drag, tracks target, an
   }
 });
 
-test('updateControlState synchronizes btn-gaze-exit visibility and label', () => {
+test('updateControlState synchronizes btn-gaze-exit visibility, label, and target-adjacent position', () => {
   const prevDoc = globalThis.document;
+  const prevWin = globalThis.window;
   const resetBtn = { hidden: true, setAttribute: () => {} };
   const arrowIcon = { style: { transform: '' } };
-  const gazeExitBtn = { hidden: true };
+  const gazeExitBtn = { hidden: true, style: { left: '', top: '' }, offsetWidth: 140, offsetHeight: 32 };
   const gazeExitLabel = { textContent: '' };
   const map = new Map([
     ['btn-reset-pov', resetBtn],
@@ -194,25 +196,93 @@ test('updateControlState synchronizes btn-gaze-exit visibility and label', () =>
     getElementById: (id) => map.get(id) || null,
     body: { classList: { contains: () => false } },
   };
+  globalThis.window = { innerWidth: 1280, innerHeight: 720, addEventListener: () => {} };
   try {
-    const cam = new CameraSystem(new THREE.PerspectiveCamera(), { addEventListener: () => {}, style: {} });
+    const threeCam = createCameraLookingAt(new THREE.Vector3(0, 10, 100), new THREE.Vector3(0, 10, 0));
+    const cam = new CameraSystem(threeCam, { addEventListener: () => {}, style: {} });
     const telemetry = { flapIndex: 0, flapDegree: 0, gearState: 1, spoilers: 0 };
 
     updateControlState(telemetry, cam);
     assert.equal(gazeExitBtn.hidden, true);
+    assert.equal(gazeExitBtn.style.left, '');
+    assert.equal(gazeExitBtn.style.top, '');
 
     cam.setGazeTarget({ kind: 'tower', label: 'Control Tower', position: new THREE.Vector3(0, 10, 0) });
     updateControlState(telemetry, cam);
     assert.equal(gazeExitBtn.hidden, false);
     assert.ok(gazeExitLabel.textContent.includes('Control Tower'));
+    assert.equal(gazeExitBtn.style.left, '664px', 'button is placed 24px to the right of centered target');
+    assert.equal(gazeExitBtn.style.top, '344px', 'button is vertically centered on target');
 
     cam.clearGaze();
     updateControlState(telemetry, cam);
     assert.equal(gazeExitBtn.hidden, true);
+    assert.equal(gazeExitBtn.style.left, '');
+    assert.equal(gazeExitBtn.style.top, '');
   } finally {
     if (prevDoc === undefined) delete globalThis.document;
     else globalThis.document = prevDoc;
+    if (prevWin === undefined) delete globalThis.window;
+    else globalThis.window = prevWin;
   }
+});
+
+test('computeGazeExitScreenPosition tracks projected target, flips near right edge, and clamps inside viewport', () => {
+  const viewport = { left: 0, top: 0, width: 1000, height: 600 };
+  const camera = createCameraLookingAt(new THREE.Vector3(0, 50, 0), new THREE.Vector3(0, 50, -100));
+
+  // Target dead-center -> right next to center
+  const centered = computeGazeExitScreenPosition({
+    cameraSystem: {
+      camera,
+      getGazeTargetPosition: () => new THREE.Vector3(0, 50, -100),
+    },
+    viewport,
+    buttonWidth: 120,
+    buttonHeight: 30,
+  });
+  assert.equal(centered.left, 524);
+  assert.equal(centered.top, 285);
+
+  // Target near right edge -> flips to the left of the target
+  const rightEdge = computeGazeExitScreenPosition({
+    cameraSystem: {
+      camera,
+      getGazeTargetPosition: () => new THREE.Vector3(85, 50, -100),
+    },
+    viewport,
+    buttonWidth: 120,
+    buttonHeight: 30,
+  });
+  assert.ok(rightEdge.targetX > 850, 'target projects near right edge');
+  assert.ok(rightEdge.left + 120 < rightEdge.targetX, 'button flips to left side of right-edge target');
+  assert.ok(rightEdge.left >= 12 && rightEdge.left + 120 <= 988, 'button stays within horizontal viewport bounds');
+
+  // Target near top edge -> clamped below top HUD margin
+  const topEdge = computeGazeExitScreenPosition({
+    cameraSystem: {
+      camera,
+      getGazeTargetPosition: () => new THREE.Vector3(0, 120, -100),
+    },
+    viewport,
+    buttonWidth: 120,
+    buttonHeight: 30,
+  });
+  assert.equal(topEdge.top, 56, 'top position clamps to safe margin below HUD');
+
+  // Bandit gaze exposes live bandit position
+  const banditPos = new THREE.Vector3(10, 50, -100);
+  const cam = new CameraSystem(camera, { addEventListener: () => {}, style: {} });
+  cam.combatStateProvider = () => ({ targets: [{ alive: true, position: banditPos }] });
+  cam.toggleBanditGaze();
+  const banditScreen = computeGazeExitScreenPosition({
+    cameraSystem: cam,
+    viewport,
+    buttonWidth: 120,
+    buttonHeight: 30,
+  });
+  assert.ok(banditScreen.targetX > 500, 'projects live bandit position even before first applyActiveGaze');
+  assert.equal(banditScreen.left, Math.round(banditScreen.targetX + 24));
 });
 
 test('pickGazeTarget tracks moving dynamic objects and CameraSystem suppresses pinch-release taps and overrides custom views', () => {

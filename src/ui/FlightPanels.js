@@ -3,6 +3,7 @@ import { t, bindText, getLanguage, setLanguage } from '../i18n/index.js';
 import { toolbarOptionalItems, normalizeToolbarHidden, applyToolbarVisibility } from './toolbarVisibility.js';
 import { gearIconName, setToolbarIcon } from './toolbarIcons.js';
 import { bindPilotageMapFold } from './pilotageMapFold.js';
+import { syncGazeExitButton } from './gazeExitOverlay.js';
 
 export const CAMERA_MODES = [
   [1, 'chase'],
@@ -572,18 +573,7 @@ export function updateControlState(telemetry, camera, options = {}) {
       }
     }
   }
-  const gazeExitBtn = document.getElementById('btn-gaze-exit');
-  if (gazeExitBtn) {
-    const gazeActive = Boolean(camera && typeof camera.isGazeActive === 'function' && camera.isGazeActive());
-    gazeExitBtn.hidden = !gazeActive;
-    if (gazeActive) {
-      const labelEl = document.getElementById('gaze-exit-label');
-      const targetLabel = typeof camera.getGazeTargetLabel === 'function' ? camera.getGazeTargetLabel() : '';
-      if (labelEl) {
-        labelEl.textContent = targetLabel ? t('gaze.exit.target', { target: targetLabel }) : t('gaze.exit');
-      }
-    }
-  }
+  syncGazeExitButton(camera);
   const isCockpit = Boolean(camera && camera.mode === 0);
   const povAdjustBtn = document.getElementById('btn-open-cockpit-pov');
   if (povAdjustBtn) povAdjustBtn.hidden = !isCockpit;

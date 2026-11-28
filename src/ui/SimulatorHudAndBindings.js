@@ -6,6 +6,7 @@ import { prepareCockpitShadowDepth } from '../aircraft/CockpitDepth.js';
 import { RENDER_QUALITY, RENDER_QUALITY_KEY, resolveRenderQuality, effectiveShadowMapSizes, renderPixelRatio, applyFlatShading } from '../config/renderQuality.js';
 import { CameraSystem } from '../cameras/CameraSystem.js';
 import { updateControlState, touchLabel } from './FlightPanels.js';
+import { syncGazeExitButton as syncGazeExitOverlay } from './gazeExitOverlay.js';
 import { setToolbarIcon } from './toolbarIcons.js';
 import { FLOW } from './GameFlowController.js';
 import { ReplayPanel } from './ReplayPanel.js';
@@ -1095,17 +1096,7 @@ class SimulatorHudAndBindingsMethods {
   }
 
   syncGazeExitButton() {
-    const btn = document.getElementById('btn-gaze-exit');
-    if (!btn) return;
-    const active = Boolean(this.cameraSystem?.isGazeActive?.());
-    btn.hidden = !active;
-    if (active) {
-      const labelEl = document.getElementById('gaze-exit-label');
-      const targetLabel = this.cameraSystem?.getGazeTargetLabel?.() || '';
-      if (labelEl) {
-        labelEl.textContent = targetLabel ? t('gaze.exit.target', { target: targetLabel }) : t('gaze.exit');
-      }
-    }
+    syncGazeExitOverlay(this.cameraSystem);
   }
 
   handleResize() {
