@@ -3,11 +3,12 @@ import { ScenarioStartCoordinator } from './ScenarioStartCoordinator.js';
 import { applyDeviceTimeOfDay, saveSimulatorPreferences } from '../config/simulatorPreferences.js';
 import { saveFlightSelection } from '../config/flightSelection.js';
 import { isScenarioAvailable } from '../config/scenarioRegistry.js';
-import { mapCruisePoint, mapPlanCustomOrigin, mapPlanLabel } from '../config/mapFlightPlaces.js';
+import { MAP_START_STATE_KEYS, mapCruisePoint, mapPlanCustomOrigin, mapPlanLabel } from '../config/mapFlightPlaces.js';
 import { resolveMapFlightPlan } from '../config/mapFlightPlan.js';
 import { BASE_OFFSETS } from '../world/UnifiedWorld.js';
 import { projectToLocal } from '../geospatial/incheon.js';
-import { t } from '../i18n/index.js';
+import { getLanguage, t } from '../i18n/index.js';
+import { airportDisplayName } from '../config/airportProfile.js';
 import { applyAirportOverrides } from '../config/airportOverrides.js';
 import { airportSpawnPlan } from '../config/airportSpawnPlan.js';
 /** Composition of scenario policy, simulator operations and durable preferences. */
@@ -54,8 +55,23 @@ export function createSimulatorScenarioStart(sim) {
             tileId: request.mapPlan.placeTileId ?? null,
           }
           : null;
-        const result = sim.setPreset(request.scenario);
-        if (request.mapPlan) sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+        let result;
+        if (request.mapPlan) {
+          // setPreset runs the lobby base airport's branch only to configure the
+          // aircraft; its showcase toast (e.g. "Yeongjong cruise") would name the
+          // wrong place, so announce the map spawn instead (#1096).
+          const quiet = sim.quietPresetToast;
+          sim.quietPresetToast = true;
+          try {
+            result = sim.setPreset(request.scenario);
+          } finally {
+            sim.quietPresetToast = quiet;
+          }
+          sim.applyMapSpawn(request.mapPlan.spawn, request.mapPlan.scenario);
+          sim.showToast?.(() => mapStartToast(request.mapPlan, sim.mapPlaces));
+        } else {
+          result = sim.setPreset(request.scenario);
+        }
         const clearHandoff = () => {
           for (const objects of Object.values(sim._handedOffRunways ?? {})) {
             for (const object of objects) if (object) object.visible = true;
@@ -188,6 +204,14 @@ function resolveLobbyMapPlan(sim) {
     placeCode: airport?.code ?? null,
     placeTileId: choice.tileId ?? airport?.tileId ?? null,
   };
+}
+
+// Same place wording as the lobby summary ("울산공항 (RKPU)"), in the live language.
+function mapStartToast(plan, places = {}) {
+  const stateKey = MAP_START_STATE_KEYS[plan.scenario];
+  const airport = plan.placeCode ? places?.airports?.find(entry => entry.code === plan.placeCode) : null;
+  const place = airport ? airportDisplayName(airport, getLanguage()) : plan.placeLabel;
+  return [stateKey && t(stateKey), place].filter(Boolean).join(' — ');
 }
 
 async function waitForStreamedAirport(sim, code) {
