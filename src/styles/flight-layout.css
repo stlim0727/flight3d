@@ -344,9 +344,16 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   -webkit-user-select: none;
 }
 .btn-gaze-exit {
-  border-color: rgba(251, 191, 36, 0.72);
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  margin: 0;
+  z-index: 80;
+  padding: calc(4px * var(--ui-scale, 1)) calc(10px * var(--ui-scale, 1));
+  background: rgba(15, 23, 42, 0.78);
+  border-color: rgba(251, 191, 36, 0.78);
   color: #fef3c7;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4), 0 0 12px rgba(251, 191, 36, 0.3);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(251, 191, 36, 0.32);
 }
 .btn-cockpit-pov {
   border-color: rgba(56, 189, 248, 0.6);
@@ -552,8 +559,10 @@ body.hud-folded .hud-unfold-pill:not([hidden]) {
   .cockpit-pov-actions { grid-column: 1 / -1; margin-top: 0; }
 }
 .btn-gaze-exit .gaze-exit-close {
-  font-size: calc(11px * var(--ui-scale, 1));
-  opacity: 0.85;
+  font-size: calc(14px * var(--ui-scale, 1));
+  line-height: 1;
+  font-weight: 700;
+  opacity: 0.9;
 }
 .btn-reset-pov .pov-arrow-icon {
   display: inline-flex;
