@@ -6,7 +6,7 @@ import { buildGeographicBuildingTile, geographicBuildingHeight, GeographicBuildi
 import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
 import { cityRoofAtlasRgb } from '../src/environment/CityBuildingAssets.js';
 
-function buildingTile(id, properties = {}, center) {
+function buildingTile(id, properties = {}, center, rings) {
   const writer = new PbfWriter();
   writer.writeMessage(3, (_, layer) => {
     layer.writeStringField(1, 'building');
@@ -28,7 +28,20 @@ function buildingTile(id, properties = {}, center) {
       const startX = center ? Math.round(center.fx * 4096) - 200 : -100;
       const startY = center ? Math.round(center.fy * 4096) - 200 : 100;
       const zigzag = n => (n << 1) ^ (n >> 31);
-      feature.writePackedVarint(4, [9, zigzag(startX), zigzag(startY), 26, 800, 0, 0, 800, 799, 0, 15]);
+      const commands = [];
+      let x = 0, y = 0;
+      for (const ring of rings ?? [[[startX, startY], [startX + 400, startY],
+        [startX + 400, startY + 400], [startX, startY + 400]]]) {
+        for (const [i, [px, py]] of ring.entries()) {
+          if (i === 0) commands.push(9);
+          if (i === 1) commands.push(((ring.length - 1) << 3) | 2);
+          commands.push(zigzag(px - x), zigzag(py - y));
+          x = px;
+          y = py;
+        }
+        commands.push(15);
+      }
+      feature.writePackedVarint(4, commands);
     }, null);
   }, null);
   return writer.finish();
@@ -62,6 +75,65 @@ test('regional flat roofs share height with collision and leave facade colors un
     } else assert.deepEqual(tint.toArray(), [1, 1, 1]);
   }
   geometry.dispose();
+});
+
+const rotated = [[120, 100], [280, 220], [250, 260], [90, 140]];
+const equatorTile = { x: 8192, y: 8192 };
+const metreProjection = (lat, lon) => [lon * 100000, -lat * 100000];
+
+test('rotated mapped gable fits its footprint and collides at the rendered slopes and ends', async () => {
+  const data = buildingTile(42, { roof_shape: 'gabled', height: 9 }, null, [rotated]);
+  const layer = new GeographicBuildings({ terrain: { getHeight: () => 20 }, project: metreProjection,
+    archive: { getZxy: async () => ({ data }) } });
+  const key = '8192/8192';
+  await layer.load({ ...equatorTile, key });
+  layer.aircraftTiles = new Set([key]);
+  const { mesh, collisionCells } = layer.tiles.get(key);
+  const { position, normal } = mesh.geometry.attributes;
+  assert.equal(position.count / 3, 14);
+  const [building] = collisionCells.values().next().value;
+  const { slopes, eave } = building.gable;
+  const ring = building.rings[0];
+  const tips = [0, 3, 1, 2].map(i => new THREE.Vector3(ring[i][0], 29, ring[i][1]));
+  const ridge = [tips[0].lerp(tips[1], 0.5), tips[2].lerp(tips[3], 0.5)];
+  const corners = ring.map(([x, z]) => new THREE.Vector3(x, eave, z));
+  for (let i = 0; i < 12; i++) {
+    const point = new THREE.Vector3().fromBufferAttribute(position, i);
+    assert.ok([...corners, ...ridge].some(vertex => vertex.distanceTo(point) < 1e-4));
+    assert.ok(normal.getY(i) > 0 && normal.getY(i) < 1);
+  }
+  const hits = (pos, radius) => Boolean(layer.checkCollision([{ pos, radius }]));
+  const center = ridge[0].clone().lerp(ridge[1], 0.5);
+  assert.equal(hits(center.clone().setY(29.51), 0.5), false);
+  assert.equal(hits(center.clone().setY(29.49), 0.5), true);
+  const face = slopes[0];
+  const surface = face.getMidpoint(new THREE.Vector3());
+  const outward = face.getNormal(new THREE.Vector3());
+  assert.equal(hits(surface.clone().addScaledVector(outward, 0.51), 0.5), false);
+  assert.equal(hits(surface.clone().addScaledVector(outward, 0.49), 0.5), true);
+  assert.equal(hits(surface.clone().addScaledVector(outward, -0.5), 0.1), true);
+  const end = building.gable.ends[0];
+  assert.equal(hits(end.getMidpoint(new THREE.Vector3()).addScaledVector(end.getNormal(outward), 0.49), 0.5), true);
+  layer.dispose();
+});
+
+test('holes, concavity, near-square and tile-cut outlines keep horizontal roofs', () => {
+  const rect = [[50, 50], [350, 50], [350, 150], [50, 150]];
+  for (const rings of [
+    [rect, [[100, 75], [100, 125], [200, 125], [200, 75]]],
+    [[[50, 50], [350, 50], [200, 80], [50, 150]]],
+    [[[50, 50], [150, 50], [150, 150], [50, 150]]],
+    [rect.map(([x, y]) => [x - 50, y])],
+    [rect.map(([x, y]) => [x - 60, y])],
+  ]) {
+    const colliders = [];
+    const geometry = buildGeographicBuildingTile(buildingTile(1, { roof_shape: 'gabled' }, null, rings),
+      equatorTile, metreProjection, { getHeight: () => 20 }, undefined, colliders);
+    assert.equal(colliders[0].gable, null);
+    const { normal } = geometry.attributes;
+    for (let i = 0; i < normal.count; i++) assert.ok([0, 1].includes(normal.getY(i)));
+    geometry.dispose();
+  }
 });
 
 test('sparse Songdo overview uses matching detail height and tints only upward faces', async () => {
