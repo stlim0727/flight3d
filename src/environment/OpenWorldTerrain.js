@@ -797,7 +797,8 @@ export class OpenWorldTerrain {
     const world = this.world;
     if (!world?.regions) return '';
     return [...world.regions]
-      .filter(([, region]) => region.terrain?.runways?.length && this.runwayVisible(region))
+      .filter(([, region]) => (region.terrain?.runways?.length
+        || typeof region.terrain?.flattenHeight === 'function') && this.runwayVisible(region))
       .map(([id]) => id)
       .sort()
       .join('|');

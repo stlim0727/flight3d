@@ -641,6 +641,45 @@ test('ignores hidden regions when flattening streamed terrain for a custom origi
   openWorld.dispose();
 });
 
+test('shows flatten-only regions in the visibility key so mounted tiles reload', async () => {
+  const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
+  const tile = { x, y, key: `${x}/${y}` };
+  const region = {
+    mounted: true,
+    group: { visible: false },
+    mesh: { visible: false },
+    extent: { minX: -2000, maxX: 2000, minZ: -2000, maxZ: 2000 },
+    terrain: { flattenHeight: () => 7 },
+  };
+  const fakeWorld = {
+    regions: new Map([['RKSI', region]]),
+    offsets: new Map([['RKSI', [0, 0]]]),
+  };
+  const openWorld = new OpenWorldTerrain({
+    origin,
+    world: fakeWorld,
+    elevationCache: {
+      get() { return Promise.resolve(new ImageData(new Uint8ClampedArray(256 * 256 * 4), 256, 256)); },
+      prefetch() {},
+      dispose() {},
+    },
+  });
+  openWorld.raster = () => Promise.resolve(flat(3000));
+  openWorld.fetchWater = () => Promise.resolve(null);
+  await openWorld.load(tile);
+  assert.equal(openWorld.runwayVisibilityKey(), '');
+  assert.equal(openWorld.sample(0, 0).height > 2900, true);
+
+  region.group.visible = true;
+  region.mesh.visible = true;
+  assert.equal(openWorld.runwayVisibilityKey(), 'RKSI');
+  openWorld.syncRunwayVisibility();
+  await openWorld.farPending;
+  await Promise.all(openWorld.pending.values());
+  assert.equal(openWorld.sample(0, 0).height, 7);
+  openWorld.dispose();
+});
+
 test('invalidateArea retains existing tiles until reload finishes without gap', async () => {
   const origin = tileToWgs84(x + 0.5, y + 0.5, 11);
   const openWorld = new OpenWorldTerrain({
