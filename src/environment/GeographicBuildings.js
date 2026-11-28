@@ -134,6 +134,50 @@ function buildSilhouettes(boxes) {
   return geometry;
 }
 
+export const BUILDING_DETAIL_TIERS = Object.freeze([
+  Object.freeze({
+    name: 'major',
+    minHeight: 25,
+    minArea: 1200,
+    maxAgl: 3500,
+    fadeStartAgl: 3500,
+    prefetchAgl: 3500,
+    maxDistance: Infinity,
+  }),
+  Object.freeze({
+    name: 'medium',
+    minHeight: 12,
+    minArea: 250,
+    maxAgl: 1500,
+    fadeStartAgl: 1200,
+    prefetchAgl: 1600,
+    maxDistance: 2200,
+  }),
+  Object.freeze({
+    name: 'minor',
+    minHeight: 0,
+    minArea: 3,
+    maxAgl: 600,
+    fadeStartAgl: 450,
+    prefetchAgl: 650,
+    maxDistance: 900,
+  }),
+]);
+
+export function classifyBuildingTier(height, area) {
+  if (height >= BUILDING_DETAIL_TIERS[0].minHeight || area >= BUILDING_DETAIL_TIERS[0].minArea) return 0;
+  if (height >= BUILDING_DETAIL_TIERS[1].minHeight || area >= BUILDING_DETAIL_TIERS[1].minArea) return 1;
+  return 2;
+}
+
+export function maxBuildingTierForAgl(agl) {
+  if (!Number.isFinite(agl)) return 2;
+  if (agl >= BUILDING_DETAIL_TIERS[0].prefetchAgl) return -1;
+  if (agl < BUILDING_DETAIL_TIERS[2].prefetchAgl) return 2;
+  if (agl < BUILDING_DETAIL_TIERS[1].prefetchAgl) return 1;
+  return 0;
+}
+
 export function geographicBuildingHeight({ height, num_floors: floors }) {
   if (Number.isFinite(height) && height > 0 && height <= 1500) return height;
   if (Number.isFinite(floors) && floors > 0 && floors <= 300) return floors * 3.2;
@@ -182,16 +226,43 @@ function tilePolygons(feature) {
     ? [polygon] : polygonClipping.intersection(polygon, tile));
 }
 
-export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false, colliders = null,
-  overrides = []) {
+function createGeometryBucket() {
+  return { positions: [], facadeUvs: [], tint: [], count: 0 };
+}
+
+function finalizeGeometryBucket(bucket) {
+  if (!bucket.positions.length) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(bucket.positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(bucket.facadeUvs, 2));
+  const colors = bucket.tint.length === bucket.positions.length
+    ? bucket.tint : new Array(bucket.positions.length).fill(1);
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function buildBuildingBuckets(data, tile, project, terrain, exclude = () => false, colliders = null,
+  overrides = [], { minTier = 0, maxTier = 2, splitByTier = false } = {}) {
   const layer = new VectorTile(new PbfReader(data)).layers.building;
   if (!layer?.length) return null;
-  const positions = [];
-  const facadeUvs = [];
-  const tint = [];
+  const buckets = splitByTier
+    ? BUILDING_DETAIL_TIERS.map(() => createGeometryBucket())
+    : [createGeometryBucket()];
+  const tileCenterLat = tileToWgs84(tile.x + 0.5, tile.y + 0.5, zoom).latitude;
+  const tileMeters = (40075016.686 * Math.cos(tileCenterLat * Math.PI / 180)) / (2 ** zoom);
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
     if (feature.type !== 3 || feature.properties.is_underground) continue;
+    const height = geographicBuildingHeight(feature.properties);
+    // Cheap upper-bound tier check before decoding or clipping geometry:
+    // if even the full bbox cannot reach maxTier, skip immediately (big win in dense cities at altitude).
+    if (maxTier < BUILDING_DETAIL_TIERS.length - 1) {
+      const [west, north, east, south] = feature.bbox();
+      const unitMeters = tileMeters / feature.extent;
+      const maxBboxArea = Math.abs(east - west) * Math.abs(south - north) * unitMeters * unitMeters * 1.15;
+      if (classifyBuildingTier(height, maxBboxArea) > maxTier) continue;
+    }
     for (const polygon of tilePolygons(feature)) {
       const outerTileRing = polygon[0]?.slice(0, -1) ?? [];
       if (outerTileRing.length < 3) continue;
@@ -208,7 +279,11 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
         return new THREE.Vector2(localX, localZ);
       }));
       const [outer, ...holes] = rings;
-      if (outer.length < 3 || Math.abs(THREE.ShapeUtils.area(outer)) < 3) continue;
+      if (outer.length < 3) continue;
+      const area = Math.abs(THREE.ShapeUtils.area(outer));
+      if (area < 3) continue;
+      const tier = classifyBuildingTier(height, area);
+      if (tier < minTier || tier > maxTier) continue;
       const center = outer.reduce((sum, point) => sum.add(point), new THREE.Vector2()).divideScalar(outer.length);
       const override = findBuildingOverride(overrides, feature, tileCenter, tile);
       if (override?.collision === 'suppress') continue;
@@ -218,10 +293,13 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       const low = Math.min(...samples);
       const high = Math.max(...samples);
       if (!Number.isFinite(low) || !Number.isFinite(high) || high <= 0) continue;
-      const roof = high + geographicBuildingHeight(feature.properties);
+      const roof = high + height;
       const roofTriangles = THREE.ShapeUtils.triangulateShape(outer, holes);
       if (!roofTriangles.length) continue;
       if (colliders) colliders.push({ rings: rings.map(ring => ring.map(({ x, y }) => [x, y])), low, roof });
+      const bucket = splitByTier ? buckets[tier] : buckets[0];
+      bucket.count++;
+      const { positions, facadeUvs, tint } = bucket;
       const points = rings.flat();
       const color = override?.material?.baseColor ? new THREE.Color(override.material.baseColor) : null;
       const facadeTile = Math.floor(Math.abs(center.x) / 83 + Math.abs(center.y) / 47) % 3;
@@ -247,14 +325,30 @@ export function buildGeographicBuildingTile(data, tile, project, terrain, exclud
       }
     }
   }
-  if (!positions.length) return null;
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(facadeUvs, 2));
-  const colors = tint.length === positions.length ? tint : new Array(positions.length).fill(1);
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  return geometry;
+  return buckets;
+}
+
+export function buildGeographicBuildingTiers(data, tile, project, terrain, exclude = () => false, colliders = null,
+  overrides = [], options = {}) {
+  const buckets = buildBuildingBuckets(data, tile, project, terrain, exclude, colliders, overrides, {
+    ...options,
+    splitByTier: true,
+  });
+  if (!buckets) return { geometries: BUILDING_DETAIL_TIERS.map(() => null), counts: BUILDING_DETAIL_TIERS.map(() => 0) };
+  return {
+    geometries: buckets.map(finalizeGeometryBucket),
+    counts: buckets.map(bucket => bucket.count),
+  };
+}
+
+export function buildGeographicBuildingTile(data, tile, project, terrain, exclude = () => false, colliders = null,
+  overrides = []) {
+  const buckets = buildBuildingBuckets(data, tile, project, terrain, exclude, colliders, overrides, {
+    minTier: 0,
+    maxTier: BUILDING_DETAIL_TIERS.length - 1,
+    splitByTier: false,
+  });
+  return buckets ? finalizeGeometryBucket(buckets[0]) : null;
 }
 
 function* collisionCells(minX, minZ, maxX, maxZ) {
@@ -265,8 +359,7 @@ function* collisionCells(minX, minZ, maxX, maxZ) {
   }
 }
 
-function indexColliders(colliders) {
-  const cells = new Map();
+function addCollidersToIndex(cells, colliders) {
   for (const collider of colliders) {
     const [outer] = collider.rings;
     const xs = outer.map(point => point[0]);
@@ -278,6 +371,29 @@ function indexColliders(colliders) {
     }
   }
   return cells;
+}
+
+function indexColliders(colliders) {
+  return addCollidersToIndex(new Map(), colliders);
+}
+
+function hasVisibleDetail(entry) {
+  if (!entry) return false;
+  if (entry.tiers) return entry.tiers.some(mesh => mesh?.visible);
+  return Boolean(entry.mesh?.visible);
+}
+
+function disposeTileEntry(entry) {
+  if (entry.tiers) {
+    for (const mesh of entry.tiers) {
+      mesh?.removeFromParent();
+      mesh?.geometry.dispose();
+    }
+  } else if (entry.mesh) {
+    entry.mesh.removeFromParent();
+    entry.mesh.geometry.dispose();
+  }
+  entry.rawData = null;
 }
 
 function intersectsBuilding({ pos, radius }, { rings, low, roof }) {
@@ -313,12 +429,19 @@ export class GeographicBuildings {
     this.group.name = 'Geographic buildings';
     const atlas = createCityFacadeAtlas([255, 218, 141]);
     this.atlas = atlas;
-    this.material = new THREE.MeshLambertMaterial({
-      map: atlas.map, emissiveMap: atlas.emissiveMap,
-      emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true,
-    });
-    this.material.onBeforeCompile = cityFacadeUvShader;
-    this.material.customProgramCacheKey = () => 'geo-city-metric-facade-v1';
+    const makeTierMaterial = alphaHash => {
+      const material = new THREE.MeshLambertMaterial({
+        map: atlas.map, emissiveMap: atlas.emissiveMap,
+        emissive: 0xffffff, emissiveIntensity: 0, side: THREE.DoubleSide, vertexColors: true,
+        ...(alphaHash ? { alphaHash: true, opacity: 1 } : {}),
+      });
+      material.onBeforeCompile = cityFacadeUvShader;
+      material.customProgramCacheKey = () => (alphaHash
+        ? 'geo-city-metric-facade-alphahash-v1' : 'geo-city-metric-facade-v1');
+      return material;
+    };
+    this.material = makeTierMaterial(false);
+    this.tierMaterials = [this.material, makeTierMaterial(true), makeTierMaterial(true)];
     this.lightMaterial = new THREE.PointsMaterial({
       map: cityGlowTexture(), color: 0xffc688, size: 5, sizeAttenuation: false, vertexColors: true,
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
@@ -330,13 +453,14 @@ export class GeographicBuildings {
     this.pendingOverview = null;
     this.overviewRetryAt = 0;
     this.tiles = new Map();
+    this.targetTier = BUILDING_DETAIL_TIERS.length - 1;
     this.landmarksVersion = 0;
     this.pending = null;
     this.retryAt = new Map();
   }
 
   tilesNear(position) {
-    if (position.y - this.terrain.getHeight(position.x, position.z) >= 3500) return [];
+    if (position.y - this.terrain.getHeight(position.x, position.z) >= BUILDING_DETAIL_TIERS[0].maxAgl) return [];
     return this.tilesAround(position, zoom);
   }
 
@@ -358,8 +482,21 @@ export class GeographicBuildings {
   update(position, cameraPosition = position, sunHeight = 1, elapsed = 1 / 60, quality) {
     if (this.terrain.isLoaded === false) return;
     const night = nightLightLevel(sunHeight);
-    this.material.color.setScalar(1 - night * 0.9);
-    this.material.emissiveIntensity = night * 0.75;
+    const aircraftAgl = position.y - this.terrain.getHeight(position.x, position.z);
+    const cameraAgl = cameraPosition === position
+      ? aircraftAgl : cameraPosition.y - this.terrain.getHeight(cameraPosition.x, cameraPosition.z);
+    const minAgl = Number.isFinite(aircraftAgl) && Number.isFinite(cameraAgl)
+      ? Math.min(aircraftAgl, cameraAgl) : (Number.isFinite(aircraftAgl) ? aircraftAgl : cameraAgl);
+    this.targetTier = maxBuildingTierForAgl(minAgl);
+    const tierOpacities = BUILDING_DETAIL_TIERS.map((tier, index) => {
+      if (index === 0 || !Number.isFinite(cameraAgl)) return 1;
+      return 1 - THREE.MathUtils.smoothstep(cameraAgl, tier.fadeStartAgl, tier.maxAgl);
+    });
+    for (let t = 0; t < this.tierMaterials.length; t++) {
+      this.tierMaterials[t].color.setScalar(1 - night * 0.9);
+      this.tierMaterials[t].emissiveIntensity = night * 0.75;
+      this.tierMaterials[t].opacity = tierOpacities[t];
+    }
     const aircraftTiles = this.tilesNear(position);
     const cameraTiles = cameraPosition === position ? [] : this.tilesNear(cameraPosition);
     const selection = `${aircraftTiles[0]?.key ?? ''}:${cameraTiles[0]?.key ?? ''}`;
@@ -371,11 +508,39 @@ export class GeographicBuildings {
       if (this.pending && !this.aircraftTiles.has(this.pending.key)
         && aircraftTiles.some(({ key }) => !this.tiles.has(key))) this.pending.controller.abort();
     }
+    // Upgrade at most one loaded tile per frame when descending into finer tiers.
+    if (this.targetTier > 0) {
+      for (const candidate of this.wantedTiles ?? []) {
+        const entry = this.tiles.get(candidate.key);
+        if (entry?.rawData && entry.builtMaxTier < this.targetTier) {
+          this.upgradeTile(entry, this.targetTier);
+          break;
+        }
+      }
+    }
     const ultraLow = quality === 'ultraLow';
     const detailRadius = ultraLow ? 200 : quality === 'performance' ? 550 : Infinity;
-    for (const [key, { mesh }] of this.tiles) {
-      if (mesh) mesh.visible = detailRadius === Infinity || key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key
-        || nearBuildingTile(mesh, position, detailRadius) || nearBuildingTile(mesh, cameraPosition, detailRadius);
+    for (const [key, entry] of this.tiles) {
+      if (entry.tiers) {
+        const isCenter = key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key;
+        for (let t = 0; t < entry.tiers.length; t++) {
+          const mesh = entry.tiers[t];
+          if (!mesh) continue;
+          if (tierOpacities[t] <= 0) {
+            mesh.visible = false;
+            continue;
+          }
+          const radius = Math.min(detailRadius, BUILDING_DETAIL_TIERS[t].maxDistance);
+          mesh.visible = radius === Infinity
+            || (t === 0 && isCenter)
+            || nearBuildingTile(mesh, position, radius)
+            || nearBuildingTile(mesh, cameraPosition, radius);
+        }
+      } else if (entry.mesh) {
+        entry.mesh.visible = detailRadius === Infinity || key === cameraTiles[0]?.key || key === aircraftTiles[0]?.key
+          || nearBuildingTile(entry.mesh, position, detailRadius)
+          || nearBuildingTile(entry.mesh, cameraPosition, detailRadius);
+      }
     }
     this.updateOverview(cameraPosition, night, elapsed, ultraLow);
     if (this.pending) return;
@@ -415,11 +580,11 @@ export class GeographicBuildings {
       let changed = false;
       let silhouettesChanged = false;
       for (let i = 0; i < position.count; i++) {
-        const detail = this.tiles.get(detailKeys[i])?.mesh;
+        const detailVisible = hasVisibleDetail(this.tiles.get(detailKeys[i]));
         const index = i * 4 + 3;
         const previous = color.array[index];
         let alpha = 1;
-        if (detail?.visible) {
+        if (detailVisible) {
           const distance = Math.hypot(
             cameraPosition.x - position.getX(i),
             cameraPosition.y - position.getY(i),
@@ -490,16 +655,38 @@ export class GeographicBuildings {
   retainTiles(wanted) {
     const wantedKeys = new Set(wanted.map(tile => tile.key));
     let removedLandmarks = false;
-    for (const [key, { mesh, landmarks }] of this.tiles) {
+    for (const [key, entry] of this.tiles) {
       if (wantedKeys.has(key)) continue;
-      mesh?.removeFromParent();
-      mesh?.geometry.dispose();
+      disposeTileEntry(entry);
       this.tiles.delete(key);
-      if (landmarks?.length) removedLandmarks = true;
+      if (entry.landmarks?.length) removedLandmarks = true;
     }
     if (removedLandmarks) this.landmarksVersion++;
     for (const key of this.retryAt.keys()) if (!wantedKeys.has(key)) this.retryAt.delete(key);
     if (this.pending && !wantedKeys.has(this.pending.key)) this.pending.controller.abort();
+  }
+
+  upgradeTile(entry, targetTier) {
+    const maxTier = Math.min(targetTier, BUILDING_DETAIL_TIERS.length - 1);
+    if (!entry.rawData || entry.builtMaxTier >= maxTier) return;
+    const colliders = [];
+    const { geometries } = buildGeographicBuildingTiers(
+      entry.rawData, entry.tile, this.project, this.terrain, this.exclude, colliders, this.buildingOverrides,
+      { minTier: entry.builtMaxTier + 1, maxTier },
+    );
+    addCollidersToIndex(entry.collisionCells, colliders);
+    for (let t = entry.builtMaxTier + 1; t <= maxTier; t++) {
+      const geometry = geometries[t];
+      if (!geometry) continue;
+      geometry.computeBoundingBox();
+      const mesh = new THREE.Mesh(geometry, this.tierMaterials[t]);
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
+      entry.tiers[t] = mesh;
+    }
+    entry.mesh = entry.tiers.find(Boolean) ?? null;
+    entry.builtMaxTier = maxTier;
+    if (maxTier >= BUILDING_DETAIL_TIERS.length - 1) entry.rawData = null;
   }
 
   async load(tile) {
@@ -508,18 +695,32 @@ export class GeographicBuildings {
     try {
       const response = await this.archive.getZxy(zoom, tile.x, tile.y, controller.signal);
       if (controller.signal.aborted) return;
+      const buildMaxTier = Math.max(0, Math.min(this.targetTier, BUILDING_DETAIL_TIERS.length - 1));
       const colliders = [];
-      const geometry = response && buildGeographicBuildingTile(response.data, tile, this.project, this.terrain,
-        this.exclude, colliders, this.buildingOverrides);
+      const built = response && buildGeographicBuildingTiers(
+        response.data, tile, this.project, this.terrain, this.exclude, colliders, this.buildingOverrides,
+        { minTier: 0, maxTier: buildMaxTier },
+      );
       const collisionCells = indexColliders(colliders);
-      geometry?.computeBoundingBox();
-      const mesh = geometry ? new THREE.Mesh(geometry, this.material) : null;
-      if (mesh) {
+      const tiers = BUILDING_DETAIL_TIERS.map((_, t) => {
+        const geometry = built?.geometries[t] ?? null;
+        if (!geometry) return null;
+        geometry.computeBoundingBox();
+        const mesh = new THREE.Mesh(geometry, this.tierMaterials[t]);
         mesh.receiveShadow = true;
         this.group.add(mesh);
-      }
+        return mesh;
+      });
       const landmarks = response?.data ? extractBuildingLandmarks(response.data, tile, zoom) : [];
-      this.tiles.set(tile.key, { mesh, collisionCells, landmarks });
+      this.tiles.set(tile.key, {
+        tile,
+        rawData: response?.data && buildMaxTier < BUILDING_DETAIL_TIERS.length - 1 ? response.data : null,
+        builtMaxTier: buildMaxTier,
+        tiers,
+        mesh: tiers.find(Boolean) ?? null,
+        collisionCells,
+        landmarks,
+      });
       if (landmarks.length) this.landmarksVersion++;
       this.retryAt.delete(tile.key);
     } catch {
@@ -557,9 +758,9 @@ export class GeographicBuildings {
     this.pending?.controller.abort();
     this.retainOverviewTiles(new Set());
     this.group.removeFromParent();
-    for (const { mesh, landmarks } of this.tiles.values()) {
-      mesh?.geometry.dispose();
-      if (landmarks?.length) this.landmarksVersion++;
+    for (const entry of this.tiles.values()) {
+      disposeTileEntry(entry);
+      if (entry.landmarks?.length) this.landmarksVersion++;
     }
     if (this.terrain.geographicBuildingLayer === this) delete this.terrain.geographicBuildingLayer;
     this.group.clear();
@@ -567,7 +768,7 @@ export class GeographicBuildings {
     this.retryAt.clear();
     this.atlas.map.dispose();
     this.atlas.emissiveMap.dispose();
-    this.material.dispose();
+    for (const material of this.tierMaterials) material.dispose();
     this.lightMaterial.map.dispose();
     this.lightMaterial.dispose();
     this.silhouetteMaterial.dispose();
