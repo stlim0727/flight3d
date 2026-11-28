@@ -123,12 +123,16 @@ await withBrowserSession({ width: 390, height: 844, mobile: true, deviceScaleFac
   });
   assert.ok(dropdownLayout.resultsTop >= dropdownLayout.statusBottom, 'search dropdown must not cover the retry status row');
   await evaluate("document.querySelector('#lobby-map-results button[data-place-id=\"RKSS\"]').click()");
+  await settle();
+  assert.equal(await evaluate("document.getElementById('lobby-map-dialog').open"), true, 'choosing a result must keep the modal open until confirmed');
+  assert.equal(await evaluate("document.getElementById('lobby-map-results').children.length"), 0, 'choosing a result must dismiss the dropdown');
+  assert.equal(await evaluate("(window.simulator || window.sim)?.lobby?.mapPlan?.airportCode"), 'RKSS', 'choosing a result must apply the map plan');
+  await evaluate("document.getElementById('lobby-map-confirm').click()");
   for (let i = 0; i < 20; i++) {
     if (!(await evaluate("document.getElementById('lobby-map-dialog').open"))) break;
     await settle();
   }
-  assert.equal(await evaluate("document.getElementById('lobby-map-dialog').open"), false, 'choosing a result must close the modal');
-  assert.equal(await evaluate("(window.simulator || window.sim)?.lobby?.mapPlan?.airportCode"), 'RKSS', 'choosing a result must apply the map plan');
+  assert.equal(await evaluate("document.getElementById('lobby-map-dialog').open"), false, 'confirming the location must close the modal');
   assert.deepEqual(exceptions, []);
   console.log(JSON.stringify({
     gpu: 'hardware Vulkan preflight passed',

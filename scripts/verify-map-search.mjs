@@ -166,6 +166,9 @@ await withBrowserSession({ path: '/index.html', timeoutMs: 120000 }, async sessi
   assert.ok(await waitFor(session, "Boolean(document.querySelector('#lobby-map-results [data-place-kind=\"region\"][data-place-id=\"lukla\"]'))"), 'Korean region search did not find lukla');
   await evaluate("document.querySelector('#lobby-map-results [data-place-kind=\"region\"][data-place-id=\"lukla\"]')?.click()");
   assert.ok(await waitFor(session, "window.sim?.lobby?.airport === 'lukla' && window.sim?.lobby?.mapPlan === null"), 'selecting region:lukla did not switch airport and clear mapPlan');
+  assert.equal(await evaluate("document.getElementById('lobby-map-dialog').open"), true, 'selecting a place must keep the map dialog open until confirmed');
+  await evaluate("document.getElementById('lobby-map-confirm')?.click()");
+  assert.ok(await waitFor(session, "!document.getElementById('lobby-map-dialog').open"), 'confirm button did not close the map dialog');
 
   // Open Missions disclosure: all mission buttons must be visible simultaneously and auto-switch region.
   await evaluate("document.querySelector('#lobby-missions > summary').click()");

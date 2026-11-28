@@ -391,6 +391,43 @@ dialog.lobby-map-dialog::backdrop {
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+.lobby-map-dialog-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(148, 163, 184, .16);
+  background: rgba(10, 18, 30, .96);
+}
+.lobby-map-dialog-footer .lobby-map-place-status {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lobby-map-dialog .lobby-map-dialog-confirm {
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #082f49;
+  background: #38bdf8;
+  border: 1px solid #7dd3fc;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.lobby-map-dialog .lobby-map-dialog-confirm:hover {
+  background: #7dd3fc;
+  color: #082f49;
+}
+.lobby-map-dialog .lobby-map-dialog-confirm:disabled {
+  opacity: .5;
+  cursor: default;
+}
 .lobby-map-dialog .lobby-map-search-area { position: relative; z-index: 2; flex: 0 0 auto; }
 .lobby-map-dialog .lobby-map-toolbar input { min-height: 44px; padding-left: 42px; font-size: 13px; }
 .lobby-map-dialog .lobby-map-toolbar .btn-bookmark { min-height: 44px; }

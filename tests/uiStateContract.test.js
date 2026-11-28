@@ -394,7 +394,7 @@ test('UI State Contract: Multi-pause state guard prevents early resume when over
 });
 
 const MAP_SELECT_IDS = ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure'];
-const MAP_BROWSER_IDS = ['lobby-map-dialog', 'lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-place-bookmark', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview', 'lobby-map-tiles'];
+const MAP_BROWSER_IDS = ['lobby-map-dialog', 'lobby-map-confirm', 'lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-place-bookmark', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview', 'lobby-map-tiles'];
 
 function setupMapDOM() {
   const { elements, mockDoc } = setupMockDOM();
@@ -1097,16 +1097,21 @@ test('UI State Contract: search dropdown and lobby place row let users bookmark 
     const updatedStar = updatedRow.children.find(child => child.dataset.bookmarkToggle === 'true');
     assert.equal(updatedStar.textContent, '★', 'dropdown star reflects bookmarked state');
 
-    // 2. Selecting Pangong Tso closes the dialog and exposes the bookmark toggle on the scenario menu.
+    // 2. Selecting Pangong Tso keeps the dialog open (dismissing the dropdown) so the user can inspect/bookmark it before confirming.
     const selectBtn = updatedRow.children.find(child => child.dataset.placeId === 'geonames:1260454');
     results.listeners.click[0]({
       target: { closest: selector => (selector === '[data-place-kind]' ? selectBtn : null) },
     });
-    assert.equal(dialog.open, false, 'selecting the search result still closes the map dialog');
+    assert.equal(dialog.open, true, 'selecting a search result must keep the map dialog open until confirmed');
+    assert.equal(results.children.length, 0, 'selecting a search result dismisses the dropdown so the map is visible');
     assert.equal(plan?.pointId, 'geonames:1260454');
     assert.equal(plan?.point?.altitudeM, 4950, 'high-elevation lake keeps its computed cruise altitude');
     assert.equal(placeBookmark.hidden, false, 'scenario menu bookmark button appears for the active map place');
     assert.equal(placeBookmark.textContent, '★');
+
+    // Confirming closes the dialog and returns to the scenario start menu.
+    elements.get('lobby-map-confirm').listeners.click[0]();
+    assert.equal(dialog.open, false, 'clicking the confirm button closes the map dialog');
 
     // 3. Toggling the scenario menu bookmark button removes and re-adds the active place.
     placeBookmark.listeners.click[0]();
