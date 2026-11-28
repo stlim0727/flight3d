@@ -48,7 +48,6 @@ import { FlightAudio } from './audio/FlightAudio.js';
 import { FlightControls } from './controls/FlightControls.js';
 import { CameraSystem } from './cameras/CameraSystem.js';
 import { MobileHeadTracking } from './cameras/MobileHeadTracking.js';
-import { HeadTrackingUi } from './cameras/HeadTrackingUi.js';
 import { HudView } from './ui/HudView.js';
 import { AirToAirMissileSystem } from './weapons/AirToAirMissileSystem.js';
 import { CannonCombatView } from './weapons/CannonCombatView.js';
@@ -382,10 +381,9 @@ class FlightSimulator {
     this.cameraSystem = new CameraSystem(this.camera, this.renderer.domElement, {
       logarithmicDepthBuffer: Boolean(this.renderer.capabilities?.logarithmicDepthBuffer ?? initialPreset.logarithmicDepthBuffer ?? true),
     });
-    this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem, {
-      onStatusChange: (status) => this.headTrackingUi?.update(status),
-    });
-    this.headTrackingUi = new HeadTrackingUi(this.mobileHeadTracking);
+    this.mobileHeadTracking = new MobileHeadTracking(this.cameraSystem);
+    // Head-look control UI is postponed until its implementation is complete;
+    // the tracking controller stays wired so the work can resume without rewiring cameras.
     this.cameraSystem.setTerrain(null);
     // The interior is fetched by the first cockpit view rather than by boot, and the cut is
     // held until it arrives so an entry never shows the bare airframe interior.
