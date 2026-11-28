@@ -777,7 +777,7 @@ test('aborted load finally does not remove newer pending controller for same til
   openWorld.dispose();
 });
 
-test('OpenWorldTerrain jeju frame protects only the airport precinct, leaving Hallasan and island terrain open', () => {
+test('OpenWorldTerrain jeju frame streams common open-world tiles without a protected precinct hole', () => {
   const terrain = { mesh: new Group() };
   const sim = {
     activeAirport: 'jeju',
@@ -793,9 +793,9 @@ test('OpenWorldTerrain jeju frame protects only the airport precinct, leaving Ha
   const openWorld = terrain.openWorld;
   assert.ok(openWorld, 'openWorld must be mounted on jeju terrain');
 
-  // RKPC Runway precinct (0, 0) is protected
-  assert.equal(openWorld.protects(0, 0), true, 'RKPC airport precinct must be protected');
-  assert.equal(openWorld.protects(-1463, 621), true, 'Runway 07 threshold must be protected');
+  // RKPC precinct and surrounding island stream via common tiles + runway flattening/cutouts
+  assert.equal(openWorld.protects(0, 0), false, 'RKPC airport precinct must stream via common tiles');
+  assert.equal(openWorld.protects(-1463, 621), false, 'Runway 07 threshold must stream via common tiles');
 
   // Mount Hallasan (3741.4, 16591.7) must NOT be protected
   assert.equal(openWorld.protects(3741.4, 16591.7), false, 'Mount Hallasan must NOT be protected; open-world streams it');
