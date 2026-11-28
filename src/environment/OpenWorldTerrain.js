@@ -180,6 +180,10 @@ function terrainMaterial(detail, distanceFade, quality = 'balanced', seaPalette 
       attribute float terrainWet;
       varying float vTerrainWet;
     ` + shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      transformed.y = max(transformed.y, 1.05);`,
+    ).replace(
       '#include <project_vertex>',
       `#include <project_vertex>
       #if (defined(QUALITY_ULTRALOW) && QUALITY_ULTRALOW == 1) || (defined(QUALITY_PERFORMANCE) && QUALITY_PERFORMANCE == 1)
@@ -552,7 +556,8 @@ export function buildOpenTerrainTile({ x, y, raster, east, south, southeast, wat
       const height = source[(row * sampleStep) % samples * samples + (col * sampleStep) % samples];
       const { latitude, longitude } = tileToWgs84(x + u, y + v, level);
       const [localX, localZ] = project(latitude, longitude);
-      const wet = height <= 0 || (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
+      const waterMaskWet = (water?.[(Math.min(row * sampleStep, samples - 1) * samples + Math.min(col * sampleStep, samples - 1)) * 4 + 3] ?? 0) >= 128;
+      const wet = water ? waterMaskWet : height <= 0;
       appendVertex([localX, blendHeight?.(localX, localZ, height) ?? height, localZ, u, v, Number(wet)], height);
     }
   }

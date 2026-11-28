@@ -1,18 +1,12 @@
 import { buildSihwaBridges } from '../geospatial/sihwaBridges.js';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { createRasterSurfaceMaterial } from './RasterRegionSurface.js';
 import { SihwaRegion } from '../geospatial/SihwaRegion.js';
 import { applyLogDepthOffset } from './RunwayMarkings.js';
 
 /** Source-positioned landmarks, with deliberately lightweight procedural exteriors. */
 export function createSihwaScenery(region) {
   const group=new THREE.Group();group.name='Sihwa regional scenery';
-  const land=region.geometry;
-  const uv=new Float32Array(region.positions.length/3*2);
-  for(let i=0;i<uv.length/2;i++){uv[i*2]=(region.positions[i*3]+25000)/50000;uv[i*2+1]=1-(region.positions[i*3+2]+25000)/50000;}
-  land.setAttribute('uv',new THREE.BufferAttribute(uv,2));
-  group.add(new THREE.Mesh(land,createRasterSurfaceMaterial()));
   const batches=new Map(),colliders=[];
   const features=region.features.features;
   const feature=kind=>features.find(f=>f.kind===kind);
@@ -27,11 +21,6 @@ export function createSihwaScenery(region) {
     const g=new THREE.ExtrudeGeometry(s,{depth:height,bevelEnabled:false});g.rotateX(-Math.PI/2);g.translate(0,base,0);add(color,g);
     collider(f.points,base,base+height);
   };
-  // Frozen overlay vertices lie on the same triangle planes as the land mesh.
-  for(const [name,array] of Object.entries(region.overlays)) {
-    const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(array,3));g.computeVertexNormals();
-    add(name==='sand'?0xcdbb8f:0x60656a,g);
-  }
   // The generation building follows the actual mapped station footprint.
   const plant=feature('plant'),base=pad('plant');
   footprint(plant,8,0xa5afad,base);
