@@ -10,7 +10,7 @@ import { DEFAULT_AIRPORT, DESTINATION_CHOICES, resolveDestination, saveSavedDest
 import { mergeScoredResults, placeCruiseAltitude, searchAirportIndexScored, searchMapPlacesScored, searchPlaceIndexScored } from '../config/airportSearch.js';
 import { loadBookmarks, toggleBookmark, bookmarkKey, isBookmarked } from '../config/airportBookmarks.js';
 import { registerExternalDestinations } from '../config/externalDestinations.js';
-import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, specialRegionPlaces } from '../config/mapFlightPlaces.js';
+import { defaultMapBookmarks, indexedAirportPlace, indexedAirportPlaces, MAP_START_STATE_KEYS, specialRegionPlaces } from '../config/mapFlightPlaces.js';
 import { loadAirportManifest, loadAirportSearchIndex, findAirportByCode } from '../geospatial/airportIndex.js';
 import { loadPlaceManifest, loadPlaceSearchIndex } from '../geospatial/placeIndex.js';
 import { MAP_WIDTH, MAP_HEIGHT, mapCoordinates, projectToMap, fitMapViewBoxToAspect, markerScaleForViewBoxWidth, clusterMapPoints, unwrapMapX } from './mapBrowser.js';
@@ -148,7 +148,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const placeIndexState = { status: 'idle', entries: [], error: null, pending: null };
   const mapStateLabel = state => state === 'none'
     ? t('lobby.map.none')
-    : t({ runway: 'incheon.runway', cruise: 'incheon.cruise', approach: 'incheon.approach' }[state] ?? state);
+    : t(MAP_START_STATE_KEYS[state] ?? state);
   const addOption = (select, value, label) => {
     if (!select) return;
     const option = document.createElement('option');
@@ -1351,12 +1351,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     bindText(document.querySelector('title'), () => {
       const airport = getAirport();
       const preset = getPreset();
-      const labelKey = scenarioLabelKey(airport, preset);
+      // A map place starts generically; the base airport's showcase name would
+      // label an Ulsan cruise as the Yeongjong one (#1096).
+      const mapStateKey = place && Object.hasOwn(MAP_START_STATE_KEYS, preset) ? MAP_START_STATE_KEYS[preset] : null;
+      const labelKey = mapStateKey ?? scenarioLabelKey(airport, preset);
       const scenarioTitle = preset === 'demo'
         ? t('demo.scenario.title', { title: t(resolveDemoProfile(getAircraft?.(), airport, getDemoProfile?.()).labelKey) })
         : (labelKey && t(labelKey));
       return [...new Set(['Flight3d', resolveAircraftConfig(getAircraft?.() ?? 'B738')?.name,
-        lobbyBriefing(airport, preset)[0], scenarioTitle].filter(Boolean))].join(' | ');
+        mapStateKey ? placeName() : lobbyBriefing(airport, preset)[0], scenarioTitle].filter(Boolean))].join(' | ');
     });
     if (demoGroup) demoGroup.hidden = preset !== 'demo';
     if (valleyGroup) valleyGroup.hidden = preset !== 'valley';

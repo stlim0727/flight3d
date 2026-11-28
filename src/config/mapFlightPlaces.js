@@ -144,6 +144,16 @@ export function mapPlanCustomOrigin(plan, places = {}, anchor = 'incheon') {
   return Object.freeze({ latitude: location.latitude, longitude: location.longitude });
 }
 
+/**
+ * Generic i18n keys for a map-planned start state. A map place has no authored
+ * showcase name, so it never borrows the lobby base airport's scenario label.
+ */
+export const MAP_START_STATE_KEYS = Object.freeze({
+  runway: 'lobby.takeoff',
+  cruise: 'lobby.cruiseStart',
+  approach: 'lobby.approachStart',
+});
+
 /** Human-readable place label for HUD/debrief/diagnostics on a map-planned flight. */
 export function mapPlanLabel(plan, places = {}) {
   if (!plan || plan.state === 'none') return null;
