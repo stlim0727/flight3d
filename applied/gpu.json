@@ -1,0 +1,17 @@
+{
+  "passed": true,
+  "browser": "Chrome/158.0.8127.38",
+  "devices": [
+    "Intel(R) Arc(TM) 140V GPU (8GB)"
+  ],
+  "webgl2": true,
+  "version": "WebGL 2.0 (OpenGL ES 3.0 Chromium)",
+  "renderer": "ANGLE (Intel, Intel(R) Arc(TM) 140V GPU (8GB) (0x000064A0) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "pixel": [
+    255,
+    0,
+    0,
+    255
+  ],
+  "error": 0
+}
