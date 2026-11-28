@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
-import { buildGeographicBuildingTile, geographicBuildingHeight, GeographicBuildings } from '../src/environment/GeographicBuildings.js';
+import {
+  BUILDING_DETAIL_TIERS,
+  buildGeographicBuildingTiers,
+  buildGeographicBuildingTile,
+  classifyBuildingTier,
+  geographicBuildingHeight,
+  GeographicBuildings,
+  maxBuildingTierForAgl,
+} from '../src/environment/GeographicBuildings.js';
 
 function buildingTile() {
   const writer = new PbfWriter();
@@ -306,4 +314,157 @@ test('building detail distances step down with quality and restore the full scen
   assert.ok([center, border, middle, far].every(tile => tile.mesh.visible));
   assert.equal(buildings.silhouetteMaterial.opacity, 1);
   buildings.dispose();
+});
+
+function encodeZigZag(n) {
+  return (n << 1) ^ (n >> 31);
+}
+
+function squareGeometryCommands(x, y, size) {
+  return [
+    9, encodeZigZag(x), encodeZigZag(y),
+    (3 << 3) | 2,
+    encodeZigZag(size), encodeZigZag(0),
+    encodeZigZag(0), encodeZigZag(size),
+    encodeZigZag(-size), encodeZigZag(0),
+    15,
+  ];
+}
+
+function tieredBuildingTile() {
+  const writer = new PbfWriter();
+  writer.writeMessage(3, (_, layer) => {
+    layer.writeStringField(1, 'building');
+    layer.writeVarintField(15, 2);
+    layer.writeVarintField(5, 4096);
+    layer.writeStringField(3, 'height');
+    layer.writeMessage(4, (_, value) => value.writeDoubleField(3, 40), null);
+    layer.writeMessage(4, (_, value) => value.writeDoubleField(3, 15), null);
+    layer.writeMessage(4, (_, value) => value.writeDoubleField(3, 6), null);
+    // Tier 0 (major): 40 m tall
+    layer.writeMessage(2, (_, feature) => {
+      feature.writePackedVarint(2, [0, 0]);
+      feature.writeVarintField(3, 3);
+      feature.writePackedVarint(4, squareGeometryCommands(100, 100, 40));
+    }, null);
+    // Tier 1 (medium): 15 m tall, ~15x15 m footprint (~225 m^2)
+    layer.writeMessage(2, (_, feature) => {
+      feature.writePackedVarint(2, [0, 1]);
+      feature.writeVarintField(3, 3);
+      feature.writePackedVarint(4, squareGeometryCommands(400, 100, 26));
+    }, null);
+    // Tier 2 (minor): 6 m tall, ~7x7 m footprint (~49 m^2)
+    layer.writeMessage(2, (_, feature) => {
+      feature.writePackedVarint(2, [0, 2]);
+      feature.writeVarintField(3, 3);
+      feature.writePackedVarint(4, squareGeometryCommands(700, 100, 12));
+    }, null);
+  }, null);
+  return writer.finish();
+}
+
+test('classifies building tiers by height and footprint area and maps AGL bands', () => {
+  assert.equal(BUILDING_DETAIL_TIERS.length, 3);
+  assert.equal(classifyBuildingTier(25, 20), 0);
+  assert.equal(classifyBuildingTier(8, 1200), 0);
+  assert.equal(classifyBuildingTier(12, 50), 1);
+  assert.equal(classifyBuildingTier(8, 250), 1);
+  assert.equal(classifyBuildingTier(9, 80), 2);
+
+  assert.equal(maxBuildingTierForAgl(3600), -1);
+  assert.equal(maxBuildingTierForAgl(3048), 0); // 10,000 ft: major only
+  assert.equal(maxBuildingTierForAgl(1200), 1); // medium + major
+  assert.equal(maxBuildingTierForAgl(400), 2); // all 3 tiers
+});
+
+test('splits tile buildings into three tiers and respects minTier/maxTier bounds', () => {
+  const project = (latitude, longitude) => [longitude * 100000, -latitude * 100000];
+  const tile = { x: 8192, y: 8192 };
+  const terrain = { getHeight: () => 44 };
+  const data = tieredBuildingTile();
+
+  const all = buildGeographicBuildingTiers(data, tile, project, terrain);
+  assert.deepEqual(all.counts, [1, 1, 1]);
+  assert.ok(all.geometries.every(Boolean));
+  all.geometries.forEach(geometry => geometry.dispose());
+
+  const majorOnly = buildGeographicBuildingTiers(data, tile, project, terrain, () => false, null, [], {
+    minTier: 0, maxTier: 0,
+  });
+  assert.deepEqual(majorOnly.counts, [1, 0, 0]);
+  assert.ok(majorOnly.geometries[0]);
+  assert.equal(majorOnly.geometries[1], null);
+  assert.equal(majorOnly.geometries[2], null);
+  majorOnly.geometries[0].dispose();
+});
+
+test('lazily upgrades building tiers on descent without refetching and hides minor tiers when climbing', async () => {
+  const { Vector3 } = await import('three');
+  let fetchCount = 0;
+  const data = tieredBuildingTile();
+  const project = (latitude, longitude) => [longitude * 100000, -latitude * 100000];
+  const terrain = { getHeight: () => 44 };
+  const layer = new GeographicBuildings({
+    origin: { latitude: 0, longitude: 0 },
+    project,
+    terrain,
+    archive: {
+      getZxy: async (zoom, x, y) => {
+        if (zoom !== 14 || x !== 8192 || y !== 8192) return undefined;
+        fetchCount++;
+        return { data };
+      },
+    },
+  });
+
+  // At 10,000 ft (~3,048 m AGL): only Tier 0 (major) is built and visible.
+  const cruise = new Vector3(100, 3092, 100);
+  layer.update(cruise, cruise, 1, 1 / 60);
+  await new Promise(resolve => setImmediate(resolve));
+  layer.update(cruise, cruise, 1, 1 / 60);
+  assert.equal(fetchCount, 1);
+  const entry = layer.tiles.get('8192/8192');
+  assert.equal(entry.builtMaxTier, 0);
+  assert.ok(entry.rawData);
+  assert.ok(entry.tiers[0]?.visible);
+  assert.equal(entry.tiers[1], null);
+  assert.equal(entry.tiers[2], null);
+  assert.equal(layer.tierMaterials[1].opacity, 0);
+  assert.equal(layer.tierMaterials[2].opacity, 0);
+
+  // Descend into Tier 1 fade band (~1,350 m AGL): lazily upgrades Tier 1 without refetching.
+  const approach = new Vector3(100, 1394, 100);
+  layer.update(approach, approach, 1, 1 / 60);
+  assert.equal(fetchCount, 1);
+  assert.equal(entry.builtMaxTier, 1);
+  assert.ok(entry.rawData);
+  assert.ok(entry.tiers[1]?.visible);
+  assert.equal(entry.tiers[2], null);
+  assert.ok(layer.tierMaterials[1].opacity > 0 && layer.tierMaterials[1].opacity < 1);
+  assert.equal(layer.tierMaterials[2].opacity, 0);
+
+  // Descend into Tier 2 fade band (~525 m AGL): lazily upgrades Tier 2, frees rawData, enables collision.
+  const low = new Vector3(100, 569, 100);
+  layer.update(low, low, 1, 1 / 60);
+  assert.equal(fetchCount, 1);
+  assert.equal(entry.builtMaxTier, 2);
+  assert.equal(entry.rawData, null);
+  assert.ok(entry.tiers[2]?.visible);
+  assert.ok(layer.tierMaterials[2].opacity > 0 && layer.tierMaterials[2].opacity < 1);
+
+  const minorBox = entry.tiers[2].geometry.boundingBox;
+  const minorCenter = new Vector3(
+    (minorBox.min.x + minorBox.max.x) / 2,
+    47,
+    (minorBox.min.z + minorBox.max.z) / 2,
+  );
+  assert.ok(layer.checkCollision([{ pos: minorCenter, radius: 1 }]), 'upgraded minor tier participates in collision');
+
+  // Climb back to 2,500 m AGL: medium and minor meshes hide while major stays visible.
+  const climb = new Vector3(100, 2544, 100);
+  layer.update(climb, climb, 1, 1 / 60);
+  assert.equal(entry.tiers[0].visible, true);
+  assert.equal(entry.tiers[1].visible, false);
+  assert.equal(entry.tiers[2].visible, false);
+  layer.dispose();
 });
