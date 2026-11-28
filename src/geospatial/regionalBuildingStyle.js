@@ -19,6 +19,7 @@ const regions = [
     },
   },
 ];
+export const regionalBuildingBounds = regions.map(region => region.bounds);
 const shapes = new Set([
   'flat', 'gabled', 'hipped', 'half_hipped', 'pyramidal', 'gambrel', 'mansard',
   'dome', 'onion', 'round', 'skillion', 'saltbox', 'sawtooth', 'spherical',

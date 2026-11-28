@@ -2,6 +2,15 @@
 
 Flight3d incorporates optimized open-source 3D models and atmospheric environment maps.
 
+## Regional building attributes
+
+The Songdo and Seongsan-ri overview includes building attributes from the
+Overture Maps buildings release of 2026-11-18.0, including © OpenStreetMap
+contributors. Regenerate the subset with
+`node scripts/scenery/build-regional-overview-properties.mjs` when updating the
+archive. [Overture attribution](https://docs.overturemaps.org/attribution/)
+and [OpenStreetMap attribution](https://www.openstreetmap.org/copyright).
+
 ## Aircraft 3D Models
 - **Boeing 737-800 Cockpit (`public/models/b737-cockpit-medium.glb`)**:
   - **Author**: [hakai315](https://sketchfab.com/hakai315)

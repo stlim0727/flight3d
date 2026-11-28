@@ -3,17 +3,32 @@ import test from 'node:test';
 import * as THREE from 'three';
 import { PbfWriter } from 'pbf';
 import { buildGeographicBuildingTile, geographicBuildingHeight, GeographicBuildings } from '../src/environment/GeographicBuildings.js';
+import { wgs84ToTile } from '../src/geospatial/TileCoordinateSystem.js';
+import { cityRoofAtlasRgb } from '../src/environment/CityBuildingAssets.js';
 
-function buildingTile() {
+function buildingTile(id, properties = {}, center) {
   const writer = new PbfWriter();
   writer.writeMessage(3, (_, layer) => {
     layer.writeStringField(1, 'building');
     layer.writeVarintField(15, 2);
     layer.writeVarintField(5, 4096);
+    const tags = [];
+    for (const [key, value] of Object.entries(properties)) {
+      const index = tags.length / 2;
+      layer.writeStringField(3, key);
+      layer.writeMessage(4, (_, item) => typeof value === 'string'
+        ? item.writeStringField(1, value) : item.writeVarintField(4, value), null);
+      tags.push(index, index);
+    }
     layer.writeMessage(2, (_, feature) => {
+      if (id != null) feature.writeVarintField(1, id);
+      feature.writePackedVarint(2, tags);
       feature.writeVarintField(3, 3);
-      // A clockwise square crosses the left boundary.
-      feature.writePackedVarint(4, [9, 199, 200, 26, 800, 0, 0, 800, 799, 0, 15]);
+      // The default clockwise square crosses the left boundary.
+      const startX = center ? Math.round(center.fx * 4096) - 200 : -100;
+      const startY = center ? Math.round(center.fy * 4096) - 200 : 100;
+      const zigzag = n => (n << 1) ^ (n >> 31);
+      feature.writePackedVarint(4, [9, zigzag(startX), zigzag(startY), 26, 800, 0, 0, 800, 799, 0, 15]);
     }, null);
   }, null);
   return writer.finish();
@@ -23,6 +38,54 @@ test('uses source heights, floors, and the shared default in order', () => {
   assert.equal(geographicBuildingHeight({ height: 36, num_floors: 7 }), 36);
   assert.ok(Math.abs(geographicBuildingHeight({ height: -1, num_floors: 7 }) - 22.4) < 1e-9);
   assert.equal(geographicBuildingHeight({ height: 0, num_floors: 0 }), 9);
+});
+
+test('regional flat roofs share height with collision and leave facade colors untouched', () => {
+  const tile = wgs84ToTile(37.39, 126.642, 14);
+  const project = (lat, lon) => [(lon - 126.642) * 88000, (37.39 - lat) * 111000];
+  const colliders = [];
+  const geometry = buildGeographicBuildingTile(buildingTile(17, { class: 'apartments', roof_color: 'green' }),
+    tile, project, { getHeight: x => 20 + x / 1000 }, undefined, colliders);
+  geometry.computeBoundingBox();
+  const [building] = colliders;
+  const ground = Math.max(...building.rings[0].map(([x]) => 20 + x / 1000));
+  assert.ok(building.roof - ground >= 48 && building.roof - ground <= 96);
+  assert.ok(Math.abs(geometry.boundingBox.max.y - building.roof) < 0.00001);
+  const { color, normal } = geometry.attributes;
+  const atlas = new THREE.Color().setRGB(...cityRoofAtlasRgb.map(v => v / 255), THREE.SRGBColorSpace);
+  const target = new THREE.Color('green');
+  for (let v = 0; v < color.count; v++) {
+    const tint = new THREE.Color().fromBufferAttribute(color, v);
+    if (normal.getY(v) > 0.99) {
+      const actual = tint.multiply(atlas);
+      assert.ok(Math.abs(actual.g - target.g) < 1e-6 && actual.r === 0 && actual.b === 0);
+    } else assert.deepEqual(tint.toArray(), [1, 1, 1]);
+  }
+  geometry.dispose();
+});
+
+test('sparse Songdo overview uses matching detail height and tints only upward faces', async () => {
+  const tile = wgs84ToTile(37.39, 126.642, 12);
+  // Pinned Overture feature with a 55 m z14 height, omitted from z12.
+  const id = 7298664347883176000;
+  const terrain = { getHeight: () => 12 };
+  const project = (lat, lon) => [(lon - 126.642) * 88000, (37.39 - lat) * 111000];
+  const layer = new GeographicBuildings({ terrain, project,
+    archive: { getZxy: async () => ({ data: buildingTile(id, {}, tile) }) } });
+  await layer.loadOverviewTile({ ...tile, key: 'test' });
+  const proxy = layer.overviewTiles.get('test').silhouettes.geometry;
+  const detailTile = wgs84ToTile(37.39, 126.642, 14);
+  const detail = buildGeographicBuildingTile(buildingTile(id, { height: 55 }, detailTile), detailTile, project, terrain);
+  detail.computeBoundingBox();
+  proxy.computeBoundingBox();
+  assert.equal(proxy.boundingBox.max.y, detail.boundingBox.max.y);
+  const { normal, color } = proxy.attributes;
+  for (let v = 0; v < normal.count; v++) {
+    assert.equal(color.getW(v), 1);
+    assert.equal(color.getX(v) === 1, normal.getY(v) !== 1);
+  }
+  detail.dispose();
+  layer.dispose();
 });
 
 test('clips building roofs to the tile and anchors meshes to the flight surface', () => {
