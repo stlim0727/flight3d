@@ -394,7 +394,7 @@ test('UI State Contract: Multi-pause state guard prevents early resume when over
 });
 
 const MAP_SELECT_IDS = ['lobby-map-state', 'lobby-map-airport', 'lobby-map-runway', 'lobby-map-point', 'lobby-map-departure'];
-const MAP_BROWSER_IDS = ['lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview', 'lobby-map-tiles'];
+const MAP_BROWSER_IDS = ['lobby-map-dialog', 'lobby-map-search', 'lobby-map-results', 'lobby-map-bookmarks', 'lobby-map-default-bookmarks', 'lobby-map-search-status', 'lobby-map-search-retry', 'lobby-map-bookmark-toggle', 'lobby-place-bookmark', 'lobby-map-svg', 'lobby-map-markers', 'lobby-map-overview', 'lobby-map-tiles'];
 
 function setupMapDOM() {
   const { elements, mockDoc } = setupMockDOM();
@@ -1024,6 +1024,108 @@ test('UI State Contract: offline place search finds landmarks and starts a cruis
     assert.equal(elements.get('lobby-map-point').value, 'geonames:6254976');
     assert.equal(plan?.state, 'cruise');
     assert.equal(plan?.pointId, 'geonames:6254976');
+  } finally {
+    globalThis.document = originalDoc;
+    globalThis.fetch = originalFetch;
+    globalThis.localStorage = originalStorage;
+    clearAirportIndexCache();
+    clearPlaceIndexCache();
+  }
+});
+
+test('UI State Contract: search dropdown and lobby place row let users bookmark places without losing the modal or selection', async () => {
+  const { elements, mockDoc } = setupMapDOM();
+  const originalDoc = globalThis.document;
+  const originalFetch = globalThis.fetch;
+  const originalStorage = globalThis.localStorage;
+  clearAirportIndexCache();
+  clearPlaceIndexCache();
+  const store = new Map();
+  const { files } = globalFixture();
+  const placeBase = 'http://localhost/data/places/';
+  files.set(`${placeBase}fixture/places.json`, {
+    schemaVersion: 1,
+    version: 'fixture',
+    places: [
+      { id: 'geonames:1260454', label: 'Pangong Tso', aliases: ['Pangong Lake', '판공초'], detail: 'lake · IN', latitude: 33.75, longitude: 78.66, country: 'IN', kind: 'lake', elevationM: 4249 },
+    ],
+  });
+  globalThis.document = mockDoc;
+  globalThis.fetch = async url => {
+    const body = files.get(String(url));
+    return body ? new Response(JSON.stringify(body), { status: 200 }) : new Response('missing', { status: 404 });
+  };
+  globalThis.localStorage = {
+    getItem: key => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(key, String(value)); },
+  };
+  try {
+    let plan = null;
+    const dialog = elements.get('lobby-map-dialog');
+    dialog.open = true;
+    dialog.close = () => { dialog.open = false; };
+    const screen = initLobbyScreen({
+      getAirport: () => 'incheon', getPreset: () => 'runway', getTime: () => 12, getAircraft: () => 'B738',
+      getDestination: () => 'none', getMapPlan: () => plan, onMapPlan: value => { plan = value; },
+    });
+    screen.setMapPlaces({ airports: [], points: [] });
+    await screen.requestPlaceSearchIndex();
+    await screen.requestAirportSearchIndex();
+
+    const search = elements.get('lobby-map-search');
+    const results = elements.get('lobby-map-results');
+    const bookmarks = elements.get('lobby-map-bookmarks');
+    const placeBookmark = elements.get('lobby-place-bookmark');
+    assert.equal(placeBookmark.hidden, true, 'lobby place bookmark button stays hidden until a map place is active');
+
+    // 1. Bookmark Pangong Tso directly from the search dropdown without closing the dialog.
+    search.value = 'pangong';
+    search.listeners.input[0]();
+    const row = results.children.find(child => child.dataset.placeId === 'geonames:1260454');
+    assert.ok(row, 'Pangong Tso result row appears');
+    const starBtn = row.children.find(child => child.dataset.bookmarkToggle === 'true');
+    assert.ok(starBtn, 'search result row includes a bookmark toggle button');
+    assert.equal(starBtn.textContent, '☆');
+
+    results.listeners.click[0]({
+      target: { closest: selector => (selector === '[data-bookmark-toggle]' ? starBtn : null) },
+    });
+    assert.equal(dialog.open, true, 'bookmarking a search result must keep the map dialog open');
+    assert.equal(plan, null, 'bookmarking a search result must not select or emit a plan');
+    assert.ok(bookmarks.children.some(child => child.dataset.placeId === 'geonames:1260454'), 'Pangong Tso appears in saved places');
+    const updatedRow = results.children.find(child => child.dataset.placeId === 'geonames:1260454');
+    const updatedStar = updatedRow.children.find(child => child.dataset.bookmarkToggle === 'true');
+    assert.equal(updatedStar.textContent, '★', 'dropdown star reflects bookmarked state');
+
+    // 2. Selecting Pangong Tso closes the dialog and exposes the bookmark toggle on the scenario menu.
+    const selectBtn = updatedRow.children.find(child => child.dataset.placeId === 'geonames:1260454');
+    results.listeners.click[0]({
+      target: { closest: selector => (selector === '[data-place-kind]' ? selectBtn : null) },
+    });
+    assert.equal(dialog.open, false, 'selecting the search result still closes the map dialog');
+    assert.equal(plan?.pointId, 'geonames:1260454');
+    assert.equal(plan?.point?.altitudeM, 4950, 'high-elevation lake keeps its computed cruise altitude');
+    assert.equal(placeBookmark.hidden, false, 'scenario menu bookmark button appears for the active map place');
+    assert.equal(placeBookmark.textContent, '★');
+
+    // 3. Toggling the scenario menu bookmark button removes and re-adds the active place.
+    placeBookmark.listeners.click[0]();
+    assert.equal(placeBookmark.textContent, '☆');
+    assert.ok(!bookmarks.children.some(child => child.dataset.placeId === 'geonames:1260454'));
+    placeBookmark.listeners.click[0]();
+    assert.equal(placeBookmark.textContent, '★');
+    assert.ok(bookmarks.children.some(child => child.dataset.placeId === 'geonames:1260454'));
+
+    // 4. Global airport result can also be bookmarked directly from the dropdown.
+    search.value = 'jfk';
+    search.listeners.input[0]();
+    const jfkRow = results.children.find(child => child.dataset.placeId === 'KJFK');
+    const jfkStar = jfkRow?.children.find(child => child.dataset.bookmarkToggle === 'true');
+    assert.ok(jfkStar, 'global airport result includes a bookmark button');
+    results.listeners.click[0]({
+      target: { closest: selector => (selector === '[data-bookmark-toggle]' ? jfkStar : null) },
+    });
+    assert.ok(bookmarks.children.some(child => child.dataset.placeId === 'KJFK'), 'global airport bookmark is saved');
   } finally {
     globalThis.document = originalDoc;
     globalThis.fetch = originalFetch;
