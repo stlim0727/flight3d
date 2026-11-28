@@ -1,6 +1,10 @@
 # Changelog
 
 ## [Unreleased]
+- **fix(camera):** hide the webcam head-look control until its implementation is ready
+  - The Head Look panel is no longer created during simulator startup, so the enable/reset/calibrate buttons and the panel toggle are absent from flight UI.
+  - Head tracking controller and camera integration stay wired for a later re-enable; no camera permission or tracking assets are touched until the UI returns.
+  - Verified in 390×844 hardware Chrome: flight DOM has no `#head-tracking-panel` or head-control buttons, while `mobileHeadTracking` remains available.
 - **feat(map-ui):** pan the lobby map infinitely east and west
   - Dragging past the world edge now continues into a repeating copy: Esri tiles, place pins and point clicks wrap with the view instead of stopping at the seam.
   - Vertical pan remains clamped at the Web Mercator poles; zoom and place selection stay centred on the world copy currently on screen.

@@ -28,7 +28,7 @@
   content: attr(data-ap-status);
 }
 .flight-strip-v2 .hud-top-actions .ap-toggle-btn.ap-armed {
-  background: #4b3517;
+  background: rgba(75, 53, 23, .55);
   border: 1px dashed #fbbf24;
   color: #fef3c7;
 }
@@ -61,13 +61,13 @@
   min-height: 44px;
   flex: 0 0 var(--strip-button-width, 44px);
   margin: 0;
-  background: var(--flight-control-surface);
+  background: var(--flight-button-surface);
   border: 1px solid rgba(181, 211, 234, .25);
   border-radius: 6px;
 }
 .flight-strip-v2 .flight-toolbar > .btn[aria-pressed="true"],
 .flight-strip-v2 .flight-toolbar > .btn[aria-expanded="true"] {
-  background: #254659;
+  background: rgba(37, 70, 89, .55);
   border-color: #7dd3fc;
 }
 .flight-strip-v2 .flight-toolbar #btn-flaps-ret { margin-inline-end: calc(-1 * var(--strip-gap)); border-radius: 6px 0 0 6px; }

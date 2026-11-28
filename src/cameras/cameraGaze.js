@@ -7,6 +7,7 @@ export function handleCanvasTap(cs, clientX, clientY) {
 export function setGazeTarget(cs, target) {
   cs.gazeTarget = target || null;
   cs.banditGaze = false;
+  cs.banditGazeTargetValid = false;
   notifyGazeChange(cs);
   return Boolean(cs.gazeTarget);
 }
@@ -15,6 +16,7 @@ export function clearGaze(cs) {
   const hadGaze = isGazeActive(cs);
   cs.gazeTarget = null;
   cs.banditGaze = false;
+  cs.banditGazeTargetValid = false;
   if (hadGaze) notifyGazeChange(cs);
   return hadGaze;
 }
@@ -27,6 +29,24 @@ export function getGazeTargetLabel(cs) {
   if (cs.gazeTarget?.label) return cs.gazeTarget.label;
   if (cs.banditGaze) return 'Bandit';
   return '';
+}
+
+export function getGazeTargetPosition(cs) {
+  if (cs.gazeTarget) {
+    const pos = typeof cs.gazeTarget.getPosition === 'function'
+      ? cs.gazeTarget.getPosition()
+      : cs.gazeTarget.position;
+    if (pos) return pos;
+  }
+  if (cs.banditGaze) {
+    if (cs.banditGazeTargetValid) return cs.banditGazeTarget;
+    const referencePos = cs.camera?.position || cs.chaseTarget;
+    if (referencePos) {
+      const bandit = nearestLiveBandit(cs, referencePos);
+      if (bandit?.position) return bandit.position;
+    }
+  }
+  return null;
 }
 
 export function notifyGazeChange(cs) {
@@ -42,6 +62,7 @@ export function applyActiveGaze(cs, planePos) {
       : cs.gazeTarget.position;
     if (targetPos) {
       cs.banditGazeTarget.copy(targetPos);
+      cs.banditGazeTargetValid = true;
       cs.camera.lookAt(cs.banditGazeTarget);
     } else {
       clearGaze(cs);
@@ -50,6 +71,7 @@ export function applyActiveGaze(cs, planePos) {
     const bandit = nearestLiveBandit(cs, planePos);
     if (bandit) {
       cs.banditGazeTarget.copy(bandit.position);
+      cs.banditGazeTargetValid = true;
       cs.camera.lookAt(cs.banditGazeTarget);
     } else {
       clearGaze(cs);
@@ -64,6 +86,7 @@ export function toggleBanditGaze(cs) {
   } else {
     cs.banditGaze = !cs.banditGaze;
   }
+  cs.banditGazeTargetValid = false;
   notifyGazeChange(cs);
   return cs.banditGaze;
 }

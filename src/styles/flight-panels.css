@@ -59,8 +59,8 @@
   border: 1px solid rgba(148, 163, 184, 0.25);
   color: #e2e8f0;
 }
-.flight-toolbar .btn:hover { background: rgba(181, 211, 234, .14); }
-.flight-toolbar .btn:is([aria-pressed="true"], [aria-expanded="true"]) { background: rgba(22, 78, 99, .62); }
+.flight-toolbar .btn:hover { background: rgba(181, 211, 234, .18); }
+.flight-toolbar .btn:is([aria-pressed="true"], [aria-expanded="true"]) { background: rgba(22, 78, 99, .45); }
 .btn[aria-expanded="true"], .btn[aria-pressed="true"] {
   background: #164e63;
   border-color: #67e8f9;
@@ -99,7 +99,7 @@
 }
 
 .flight-camera-btn:hover { background: rgba(181, 211, 234, .14); }
-.flight-camera-btn[aria-pressed="true"] { background: rgba(22, 78, 99, .62); }
+.flight-camera-btn[aria-pressed="true"] { background: rgba(22, 78, 99, .45); }
 .flight-camera-btn:is([aria-pressed="true"]) { border-color: #67e8f9; color: #ecfeff; }
 .btn:disabled,
 .btn[disabled],

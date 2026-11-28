@@ -13,7 +13,7 @@ import { CrashCameraMode } from './modes/CrashCameraMode.js';
 import { isInteractiveUI, initMouseLook, handleTouchStart, handleTouchMove, handleTouchEnd, updateEdgePan } from './cameraInput.js';
 import { normalizeAngle, isPovModified, getPovIndicatorAngle, updatePovButtonState, applyHatLook, updatePovReturn } from './cameraPovControls.js';
 import { updateSpeedSensation } from './cameraSpeedSensation.js';
-import { handleCanvasTap, setGazeTarget, clearGaze, isGazeActive, getGazeTargetLabel, notifyGazeChange, applyActiveGaze, toggleBanditGaze, nearestLiveBandit } from './cameraGaze.js';
+import { handleCanvasTap, setGazeTarget, clearGaze, isGazeActive, getGazeTargetLabel, getGazeTargetPosition, notifyGazeChange, applyActiveGaze, toggleBanditGaze, nearestLiveBandit } from './cameraGaze.js';
 import { loadAircraftConfig, resetLook, applyOpticalBaseFov } from './cameraStateHelpers.js';
 import { initCameraState } from './cameraInitState.js';
 import { snapToTarget, applyMouseDelta } from './cameraMotionHelpers.js';
@@ -311,6 +311,7 @@ export class CameraSystem {
   clearGaze() { return clearGaze(this); }
   isGazeActive() { return isGazeActive(this); }
   getGazeTargetLabel() { return getGazeTargetLabel(this); }
+  getGazeTargetPosition() { return getGazeTargetPosition(this); }
   notifyGazeChange() { notifyGazeChange(this); }
   applyActiveGaze(planePos) { applyActiveGaze(this, planePos); }
   toggleBanditGaze() { return toggleBanditGaze(this); }

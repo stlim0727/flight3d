@@ -124,6 +124,7 @@ export function initCameraState(cs) {
   cs.autoResetGaze = true;
   cs.banditGaze = false;
   cs.banditGazeTarget = new THREE.Vector3();
+  cs.banditGazeTargetValid = false;
   cs.gazeTarget = null;
   cs.onGazeClick = null;
   cs.onGazeChange = null;
