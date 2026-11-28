@@ -429,6 +429,7 @@ export default {
   "lobby.reason.aircraftLocked": "This flight is {aircraft} only, so the aircraft can't be changed.",
   "lobby.reason.timeFixed": "Time of day is fixed in this region.",
   "lobby.map.dialogHint": "Search a place or drop a pin on the map",
+  "lobby.map.confirm": "Confirm location",
   "lobby.map.resetView": "Full map",
   "lobby.map.zoomIn": "Zoom in",
   "lobby.map.zoomOut": "Zoom out",

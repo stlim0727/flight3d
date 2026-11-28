@@ -132,11 +132,13 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   const missionSummary = document.getElementById('lobby-mission-summary');
   const mapDialog = document.getElementById('lobby-map-dialog');
   const mapDialogClose = document.getElementById('lobby-map-dialog-close');
+  const mapConfirmBtn = document.getElementById('lobby-map-confirm');
   const placePicker = document.getElementById('lobby-place-picker');
-  const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, placeBookmarkToggle, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
+  const mapBrowserControls = [mapSearchInput, mapBookmarkToggle, placeBookmarkToggle, mapConfirmBtn, mapResults, mapBookmarksEl, mapOverview].filter(Boolean);
   let mapBookmarks = loadBookmarks();
   let mapCenteredKey = '';
   let mapPlanTileId = null;
+  let mapSearchDismissed = false;
   const mapSelects = [mapStateSelect, mapAirportSelect, mapRunwaySelect, mapPointSelect, mapDepartureSelect].filter(Boolean);
   let mapCatalog = { airports: [], points: [], regions: specialRegionPlaces() };
 
@@ -315,6 +317,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     airportIndexState.status = status;
     airportIndexState.error = error;
     airportIndexState.selectionError = selectionError;
+    mapSearchDismissed = false;
     renderMapBrowser();
   }
   function renderPlaceList(container, items, emptyKey, activeKey, { allowBookmark = false } = {}) {
@@ -434,6 +437,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     openMapDialog();
   });
   mapDialogClose?.addEventListener('click', closeMapDialog);
+  mapConfirmBtn?.addEventListener('click', closeMapDialog);
   mapDialog?.addEventListener('click', event => {
     if (event.target === mapDialog) closeMapDialog();
   });
@@ -621,7 +625,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     const formatPlaceItem = item => item.kind === 'region'
       ? { ...item, label: item.nameKey ? t(item.nameKey) : item.label, detail: '' }
       : item;
-    if (query.trim()) {
+    if (query.trim() && !mapSearchDismissed) {
       renderPlaceList(mapResults, results.map(formatPlaceItem), 'lobby.map.search.empty', activeKey, { allowBookmark: true });
     } else {
       mapResults?.replaceChildren();
@@ -740,6 +744,7 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
   function selectMapPlace(place) {
     if (!place) return;
     mapPlanTileId = place.tileId ?? null;
+    mapSearchDismissed = true;
     if (place.kind === 'region') {
       if (mapStateSelect) mapStateSelect.value = 'none';
       if (mapAirportSelect) mapAirportSelect.value = '';
@@ -748,7 +753,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       setMapView(null, 0);
       mapCenteredKey = '';
       onAirport?.(place.id);
-      closeMapDialog();
       refresh();
       return;
     }
@@ -765,7 +769,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
       if (mapPointSelect) mapPointSelect.value = pointId;
       if (mapStateSelect) mapStateSelect.value = 'cruise';
       emitMapPlan();
-      closeMapDialog();
       return;
     }
     const code = place.code ?? place.id;
@@ -786,7 +789,6 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     if (mapAirportSelect) mapAirportSelect.value = code;
     if (mapStateSelect) mapStateSelect.value = airportStartState(airport);
     emitMapPlan();
-    closeMapDialog();
   }
   async function onMapPlaceClick(event) {
     if (mapSelectionBusy) return;
@@ -830,9 +832,15 @@ export function initLobbyScreen({ getAirport, getPreset, getTime, isDeviceTime =
     selectMapPlace(findMapPlace(kind, id));
   }
   mapSearchInput?.addEventListener('input', () => {
+    mapSearchDismissed = false;
     // Unavailable indexes are retried explicitly, not on every keystroke.
     if (airportIndexState.status !== 'error') requestAirportSearchIndex();
     if (placeIndexState.status !== 'error') requestPlaceSearchIndex();
+    renderMapBrowser();
+  });
+  mapSearchInput?.addEventListener('click', () => {
+    if (!mapSearchDismissed || !mapSearchInput.value.trim()) return;
+    mapSearchDismissed = false;
     renderMapBrowser();
   });
   mapSearchInput?.addEventListener('focus', () => {

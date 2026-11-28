@@ -587,7 +587,6 @@
             <li><svg viewBox="-8 -8 16 16" aria-hidden="true"><circle class="lobby-map-legend-ring" cx="0" cy="0" r="4.5"/></svg><span data-i18n="lobby.map.tier.cruise">순항 시작만</span></li>
           </ul>
         </div>
-        <p id="lobby-map-place-status" class="lobby-map-place-status" aria-live="polite" hidden></p>
         <div class="lobby-map-saved">
           <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.savedPlaces">Saved places</span><div id="lobby-map-bookmarks" class="lobby-map-bookmarks"></div></div>
           <div class="lobby-map-saved-row"><span class="lobby-label" data-i18n="lobby.map.suggestedPlaces">Default bookmarks</span><div id="lobby-map-default-bookmarks" class="lobby-map-bookmarks"></div></div>
@@ -595,6 +594,10 @@
         <label class="lobby-map-airport-row"><span class="lobby-label" data-i18n="lobby.map.airport">공항</span><select id="lobby-map-airport" class="btn"></select></label>
         <label class="lobby-map-airport-row"><span class="lobby-label" data-i18n="lobby.destination">Destination airport</span><select id="lobby-destination" class="btn"></select></label>
       </div>
+      <footer class="lobby-map-dialog-footer">
+        <p id="lobby-map-place-status" class="lobby-map-place-status" aria-live="polite" hidden></p>
+        <button type="button" id="lobby-map-confirm" class="btn lobby-map-dialog-confirm" data-i18n="lobby.map.confirm">선택 완료</button>
+      </footer>
     </div>
   </dialog>
 

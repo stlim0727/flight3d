@@ -17,11 +17,13 @@ airport code is hand-authored in the UI.
 ## Selection flow
 
 Clicking a search result, SVG marker or bookmark calls the existing
-`emitMapPlan()` path and closes the dialog. Airports set the airport select and
-seed a runway; cruise points set the point select and force the cruise state.
-`onMapPlan` then resolves the geographic anchor, destination and spawn plan
-exactly as for a manual select. Selecting a result also centres the SVG
-`viewBox` on its coordinates.
+`emitMapPlan()` path, dismisses the search dropdown, and keeps the map dialog
+open so the user can inspect the centered location or bookmark it before
+clicking the `#lobby-map-confirm` button to return to the scenario start menu.
+Airports set the airport select and seed a runway; cruise points set the point
+select and force the cruise state. `onMapPlan` then resolves the geographic
+anchor, destination and spawn plan exactly as for a manual select. Selecting a
+result also centres the SVG `viewBox` on its coordinates.
 
 ## Bookmarks
 

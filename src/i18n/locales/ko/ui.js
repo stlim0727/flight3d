@@ -429,6 +429,7 @@ export default {
   "lobby.reason.aircraftLocked": "이 비행은 {aircraft} 전용이라 기체를 바꿀 수 없어요.",
   "lobby.reason.timeFixed": "이 지역은 시간대가 고정돼 있어 바꿀 수 없어요.",
   "lobby.map.dialogHint": "장소를 검색하거나 지도에서 지점을 선택하세요",
+  "lobby.map.confirm": "선택 완료",
   "lobby.map.resetView": "전체 지도",
   "lobby.map.zoomIn": "확대",
   "lobby.map.zoomOut": "축소",
